@@ -352,37 +352,19 @@ class PreprocessTab(QWidget):
         preview_layout.setContentsMargins(8, 12, 8, 8)
         preview_layout.setSpacing(6)
         
-        # 预览图片显示区域（两张图片）
-        preview_row = QHBoxLayout()
-        preview_row.setSpacing(6)
-        
-        self.preview_label_1 = QLabel()
-        self.preview_label_1.setMinimumSize(150, 150)
-        self.preview_label_1.setAlignment(Qt.AlignCenter)
-        self.preview_label_1.setStyleSheet(f'''QLabel {{
+        # 预览图片显示区域
+        self.preview_label = QLabel()
+        self.preview_label.setMinimumSize(150, 150)
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        self.preview_label.setStyleSheet(f'''QLabel {{
             background: {BG};
             border: 1px solid {BORDER};
             border-radius: 4px;
             color: {TEXT3};
             font-size: 12px;
         }}''')
-        self.preview_label_1.setText('—')
-        preview_row.addWidget(self.preview_label_1, 1)
-        
-        self.preview_label_2 = QLabel()
-        self.preview_label_2.setMinimumSize(150, 150)
-        self.preview_label_2.setAlignment(Qt.AlignCenter)
-        self.preview_label_2.setStyleSheet(f'''QLabel {{
-            background: {BG};
-            border: 1px solid {BORDER};
-            border-radius: 4px;
-            color: {TEXT3};
-            font-size: 12px;
-        }}''')
-        self.preview_label_2.setText('—')
-        preview_row.addWidget(self.preview_label_2, 1)
-        
-        preview_layout.addLayout(preview_row, 1)
+        self.preview_label.setText('—')
+        preview_layout.addWidget(self.preview_label, 1)
         
         # 统计信息
         self.preview_stats = QLabel('0 images processed')
@@ -587,26 +569,18 @@ class PreprocessTab(QWidget):
             current_count = int(self.preview_stats.text().split()[0]) + 1
             self.preview_stats.setText(f'{current_count} images processed')
             
-            # 交替更新两张预览图片
             pixmap = QPixmap(image_path)
             if not pixmap.isNull():
-                # 根据奇偶数决定更新哪个标签
-                if current_count % 2 == 1:
-                    target_label = self.preview_label_1
-                else:
-                    target_label = self.preview_label_2
-                
-                # 缩放到标签大小，保持宽高比
                 scaled_pixmap = pixmap.scaled(
-                    target_label.width(), 
-                    target_label.height(), 
+                    self.preview_label.width(), 
+                    self.preview_label.height(), 
                     Qt.KeepAspectRatio, 
                     Qt.SmoothTransformation
                 )
-                target_label.setPixmap(scaled_pixmap)
-                target_label.setText('')  # 清除占位符文本
+                self.preview_label.setPixmap(scaled_pixmap)
+                self.preview_label.setText('')
         except Exception as e:
-            pass  # 忽略预览更新错误
+            pass
 
     def _on_done(self, ok, msg):
         self.start_btn.setEnabled(True)

@@ -541,6 +541,7 @@ class LabelTab(QWidget):
         self._auto_anns = {}             # {str(img_path): [dict, ...]}
         self._is_auto_mode = False
         self._has_unsaved = False
+        self._pending_delete_path = None
         self._worker = None
         self._export_worker = None
         self._class_ids = []
@@ -646,11 +647,42 @@ class LabelTab(QWidget):
     def _build_center(self):
         mid = QWidget()
         mid.setStyleSheet(f"background:#f0f0f0;border:1px solid {BORDER};border-radius:6px;")
-        mid.setMinimumSize(640 + 8, 640 + 8)  # 640的画布 + 8内边距(4*2)
+        mid.setMinimumSize(640 + 8, 640 + 8)
         lo = QVBoxLayout(mid)
         lo.setContentsMargins(4, 4, 4, 4)
-        lo.setSpacing(0)
+        lo.setSpacing(4)
         lo.addWidget(self.canvas, alignment=Qt.AlignCenter)
+
+        # 删除确认栏（位于画布下方）
+        self._delete_confirm = QWidget()
+        self._delete_confirm.setStyleSheet(f"background:#fff3cd;border:1px solid #ffc107;border-radius:6px;")
+        self._delete_confirm.setVisible(False)
+        confirm_lo = QHBoxLayout(self._delete_confirm)
+        confirm_lo.setContentsMargins(12, 8, 12, 8)
+        confirm_lo.setSpacing(8)
+
+        self._confirm_msg = QLabel()
+        self._confirm_msg.setStyleSheet("font-size:12px;font-weight:500;color:#856404;background:transparent;")
+        self._confirm_msg.setWordWrap(True)
+        confirm_lo.addWidget(self._confirm_msg, 1)
+
+        yes_btn = QPushButton("Yes, Delete")
+        yes_btn.setStyleSheet(
+            "QPushButton { background:#dc3545;color:#fff;border:none;border-radius:4px;"
+            "padding:6px 16px;font-size:11px;font-weight:600; }"
+            "QPushButton:hover { background:#c82333; }")
+        yes_btn.clicked.connect(self._confirm_delete_image)
+        confirm_lo.addWidget(yes_btn)
+
+        no_btn = QPushButton("Cancel")
+        no_btn.setStyleSheet(
+            "QPushButton { background:#fff;color:#6c757d;border:1px solid #ced4da;border-radius:4px;"
+            "padding:6px 16px;font-size:11px;font-weight:500; }"
+            "QPushButton:hover { background:#f8f9fa; }")
+        no_btn.clicked.connect(lambda: self._delete_confirm.setVisible(False))
+        confirm_lo.addWidget(no_btn)
+
+        lo.addWidget(self._delete_confirm)
         return mid
 
     def _build_right_panel(self):
@@ -1347,22 +1379,22 @@ class LabelTab(QWidget):
             return
         
         current_path = self._image_paths[self._current_idx]
-        
-        # 确认删除
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("Delete Image")
-        msg.setText(f"Are you sure you want to delete this image?")
-        msg.setInformativeText(f"{current_path.name}\n\nPress <b>Space</b> or <b>Enter</b> to confirm, <b>Esc</b> to cancel")
-        msg.setTextFormat(Qt.RichText)  # 启用富文本格式以支持 HTML
-        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg.setDefaultButton(QMessageBox.Yes)
-        msg.button(QMessageBox.Yes).setShortcut(Qt.Key_Space)
-        reply = msg.exec_()
-        
-        if reply != QMessageBox.Yes:
+        boxes = len(self.canvas.annotations)
+        self._pending_delete_path = current_path
+        self._confirm_msg.setText(
+            f"Delete this image and{' its' if boxes else ''} data? "
+            f"<b>{current_path.name}</b> "
+            f"({boxes} box{'es' if boxes != 1 else ''}) — This cannot be undone."
+        )
+        self._delete_confirm.setVisible(True)
+
+    def _confirm_delete_image(self):
+        """执行删除图片操作（确认后）"""
+        self._delete_confirm.setVisible(False)
+        current_path = self._pending_delete_path
+        if current_path is None:
             return
-        
+
         try:
             # 删除图片文件
             if current_path.exists():

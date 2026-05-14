@@ -18,6 +18,7 @@ from scripts.tabs.export import ExportTab
 from scripts.tabs.predict import PredictTab
 from scripts.tabs.preprocess import PreprocessTab
 from scripts.tabs.label import LabelTab
+from scripts.tabs.guide import GuideTab
 from scripts.tabs.base import *
 
 
@@ -58,6 +59,7 @@ class Studio(QMainWindow):
         ml.addWidget(h)
 
         tabs = QTabWidget(); ml.addWidget(tabs, 1)
+        self.guide_tab = GuideTab(self); tabs.addTab(self.guide_tab, '◈ Guide')
         self.train_tab = TrainTab(self); tabs.addTab(self.train_tab, 'Training')
         self.val_tab = ValTab(self); tabs.addTab(self.val_tab, 'Validate')
 
@@ -70,7 +72,6 @@ class Studio(QMainWindow):
         self.export_tab = ExportTab(self); tabs.addTab(self.export_tab, 'Export')
 
     def _start_sys_monitor(self):
-        self._sys_data = {}
         self._sys_timer = QTimer()
         self._sys_timer.timeout.connect(self._update_sys)
         self._sys_timer.start(2000)

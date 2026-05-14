@@ -12,7 +12,7 @@ class PredictTab(QWidget):
         self._model_path = None
         self._source_path = None
         self._worker = None
-        self._mode = None  # 'video' | 'image' | 'folder'
+        self._mode = None
         self._build()
         self._load_latest()
 
@@ -22,6 +22,14 @@ class PredictTab(QWidget):
         # ── Left Panel ──
         left = QWidget(); left.setFixedWidth(320)
         ll = QVBoxLayout(left); ll.setSpacing(5); ll.setContentsMargins(0,0,0,0)
+
+        def _card(label=None):
+            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
+            cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
+            if label:
+                lbl = QLabel(label); lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
+                lbl.setFixedHeight(22); cl.addWidget(lbl)
+            return cw, cl
 
         # Input
         g1 = QGroupBox('Input')
@@ -34,7 +42,7 @@ class PredictTab(QWidget):
         g1l.addLayout(mr)
         g1l.addWidget(QLabel('Source', styleSheet=f'font-size:9px;color:{TEXT2};font-weight:500;'))
         sr = QHBoxLayout()
-        self.lbl_src = QLineEdit(''); self.lbl_src.setPlaceholderText('Image / Video / Folder'); self.lbl_src.setStyleSheet(f'font-size:10px;color:{TEXT};')
+        self.lbl_src = QLineEdit(''); self.lbl_src.setPlaceholderText('Image / Video / Folder')
         sr.addWidget(self.lbl_src,1)
         btn_src = QPushButton('Browse'); btn_src.clicked.connect(self._browse_src); sr.addWidget(btn_src)
         g1l.addLayout(sr); ll.addWidget(g1)
@@ -49,9 +57,7 @@ class PredictTab(QWidget):
         self.sp_iou = QDoubleSpinBox(); self.sp_iou.setRange(0.01,0.99); self.sp_iou.setValue(p['iou'])
         self.sp_iou.setSingleStep(0.05); self.sp_iou.setDecimals(2)
         for name, w, rc in [('Conf',self.sp_conf,(0,0)),('IoU',self.sp_iou,(0,1))]:
-            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
-            cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
-            cl.addWidget(QLabel(name, styleSheet=f'font-size:9px;color:{TEXT};font-weight:500;'))
+            cw, cl = _card(name)
             w.setMinimumHeight(22); cl.addWidget(w,1); g2l.addWidget(cw,*rc)
         ll.addWidget(g2)
 
@@ -74,11 +80,12 @@ class PredictTab(QWidget):
         # Stats
         st = QHBoxLayout()
         for lbl,col,attr in [('Images/Frame',PRI,'_st_imgs'),('Detections',GREEN,'_st_dets'),('Fallen',RED,'_st_fall')]:
-            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:5px;')
-            cl2 = QVBoxLayout(cw); cl2.setContentsMargins(6,4,6,4); cl2.setSpacing(0)
-            cl2.addWidget(QLabel(lbl, styleSheet=f'font-size:7px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
-            v = QLabel('0'); v.setStyleSheet(f'font-size:18px;font-weight:700;color:{col};qproperty-alignment:AlignCenter;')
-            setattr(self,attr,v); cl2.addWidget(v); st.addWidget(cw,1)
+            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:6px;padding:6px;')
+            cl2 = QVBoxLayout(cw); cl2.setContentsMargins(8,6,8,6); cl2.setSpacing(2)
+            v = QLabel('0'); v.setStyleSheet(f'font-size:18px;font-weight:600;color:{col};qproperty-alignment:AlignCenter;')
+            setattr(self, attr, v); cl2.addWidget(v)
+            cl2.addWidget(QLabel(lbl, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
+            st.addWidget(cw,1)
         g3l.addLayout(st)
         self.lbl_fps = QLabel(''); self.lbl_fps.setStyleSheet(f'font-size:10px;color:{TEXT3};')
         g3l.addWidget(self.lbl_fps)
@@ -101,7 +108,7 @@ class PredictTab(QWidget):
         ll.addWidget(self.log)
         ll.addStretch(); lo.addWidget(left)
 
-        # ── Right Panel ──
+        # ── Right Panel ─
         self.stack = QStackedWidget()
         # Page 0: Video display
         self.video_view = QLabel('Load model & source then start')
