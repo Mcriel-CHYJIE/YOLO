@@ -25,44 +25,53 @@ class DatasetTab(QWidget):
     # ═══════════════ BUILD ═══════════════
 
     def _build(self):
-        lo = QVBoxLayout(self); lo.setContentsMargins(8,8,8,8); lo.setSpacing(6)
+        lo = QHBoxLayout(self); lo.setContentsMargins(8,8,8,8); lo.setSpacing(8)
 
-        # ─ Row 1: Stats Summary + Controls (合并为一行) ──
-        sw = QWidget(); sw.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
-        sl = QHBoxLayout(sw); sl.setContentsMargins(16,8,16,8); sl.setSpacing(12)
-        
+        # ── Left Panel: Stats + Controls + Class Distribution ──
+        left_panel = QWidget()
+        left_panel.setFixedWidth(260)
+        left_panel.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
+        left_lo = QVBoxLayout(left_panel); left_lo.setContentsMargins(12,12,12,12); left_lo.setSpacing(8)
+
         # Title
         title_lbl = QLabel('📊 Dataset Preview')
-        title_lbl.setStyleSheet(f'font-size:13px;font-weight:600;color:{TEXT};')
-        sl.addWidget(title_lbl)
-        sl.addSpacing(10)
-        
-        sl.addWidget(self._sep())
-        sl.addSpacing(4)
+        title_lbl.setStyleSheet(f'font-size:14px;font-weight:600;color:{TEXT};')
+        left_lo.addWidget(title_lbl)
+
+        # Stats blocks
+        stats_widget = QWidget(); stats_widget.setStyleSheet('background:transparent;border:none;')
+        stats_lo = QVBoxLayout(stats_widget); stats_lo.setContentsMargins(0,8,0,8); stats_lo.setSpacing(6)
         
         self._st_total, self._st_total_v = self._stat_block('Total', '—')
-        sl.addWidget(self._st_total)
+        stats_lo.addWidget(self._st_total)
         
         self._st_lbl, self._st_lbl_v = self._stat_block('Labeled', '—')
-        sl.addWidget(self._st_lbl)
+        stats_lo.addWidget(self._st_lbl)
         
         self._st_cls, self._st_cls_v = self._stat_block('Classes', '—')
-        sl.addWidget(self._st_cls)
+        stats_lo.addWidget(self._st_cls)
         
-        sl.addSpacing(12)
-        sl.addWidget(self._sep())
-        sl.addSpacing(4)
+        left_lo.addWidget(stats_widget)
+
+        # Separator
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet(f'background:{BORDER};border:none;height:1px;')
+        left_lo.addWidget(sep)
+
+        # Controls
+        controls_widget = QWidget(); controls_widget.setStyleSheet('background:transparent;border:none;')
+        controls_lo = QVBoxLayout(controls_widget); controls_lo.setContentsMargins(0,4,0,4); controls_lo.setSpacing(6)
+
+        # Split selector
+        split_row = QWidget(); split_row.setStyleSheet('background:transparent;border:none;')
+        split_lo = QHBoxLayout(split_row); split_lo.setContentsMargins(0,0,0,0); split_lo.setSpacing(8)
         
-        # Controls (合并到同一行)
-        # Split 标签
         split_label = QLabel('Split')
         split_label.setStyleSheet(f'font-size:11px;color:{TEXT2};font-weight:500;')
-        sl.addWidget(split_label)
+        split_lo.addWidget(split_label)
         
-        # Split 下拉框
         self.dp_split = QComboBox()
         self.dp_split.addItems(['train', 'val'])
-        self.dp_split.setFixedWidth(90)
         self.dp_split.setStyleSheet(f'''
             QComboBox {{
                 background: {CARD};
@@ -84,19 +93,24 @@ class DatasetTab(QWidget):
             }}
         ''')
         self.dp_split.currentIndexChanged.connect(lambda: self._dp_refresh())
-        sl.addWidget(self.dp_split)
+        split_lo.addWidget(self.dp_split)
+        split_lo.addStretch()
         
-        # Refresh 按钮
+        controls_lo.addWidget(split_row)
+
+        # Buttons row
+        btn_row = QWidget(); btn_row.setStyleSheet('background:transparent;border:none;')
+        btn_lo = QHBoxLayout(btn_row); btn_lo.setContentsMargins(0,0,0,0); btn_lo.setSpacing(6)
+        
         self.dp_rf = QPushButton('🔄 Refresh')
         self.dp_rf.setObjectName('pri')
-        self.dp_rf.setFixedWidth(90)
         self.dp_rf.setStyleSheet(f'''
             QPushButton {{
                 background: {PRI};
                 color: #fff;
                 border: none;
                 border-radius: 4px;
-                padding: 5px 12px;
+                padding: 6px 12px;
                 font-size: 11px;
                 font-weight: 500;
             }}
@@ -111,19 +125,17 @@ class DatasetTab(QWidget):
             }}
         ''')
         self.dp_rf.clicked.connect(self._dp_refresh)
-        sl.addWidget(self.dp_rf)
+        btn_lo.addWidget(self.dp_rf)
         
-        # Import 按钮
         self.dp_import = QPushButton('📥 Import')
         self.dp_import.setObjectName('pri')
-        self.dp_import.setFixedWidth(80)
         self.dp_import.setStyleSheet(f'''
             QPushButton {{
                 background: #10b981;
                 color: #fff;
                 border: none;
                 border-radius: 4px;
-                padding: 5px 12px;
+                padding: 6px 12px;
                 font-size: 11px;
                 font-weight: 500;
             }}
@@ -138,19 +150,17 @@ class DatasetTab(QWidget):
             }}
         ''')
         self.dp_import.clicked.connect(self._import_dataset)
-        sl.addWidget(self.dp_import)
+        btn_lo.addWidget(self.dp_import)
         
-        # Fix YAML 按钮（用于修复现有配置）
         self.dp_fix_yaml = QPushButton('🔧 Fix YAML')
         self.dp_fix_yaml.setObjectName('pri')
-        self.dp_fix_yaml.setFixedWidth(80)
         self.dp_fix_yaml.setStyleSheet(f'''
             QPushButton {{
                 background: #f59e0b;
                 color: #fff;
                 border: none;
                 border-radius: 4px;
-                padding: 5px 12px;
+                padding: 6px 12px;
                 font-size: 11px;
                 font-weight: 500;
             }}
@@ -165,22 +175,48 @@ class DatasetTab(QWidget):
             }}
         ''')
         self.dp_fix_yaml.clicked.connect(self._fix_yaml_config)
-        sl.addWidget(self.dp_fix_yaml)
+        btn_lo.addWidget(self.dp_fix_yaml)
         
-        sl.addStretch()
-        
-        self.dp_info = QLabel('')
-        self.dp_info.setStyleSheet(f'font-size:9px;color:{TEXT3};')
-        sl.addWidget(self.dp_info)
-        
-        lo.addWidget(sw)
+        controls_lo.addWidget(btn_row)
+        left_lo.addWidget(controls_widget)
 
-        # ─ Row 3: Image Grid ──
+        # Separator
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.HLine)
+        sep2.setStyleSheet(f'background:{BORDER};border:none;height:1px;')
+        left_lo.addWidget(sep2)
+
+        # Class Distribution
+        cs_header = QLabel('📊 Class Distribution')
+        cs_header.setStyleSheet(f'font-size:12px;font-weight:600;color:{TEXT};')
+        left_lo.addWidget(cs_header)
+
+        self._cs_grid = QGridLayout()
+        self._cs_grid.setSpacing(4)
+        self._cs_grid.setColumnStretch(0, 0)
+        self._cs_grid.setColumnStretch(1, 0)
+        self._cs_grid.setColumnStretch(2, 0)
+        self._cs_grid.setColumnStretch(3, 1)
+        left_lo.addLayout(self._cs_grid)
+
+        left_lo.addStretch()
+
+        # Status at bottom of left panel
+        self.dp_status = QLabel('Ready - Click Refresh to load dataset preview')
+        self.dp_status.setStyleSheet(f'font-size:9px;color:{TEXT2};padding:4px 0;')
+        left_lo.addWidget(self.dp_status)
+
+        lo.addWidget(left_panel)
+
+        # ── Right Panel: Image Grid ──
+        right_panel = QWidget()
+        right_panel.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
+        right_lo = QVBoxLayout(right_panel); right_lo.setContentsMargins(8,8,8,8); right_lo.setSpacing(0)
+
         self._cols = 3
         sa = QScrollArea()
         sa.setWidgetResizable(True)
         sa.setStyleSheet(f'QScrollArea{{background:transparent;border:none;}}')
-        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         self.dp_grid = QWidget()
         self.dp_grid.setStyleSheet('background:transparent;')
@@ -190,12 +226,9 @@ class DatasetTab(QWidget):
         self.dp_gl.setContentsMargins(0, 0, 0, 0)
         
         sa.setWidget(self.dp_grid)
-        lo.addWidget(sa, 1)
+        right_lo.addWidget(sa)
 
-        # ── Bottom: Status ──
-        self.dp_status = QLabel('Ready')
-        self.dp_status.setStyleSheet(f'font-size:9px;color:{TEXT2};padding:2px 4px;')
-        lo.addWidget(self.dp_status)
+        lo.addWidget(right_panel, 1)
 
     def _stat_block(self, title, value, is_title=False):
         """创建统计块，同一行显示数值和标签"""
@@ -225,11 +258,6 @@ class DatasetTab(QWidget):
             l.addStretch()
             l.setAlignment(Qt.AlignVCenter)
             return w, v
-
-    def _sep(self):
-        s = QFrame(); s.setFrameShape(QFrame.VLine)
-        s.setStyleSheet(f'background:{BORDER};border:none;width:1px;max-width:1px;')
-        s.setFixedWidth(1); return s
 
     # ═══════════════ REFRESH ═══════════════
 
@@ -345,7 +373,7 @@ class DatasetTab(QWidget):
                 annos.append((cid, cn, color))
 
         # Thumbnail → QPixmap (bytes roundtrip avoids PIL.ImageQt fragility)
-        img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+        img.thumbnail((260, 260), Image.Resampling.LANCZOS)
         buf = BytesIO()
         img.save(buf, format='PNG')
         pix = QPixmap()
@@ -393,16 +421,79 @@ class DatasetTab(QWidget):
     # ═══════════════ HELPERS ═══════════════
 
     def _update_stats(self, total, labeled_imgs, labeled, cls_counter):
-        """更新摘要统计行"""
+        """更新摘要统计行 + 类分布"""
         self._st_total_v.setText(str(total))
         self._st_lbl_v.setText(str(labeled_imgs))
-        # Classes显示：数量和类别名称分开
         cls_count = len(self._names)
         self._st_cls_v.setText(str(cls_count))
-        # 在控件提示中显示完整类别名
         if self._names:
             cls_str = '  ' + ' '.join(str(n) for n in self._names)
             self._st_cls.setToolTip(f'Classes: {cls_str}')
+        self._update_class_stats(cls_counter, total)
+
+    def _update_class_stats(self, cls_counter, total_imgs):
+        """更新各类别详细统计"""
+        for i in reversed(range(self._cs_grid.count())):
+            w = self._cs_grid.itemAt(i).widget()
+            if w: w.deleteLater()
+
+        total_instances = sum(cls_counter.values()) if cls_counter else 0
+
+        if not cls_counter or not self._names:
+            placeholder = QLabel('Click Refresh to load class distribution')
+            placeholder.setStyleSheet(f'font-size:10px;color:{TEXT3};padding:10px 0;')
+            self._cs_grid.addWidget(placeholder, 0, 0, 1, 4)
+            return
+
+        # Headers
+        for c, txt in enumerate(['Class', 'Count', '%', 'Distribution']):
+            lbl = QLabel(txt)
+            lbl.setStyleSheet(f'font-size:9px;color:{TEXT3};font-weight:600;padding:2px 0;')
+            self._cs_grid.addWidget(lbl, 0, c)
+
+        # Image count info row
+        info = QLabel(f'{total_imgs} images  ·  {total_instances} instances')
+        info.setStyleSheet(f'font-size:9px;color:{TEXT2};padding:0 0 2px 0;')
+        self._cs_grid.addWidget(info, 1, 0, 1, 4)
+
+        for r, (cls_id, count) in enumerate(sorted(cls_counter.items()), start=2):
+            cls_name = self._names[cls_id] if cls_id < len(self._names) else f'cls{cls_id}'
+            pct = (count / total_instances * 100) if total_instances > 0 else 0
+            color = self.COLORS[cls_id % len(self.COLORS)]
+
+            # Name with colored dot
+            name_w = QWidget(); name_w.setStyleSheet('background:transparent;')
+            nl = QHBoxLayout(name_w); nl.setContentsMargins(0,0,0,0); nl.setSpacing(4)
+            dot = QLabel('●'); dot.setStyleSheet(f'color:{color};font-size:10px;')
+            nl.addWidget(dot)
+            nl.addWidget(QLabel(cls_name, styleSheet=f'font-size:10px;color:{TEXT};font-weight:500;'))
+            nl.addStretch()
+            self._cs_grid.addWidget(name_w, r, 0)
+
+            # Count
+            cl = QLabel(str(count))
+            cl.setStyleSheet(f'font-size:10px;color:{TEXT};')
+            self._cs_grid.addWidget(cl, r, 1)
+
+            # Percentage
+            pl = QLabel(f'{pct:.1f}%')
+            pl.setStyleSheet(f'font-size:10px;color:{TEXT2};')
+            self._cs_grid.addWidget(pl, r, 2)
+
+            # Bar
+            bar = QProgressBar()
+            bar.setFixedHeight(8); bar.setMinimum(0); bar.setMaximum(100)
+            bar.setValue(int(round(pct))); bar.setTextVisible(False)
+            bar.setStyleSheet(f'''
+                QProgressBar {{
+                    border:none; border-radius:4px; background:{BORDER};
+                    height:8px;
+                }}
+                QProgressBar::chunk {{
+                    background:{color}; border-radius:4px;
+                }}
+            ''')
+            self._cs_grid.addWidget(bar, r, 3)
 
     def _clear_grid(self):
         for i in reversed(range(self.dp_gl.count())):

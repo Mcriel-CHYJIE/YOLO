@@ -1,6 +1,10 @@
 """训练标签页"""
 from scripts.tabs.base import *
 
+PROG_RE = re.compile(r'\d+%\s+\d+/\d+')
+HTML_RE = re.compile(r'<[^>]+>')
+
+
 class TrainTab(QWidget):
     def __init__(self, studio):
         super().__init__()
@@ -10,15 +14,10 @@ class TrainTab(QWidget):
 
     def _build(self):
         lo = QHBoxLayout(self); lo.setContentsMargins(4,4,4,4); lo.setSpacing(6)
+
         # ── 左栏 ──
-        left = QWidget(); left.setFixedWidth(360)
+        left = QWidget(); left.setFixedWidth(340)
         ll = QVBoxLayout(left); ll.setSpacing(5); ll.setContentsMargins(0,0,0,0)
-        def _fi(w, label, r, c, grid=None):
-            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
-            cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
-            lbl = QLabel(label); lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
-            lbl.setFixedHeight(22); w.setMinimumHeight(22)
-            cl.addWidget(lbl); cl.addWidget(w, 1); grid.addWidget(cw, r, c)
 
         g1 = QGroupBox('Configuration')
         g1l = QGridLayout(g1); g1l.setSpacing(3); g1l.setContentsMargins(6,12,6,6)
@@ -26,32 +25,32 @@ class TrainTab(QWidget):
         t = cfg['training']
         self.m = QComboBox(); self.m.addItems(t['model_options'])
         self.m.setCurrentText(t['model'])
-        _fi(self.m,'Model',0,0,grid=g1l)
+        labeled_field(self.m,'Model',g1l,0,0)
         self.ep = QSpinBox(); self.ep.setRange(1,2000); self.ep.setValue(t['epochs'])
-        _fi(self.ep,'Epochs',0,1,grid=g1l)
+        labeled_field(self.ep,'Epochs',g1l,0,1)
         self.bs = QSpinBox(); self.bs.setRange(1,256); self.bs.setValue(t['batch'])
-        _fi(self.bs,'Batch',1,0,grid=g1l)
+        labeled_field(self.bs,'Batch',g1l,1,0)
         self.sz = QComboBox(); self.sz.addItems([str(v) for v in t['imgsz_options']])
         self.sz.setCurrentText(str(t['imgsz']))
-        _fi(self.sz,'ImgSz',1,1,grid=g1l)
+        labeled_field(self.sz,'ImgSz',g1l,1,1)
         self.opt = QComboBox(); self.opt.addItems(t['optimizer_options'])
         self.opt.setCurrentText(t['optimizer'])
-        _fi(self.opt,'Optimizer',2,0,grid=g1l)
+        labeled_field(self.opt,'Optimizer',g1l,2,0)
         self.dev = QComboBox(); self.dev.addItems(['GPU','CPU'])
-        _fi(self.dev,'Device',2,1,grid=g1l)
+        labeled_field(self.dev,'Device',g1l,2,1)
         self.sch = QComboBox(); self.sch.addItems(t['scheduler_options'])
         self.sch.setCurrentText(t['scheduler'].capitalize())
-        _fi(self.sch,'Schedule',3,0,grid=g1l)
+        labeled_field(self.sch,'Schedule',g1l,3,0)
         self.pt = QSpinBox(); self.pt.setRange(5,500); self.pt.setValue(t['patience'])
-        _fi(self.pt,'Patience',3,1,grid=g1l)
+        labeled_field(self.pt,'Patience',g1l,3,1)
         self.lr0 = QDoubleSpinBox(); self.lr0.setRange(1e-6,1); self.lr0.setDecimals(6); self.lr0.setValue(t['lr0'])
-        _fi(self.lr0,'LR',4,0,grid=g1l)
+        labeled_field(self.lr0,'LR',g1l,4,0)
         self.lrf = QDoubleSpinBox(); self.lrf.setRange(1e-6,1); self.lrf.setDecimals(6); self.lrf.setValue(t['lrf'])
-        _fi(self.lrf,'LR Final',4,1,grid=g1l)
+        labeled_field(self.lrf,'LR Final',g1l,4,1)
         self.wu = QSpinBox(); self.wu.setRange(0,50); self.wu.setValue(t['warmup_epochs'])
-        _fi(self.wu,'Warmup',5,0,grid=g1l)
+        labeled_field(self.wu,'Warmup',g1l,5,0)
         self.wk = QSpinBox(); self.wk.setRange(1,32); self.wk.setValue(min(t['workers'], self.studio.cpu_count))
-        _fi(self.wk,'Workers',5,1,grid=g1l)
+        labeled_field(self.wk,'Workers',g1l,5,1)
         if not self.studio.gpu_ok: self.dev.setCurrentIndex(1)
         else:
             self.dev.setCurrentText('GPU' if t['device'] in ('auto', '0', 'GPU') else 'CPU')
@@ -63,21 +62,21 @@ class TrainTab(QWidget):
         a = cfg['training']
         self.fl = QDoubleSpinBox(); self.fl.setRange(0,5); self.fl.setDecimals(1); self.fl.setSingleStep(0.5)
         self.fl.setValue(a['fl_gamma'])
-        _fi(self.fl,'Focal γ',0,0,grid=g2l)
+        labeled_field(self.fl,'Focal γ',g2l,0,0)
         self.sm = QDoubleSpinBox(); self.sm.setRange(0,.5); self.sm.setDecimals(2); self.sm.setSingleStep(.05)
         self.sm.setValue(a['label_smoothing'])
-        _fi(self.sm,'Smoothing',0,1,grid=g2l)
+        labeled_field(self.sm,'Smoothing',g2l,0,1)
         self.iou_thresh = QDoubleSpinBox(); self.iou_thresh.setRange(0.1,0.9); self.iou_thresh.setDecimals(2); self.iou_thresh.setSingleStep(0.05)
         self.iou_thresh.setValue(a['iou'])
-        _fi(self.iou_thresh,'IoU',1,0,grid=g2l)
+        labeled_field(self.iou_thresh,'IoU',g2l,1,0)
         self.cm = QSpinBox(); self.cm.setRange(0,100); self.cm.setValue(a['close_mosaic'])
-        _fi(self.cm,'Close Mosaic',1,1,grid=g2l)
+        labeled_field(self.cm,'Close Mosaic',g2l,1,1)
         self.cp = QDoubleSpinBox(); self.cp.setRange(0,1); self.cp.setDecimals(2); self.cp.setSingleStep(.1)
         self.cp.setValue(a['copy_paste'])
-        _fi(self.cp,'Copy-Paste',2,0,grid=g2l)
+        labeled_field(self.cp,'Copy-Paste',g2l,2,0)
         self.dg = QDoubleSpinBox(); self.dg.setRange(0,45); self.dg.setDecimals(1); self.dg.setSingleStep(5)
         self.dg.setValue(a['degrees'])
-        _fi(self.dg,'Rotation',2,1,grid=g2l)
+        labeled_field(self.dg,'Rotation',g2l,2,1)
         cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
         cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
         lbl = QLabel('Multi-Scale'); lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
@@ -103,14 +102,14 @@ class TrainTab(QWidget):
         br.addWidget(self.bs1,1); br.addWidget(self.bs2,1)
         g3l.addLayout(br)
         self.pg = QProgressBar(); self.pg.setTextVisible(False); g3l.addWidget(self.pg)
+
         mr = QHBoxLayout(); mr.setSpacing(8)
-        for lbl, attr, col in [('Epoch','_me',TEXT), ('mAP@0.5','_mm',GREEN), ('Best','_mb',PRI)]:
-            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:6px;padding:6px;')
-            cl2 = QVBoxLayout(cw); cl2.setContentsMargins(8,6,8,6); cl2.setSpacing(2)
-            v = QLabel('0'); v.setStyleSheet(f'font-size:18px;font-weight:600;color:{col};qproperty-alignment:AlignCenter;')
-            setattr(self, attr, v); cl2.addWidget(v)
-            cl2.addWidget(QLabel(lbl, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
-            mr.addWidget(cw,1)
+        self._me_card = MetricCard('Epoch', TEXT)
+        self._me = self._me_card.value_label; mr.addWidget(self._me_card, 1)
+        self._mm_card = MetricCard('mAP@0.5', GREEN, '—')
+        self._mm = self._mm_card.value_label; mr.addWidget(self._mm_card, 1)
+        self._mb_card = MetricCard('Best', PRI, '—')
+        self._mb = self._mb_card.value_label; mr.addWidget(self._mb_card, 1)
         g3l.addLayout(mr)
         ll.addWidget(g3)
         lo.addWidget(left)
@@ -136,36 +135,19 @@ class TrainTab(QWidget):
         bottom_layout = QHBoxLayout(bottom)
         bottom_layout.setContentsMargins(0,0,0,0)
         bottom_layout.setSpacing(5)
-        
-        # 左：日志面板
-        lw = QWidget(); lw.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
-        lo2 = QVBoxLayout(lw); lo2.setContentsMargins(6,4,6,6); lo2.setSpacing(4)
-        h = QWidget(); h.setStyleSheet('background:transparent;border:none;')
-        hl = QHBoxLayout(h); hl.setContentsMargins(2,0,2,0); hl.setSpacing(6)
-        hl.addWidget(QLabel('● Console', styleSheet=f'font-size:10px;font-weight:600;color:{TEXT3};')); hl.addStretch()
-        self.log_count_label = QLabel('0 lines'); self.log_count_label.setStyleSheet(f'font-size:9px;color:{TEXT3};')
-        hl.addWidget(self.log_count_label)
-        clear_btn = QPushButton('Clear'); clear_btn.setObjectName('danger')
-        clear_btn.setStyleSheet('padding:2px 8px;min-height:18px;font-size:10px;')
-        clear_btn.clicked.connect(self._clear_log)
-        hl.addWidget(clear_btn); lo2.addWidget(h)
-        self.lo = QTextEdit(); self.lo.setReadOnly(True)
-        self.lo.setStyleSheet(f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:5px;padding:8px 10px;font-family:"Consolas","Courier New",monospace;font-size:13px;line-height:1.4;}}')
-        self._log_lines = []; self._max_log_lines = 500
-        lo2.addWidget(self.lo)
-        bottom_layout.addWidget(lw, 1)
-        
+
+        self.log_panel = LogPanel('● Console', max_lines=500)
+        bottom_layout.addWidget(self.log_panel, 3)
+
         # 右：系统监控面板
         mw = QWidget(); mw.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
-        mw.setFixedWidth(160)
-        mvl = QVBoxLayout(mw); mvl.setContentsMargins(10,12,10,12); mvl.setSpacing(12)
-        
-        # 监控标题
-        title = QLabel('● System Monitor')
+        mw.setFixedWidth(100)
+        mvl = QVBoxLayout(mw); mvl.setContentsMargins(8,8,8,8); mvl.setSpacing(4)
+
+        title = QLabel('● System')
         title.setStyleSheet(f'font-size:10px;font-weight:600;color:{TEXT3};')
         mvl.addWidget(title)
-        
-        # 监控指标
+
         monitors = [
             ('CPU', 'CPU'),
             ('MEM', 'Memory'),
@@ -174,55 +156,28 @@ class TrainTab(QWidget):
         if self.studio.gpu_ok:
             monitors.append(('VRM', 'VRAM'))
             monitors.append(('GPU', 'GPU'))
-        
+
         for key, label in monitors:
             item = QWidget()
             item.setStyleSheet('background:transparent;border:none;')
             item_layout = QHBoxLayout(item)
             item_layout.setContentsMargins(0,0,0,0)
-            item_layout.setSpacing(6)
-            
-            # 名称标签
+            item_layout.setSpacing(0)
             lbl = QLabel(label)
             lbl.setStyleSheet(f'font-size:10px;font-weight:500;color:{TEXT2};')
-            lbl.setFixedWidth(50)
+            lbl.setAlignment(Qt.AlignLeft)
+            lbl.setFixedWidth(35)
             item_layout.addWidget(lbl)
-            
-            # 进度条
-            bar = QProgressBar()
-            bar.setTextVisible(False)
-            bar.setFixedHeight(8)
-            bar.setStyleSheet(f'''
-                QProgressBar {{
-                    border: none;
-                    border-radius: 4px;
-                    height: 8px;
-                    background: {BORDER};
-                    text-align: center;
-                }}
-                QProgressBar::chunk {{
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {PRI}, stop:1 #8b5cf6);
-                    border-radius: 4px;
-                }}
-            ''')
-            item_layout.addWidget(bar, 1)
-            
-            # 百分比数值
             val = QLabel('0%')
             val.setStyleSheet(f'font-size:10px;font-weight:600;color:{TEXT};')
-            val.setFixedWidth(35)
-            val.setAlignment(Qt.AlignCenter)
-            item_layout.addWidget(val)
-            
+            val.setAlignment(Qt.AlignRight)
+            item_layout.addWidget(val, 1)
             mvl.addWidget(item)
-            
-            # 注册到studio的监控数据
-            self.studio._sys_data[key] = [bar, val]
-        
+            self.studio._sys_data[key] = [val]
+
         bottom_layout.addWidget(mw)
-        
         rl.addWidget(bottom, 2)
-        lo.addWidget(right,1)
+        lo.addWidget(right, 1)
 
     def _config(self):
         s = lambda w: w.currentText()
@@ -241,8 +196,9 @@ class TrainTab(QWidget):
             QMessageBox.warning(self, 'Warning', 'Training is in progress, please stop the current training first!'); return
         self.trainer = None
         self.bs1.setEnabled(False); self.bs2.setEnabled(True); self._enable_params(False)
-        self.lo.clear(); self.pg.setValue(0); self._me.setText('0'); self._mm.setText('—'); self._mb.setText('—')
-        self.lc.upd({}); self.mc.upd({}); self._log_lines = []; self.log_count_label.setText('0 lines')
+        self.log_panel.clear(); self.pg.setValue(0)
+        self._me.setText('0'); self._mm.setText('—'); self._mb.setText('—')
+        self.lc.upd({}); self.mc.upd({})
         cfg = self._config()
         self._log(f'🚀 {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
         self.trainer = Trainer(cfg)
@@ -272,33 +228,11 @@ class TrainTab(QWidget):
 
     def _log(self, msg):
         ts = datetime.now().strftime('%H:%M:%S')
-        is_prog = bool(__import__('re').search(r'\d+%\s+\d+/\d+', msg))
-        if is_prog and self._log_lines:
-            last = self._log_lines[-1]
-            text = __import__('re').sub(r'<[^>]+>', '', last)
-            if __import__('re').search(r'\d+%\s+\d+/\d+', text):
-                self._log_lines[-1] = self._fmt(ts, msg)
-                self.lo.setHtml('\n'.join(self._log_lines))
-                self.lo.verticalScrollBar().setValue(self.lo.verticalScrollBar().maximum())
+        is_prog = bool(PROG_RE.search(msg))
+        if is_prog and self.log_panel._log_lines:
+            last = self.log_panel._log_lines[-1]
+            text = HTML_RE.sub('', last)
+            if PROG_RE.search(text):
+                self.log_panel.replace_last(format_log(ts, msg))
                 return
-        self._log_lines.append(self._fmt(ts, msg))
-        if len(self._log_lines) > self._max_log_lines:
-            self._log_lines = self._log_lines[-self._max_log_lines:]
-            self.lo.setHtml('\n'.join(self._log_lines))
-        else:
-            self.lo.append(self._log_lines[-1])
-        self.lo.verticalScrollBar().setValue(self.lo.verticalScrollBar().maximum())
-        self.log_count_label.setText(f'{len(self._log_lines)} lines')
-
-    def _fmt(self, ts, msg):
-        color = CON_T
-        if '✅' in msg or 'Done' in msg: color = GREEN
-        elif '❌' in msg or 'Failed' in msg: color = RED
-        elif '⚠️' in msg: color = AMBER
-        elif '🚀' in msg or 'Epoch' in msg: color = '#a5b4fc'
-        elif '📁' in msg: color = TEXT3
-        elif __import__('re').search(r'\d+%\s+\d+/\d+', msg): color = '#9ca3af'
-        return f'<span style="color:#6b7280">[{ts}]</span> <span style="color:{color}">{msg}</span>'
-
-    def _clear_log(self):
-        self.lo.clear(); self._log_lines = []; self.log_count_label.setText('0 lines')
+        self.log_panel.append(format_log(ts, msg))

@@ -59,7 +59,7 @@ class Studio(QMainWindow):
         ml.addWidget(h)
 
         tabs = QTabWidget(); ml.addWidget(tabs, 1)
-        self.guide_tab = GuideTab(self); tabs.addTab(self.guide_tab, '◈ Guide')
+
         self.train_tab = TrainTab(self); tabs.addTab(self.train_tab, 'Training')
         self.val_tab = ValTab(self); tabs.addTab(self.val_tab, 'Validate')
 
@@ -68,8 +68,11 @@ class Studio(QMainWindow):
         
         self.preprocess_tab = PreprocessTab(self); tabs.addTab(self.preprocess_tab, 'Preprocess')
         self.label_tab = LabelTab(self); tabs.addTab(self.label_tab, 'Label')
+
         self.distill_tab = DistillTab(self); tabs.addTab(self.distill_tab, 'Distill')
         self.export_tab = ExportTab(self); tabs.addTab(self.export_tab, 'Export')
+
+        self.guide_tab = GuideTab(self); tabs.addTab(self.guide_tab, 'Guide')
 
     def _start_sys_monitor(self):
         self._sys_timer = QTimer()
@@ -77,7 +80,6 @@ class Studio(QMainWindow):
         self._sys_timer.start(2000)
 
     def _update_sys(self):
-        # 移除空字典检查，允许后续注册监控组件
         if not hasattr(self, '_sys_data'):
             return
         try:
@@ -86,14 +88,11 @@ class Studio(QMainWindow):
             mem = psutil.virtual_memory().percent
             disk = psutil.disk_usage('/').percent
             if 'CPU' in self._sys_data:
-                self._sys_data['CPU'][0].setValue(int(cpu))
-                self._sys_data['CPU'][1].setText(f'{cpu:.0f}%')
+                self._sys_data['CPU'][0].setText(f'{cpu:.0f}%')
             if 'MEM' in self._sys_data:
-                self._sys_data['MEM'][0].setValue(int(mem))
-                self._sys_data['MEM'][1].setText(f'{mem:.0f}%')
+                self._sys_data['MEM'][0].setText(f'{mem:.0f}%')
             if 'DSK' in self._sys_data:
-                self._sys_data['DSK'][0].setValue(int(disk))
-                self._sys_data['DSK'][1].setText(f'{disk:.0f}%')
+                self._sys_data['DSK'][0].setText(f'{disk:.0f}%')
         except: pass
         try:
             import torch
@@ -101,8 +100,7 @@ class Studio(QMainWindow):
                 free, total = torch.cuda.mem_get_info()
                 vram = (total - free) / total * 100
                 if 'VRM' in self._sys_data:
-                    self._sys_data['VRM'][0].setValue(int(vram))
-                    self._sys_data['VRM'][1].setText(f'{vram:.0f}%')
+                    self._sys_data['VRM'][0].setText(f'{vram:.0f}%')
         except: pass
         try:
             import subprocess
@@ -111,8 +109,7 @@ class Studio(QMainWindow):
             if r.returncode == 0 and r.stdout.strip():
                 gpu = float(r.stdout.strip())
                 if 'GPU' in self._sys_data:
-                    self._sys_data['GPU'][0].setValue(int(gpu))
-                    self._sys_data['GPU'][1].setText(f'{gpu:.0f}%')
+                    self._sys_data['GPU'][0].setText(f'{gpu:.0f}%')
         except: pass
 
 

@@ -1,6 +1,8 @@
 """视频预处理标签页 — 重命名+缩放+抽帧"""
 from scripts.tabs.base import *
 import cv2
+import os
+os.environ['OPENCV_FFMPEG_LOGLEVEL'] = 'error'
 
 
 class VideoPreprocessWorker(QThread):
@@ -11,12 +13,11 @@ class VideoPreprocessWorker(QThread):
     done = pyqtSignal(bool, str)
     image_saved = pyqtSignal(str)  # 发送保存的图片路径
 
-    def __init__(self, src_folder: str, out_folder: str, target_size: int = 640, target_fps: float = 2.0):
+    def __init__(self, src_folder: str, out_folder: str, target_size: int = 640):
         super().__init__()
         self.src_folder = Path(src_folder)
         self.out_folder = Path(out_folder)
         self.target_size = target_size
-        self.target_fps = target_fps
         self._stop = False
 
     def stop(self):
@@ -40,7 +41,7 @@ class VideoPreprocessWorker(QThread):
         try:
             import random
             # ── 1. 获取视频文件 ──
-            exts = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
+            exts = VIDEO_EXTS
             videos = sorted([f for f in self.src_folder.iterdir()
                              if f.suffix.lower() in exts and f.is_file()])
             if not videos:
@@ -109,36 +110,47 @@ class VideoPreprocessWorker(QThread):
                 self.progress.emit(idx + 1, n)
 
                 saved = 0
+                decode_errors = 0
                 # 遍历每一秒
                 for second in range(total_seconds):
                     if self._stop:
                         break
                     
-                    # 计算该秒的起始和结束帧
-                    start_frame = second * frames_per_second
-                    end_frame = min((second + 1) * frames_per_second, total_frames)
-                    
-                    # 随机选择该秒中的一帧
-                    random_frame = random.randint(start_frame, end_frame - 1)
-                    
-                    # 跳转到随机帧
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
-                    ret, frame = cap.read()
-                    
-                    if ret:
-                        # 缩放到640×640
-                        resized = self._letterbox_resize(frame, self.target_size)
-                        # 命名格式：文件夹名-视频序号-秒数.jpg
-                        out_filename = f'{folder_name}-{video_num}-{second:04d}.jpg'
-                        out_path = self.out_folder / out_filename
-                        cv2.imwrite(str(out_path), resized, [cv2.IMWRITE_JPEG_QUALITY, 98, cv2.IMWRITE_JPEG_OPTIMIZE, 1])
-                        saved += 1
-                        self.video_progress.emit(saved, total_seconds)
-                        # 发送图片路径用于预览
-                        self.image_saved.emit(str(out_path))
+                    try:
+                        # 计算该秒的起始和结束帧
+                        start_frame = second * frames_per_second
+                        end_frame = min((second + 1) * frames_per_second, total_frames)
+                        
+                        # 随机选择该秒中的一帧
+                        random_frame = random.randint(start_frame, end_frame - 1)
+                        
+                        # 跳转到随机帧
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
+                        ret, frame = cap.read()
+                        
+                        if ret and frame is not None and frame.size > 0:
+                            # 缩放到640×640
+                            resized = self._letterbox_resize(frame, self.target_size)
+                            # 命名格式：文件夹名-视频序号-秒数.jpg
+                            out_filename = f'{folder_name}-{video_num}-{second:04d}.jpg'
+                            out_path = self.out_folder / out_filename
+                            cv2.imwrite(str(out_path), resized, [cv2.IMWRITE_JPEG_QUALITY, 98, cv2.IMWRITE_JPEG_OPTIMIZE, 1])
+                            saved += 1
+                            self.video_progress.emit(saved, total_seconds)
+                            # 发送图片路径用于预览
+                            self.image_saved.emit(str(out_path))
+                        else:
+                            decode_errors += 1
+                            if decode_errors <= 3:
+                                self.log.emit(f' ⚠️ Frame decode failed at second {second}')
+                    except Exception as e:
+                        decode_errors += 1
+                        if decode_errors <= 3:
+                            self.log.emit(f' ⚠️ Error at second {second}: {str(e)[:50]}')
 
                 cap.release()
-                self.log.emit(f' {new_name} → {saved} 帧（{total_seconds}秒）')
+                err_msg = f' ({decode_errors} decode errors)' if decode_errors > 0 else ''
+                self.log.emit(f' {new_name} → {saved} 帧（{total_seconds}秒）{err_msg}')
 
             self.log.emit(f' 全部完成！共处理 {n} 个视频')
             self.done.emit(True, f'Complete — {n} videos processed')
@@ -264,32 +276,7 @@ class PreprocessTab(QWidget):
         g2l.addWidget(self.video_count)
         ll.addWidget(g2)
 
-        # -- Group 3: 参数 --
-        g3 = QGroupBox('Parameters')
-        g3l = QGridLayout(g3)
-        g3l.setSpacing(6)
-        g3l.setContentsMargins(10, 14, 10, 10)
-        g3l.setColumnStretch(0, 1)
-        g3l.setColumnStretch(1, 1)
-
-        self.out_fps = QDoubleSpinBox()
-        self.out_fps.setRange(0.5, 30)
-        self.out_fps.setValue(2.0)
-        self.out_fps.setSingleStep(1)
-        self.out_fps.setDecimals(1)
-        self.out_fps.setMinimumHeight(24)
-        self._add_param(g3l, 'FPS', self.out_fps, 0, 0)
-
-        self.target_size = QSpinBox()
-        self.target_size.setRange(256, 1920)
-        self.target_size.setValue(640)
-        self.target_size.setSingleStep(64)
-        self.target_size.setMinimumHeight(24)
-        self._add_param(g3l, 'Size', self.target_size, 0, 1)
-
-        ll.addWidget(g3)
-
-        # -- Group 4: Control --
+        # -- Group 3: Control --
         g4 = QGroupBox('Control')
         g4l = QVBoxLayout(g4)
         g4l.setSpacing(6)
@@ -318,18 +305,12 @@ class PreprocessTab(QWidget):
         # 进度统计卡片
         sr = QHBoxLayout()
         sr.setSpacing(6)
-        for lbl, attr, col in [('Video', '_pv', TEXT), ('Frame', '_pf', GREEN)]:
-            cw = QWidget()
-            cw.setStyleSheet(f'background:{BG};border-radius:5px;')
-            cl2 = QVBoxLayout(cw)
-            cl2.setContentsMargins(8, 6, 8, 6)
-            cl2.setSpacing(2)
-            v = QLabel('—')
-            v.setStyleSheet(f'font-size:16px;font-weight:700;color:{col};qproperty-alignment:AlignCenter;')
-            setattr(self, attr, v)
-            cl2.addWidget(v)
-            cl2.addWidget(QLabel(lbl, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
-            sr.addWidget(cw, 1)
+        self._pv_card = MetricCard('Video', TEXT, '—')
+        self._pv = self._pv_card.value_label; self._pv.setStyleSheet(f'font-size:16px;font-weight:700;color:{TEXT};qproperty-alignment:AlignCenter;')
+        sr.addWidget(self._pv_card, 1)
+        self._pf_card = MetricCard('Frame', GREEN, '—')
+        self._pf = self._pf_card.value_label; self._pf.setStyleSheet(f'font-size:16px;font-weight:700;color:{GREEN};qproperty-alignment:AlignCenter;')
+        sr.addWidget(self._pf_card, 1)
         g4l.addLayout(sr)
 
         self.status_label = QLabel('Ready')
@@ -371,48 +352,11 @@ class PreprocessTab(QWidget):
         self.preview_stats.setStyleSheet(f'font-size:9px;color:{TEXT3};padding:2px 0;')
         preview_layout.addWidget(self.preview_stats)
         
-        rl.addWidget(preview_group, 1)  # 添加拉伸因子，填充空间
+        rl.addWidget(preview_group, 1)
 
-        # 日志区
-        log_header = QWidget()
-        log_header.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px 6px 0 0;')
-        hl = QHBoxLayout(log_header)
-        hl.setContentsMargins(12, 6, 12, 6)
-        hl.addWidget(QLabel('● Console', styleSheet=f'font-size:11px;font-weight:600;color:{TEXT3};'))
-        hl.addStretch()
-        clear_btn = QPushButton('Clear')
-        clear_btn.clicked.connect(self._clear_log)
-        clear_btn.setStyleSheet('padding:3px 10px;min-height:20px;font-size:10px;border-radius:3px;')
-        hl.addWidget(clear_btn)
-        rl.addWidget(log_header)
-
-        self.log_output = QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setStyleSheet(f'''
-            QTextEdit {{
-                background: {CON};
-                color: {CON_T};
-                border: 1px solid {BORDER};
-                border-top: none;
-                border-radius: 0 0 6px 6px;
-                padding: 8px 12px;
-                font-family: "Consolas", "Courier New", monospace;
-                font-size: 12px;
-            }}
-        ''')
-        self.log_output.setFixedHeight(100)
-        rl.addWidget(self.log_output)
+        self.log_panel = LogPanel('● Console', max_lines=500)
+        rl.addWidget(self.log_panel)
         lo.addWidget(right, 1)
-
-    def _add_param(self, grid, label, widget, r, c):
-        cw = QWidget()
-        cw.setStyleSheet(f'background:{BG};border-radius:4px;')
-        cl = QHBoxLayout(cw)
-        cl.setContentsMargins(8, 2, 8, 2)
-        cl.setSpacing(6)
-        cl.addWidget(QLabel(label, styleSheet=f'font-size:10px;color:{TEXT};font-weight:500;'))
-        cl.addWidget(widget, 1)
-        grid.addWidget(cw, r, c)
 
     # ═══════════════ LOGIC ═══════════════
 
@@ -470,24 +414,11 @@ class PreprocessTab(QWidget):
         if not dirs:
             self.input_label.setText('⚠️ 没有子文件夹')
 
-    def _on_folder_selected(self):
-        """选中文件夹时刷新视频列表（保留用于兼容）"""
-        folder = self.src_combo.currentText()
-        if not folder:
-            return
-        src = self._before_root / folder
-        out = self._after_root / folder
-        self.src_input.setText(str(src))
-        self.out_input.setText(str(out))
-        self.input_label.setText(f'📂 {src}')
-        self._refresh_video_list(src)
-
     def _refresh_video_list(self, folder: Path):
         """列出文件夹中的视频文件"""
         self.video_list.clear()
-        exts = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
         videos = sorted([f.name for f in folder.iterdir()
-                         if f.suffix.lower() in exts and f.is_file()])
+                         if f.suffix.lower() in VIDEO_EXTS and f.is_file()])
         if videos:
             for v in videos:
                 self.video_list.addItem(v)
@@ -511,7 +442,7 @@ class PreprocessTab(QWidget):
             QMessageBox.warning(self, 'Warning', f'Input directory does not exist: {src_folder}')
             return
 
-        exts = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
+        exts = VIDEO_EXTS
         videos = [f for f in src_folder.iterdir() if f.suffix.lower() in exts and f.is_file()]
         if not videos:
             QMessageBox.warning(self, 'Warning', 'No video files found in this folder')
@@ -522,24 +453,20 @@ class PreprocessTab(QWidget):
         self.stop_btn.setEnabled(True)
         self.src_input.setEnabled(False)
         self.out_input.setEnabled(False)
-        self.out_fps.setEnabled(False)
-        self.target_size.setEnabled(False)
         self.progress_bar.setValue(0)
         self._pv.setText('—')
         self._pf.setText('—')
-        self._clear_log()
+        self.log_panel.clear()
 
-        self._log(f'🚀 Starting preprocessing: {src_folder.name}')
+        self._log(f' Starting preprocessing: {src_folder.name}')
         self._log(f' Input:  {src_folder}')
         self._log(f'📁 Output: {out_folder}')
-        self._log(f'   Size: {self.target_size.value()}×{self.target_size.value()}')
-        self._log(f'   FPS:  {self.out_fps.value()}')
+        self._log(f'   Size: 640×640 (Fixed)')
+        self._log(f'   FPS:  2.0 (Fixed)')
 
         self._worker = VideoPreprocessWorker(
             src_folder=str(src_folder),
             out_folder=str(out_folder),
-            target_size=self.target_size.value(),
-            target_fps=self.out_fps.value(),
         )
         self._worker.log.connect(self._log)
         self._worker.progress.connect(self._on_video_progress)
@@ -587,8 +514,6 @@ class PreprocessTab(QWidget):
         self.stop_btn.setEnabled(False)
         self.src_input.setEnabled(True)
         self.out_input.setEnabled(True)
-        self.out_fps.setEnabled(True)
-        self.target_size.setEnabled(True)
         self.progress_bar.setValue(100 if ok else 0)
         self._log(f'{"🎉" if ok else "❌"} {msg}')
         self.status_label.setText(msg)
@@ -596,17 +521,4 @@ class PreprocessTab(QWidget):
 
     def _log(self, msg):
         ts = datetime.now().strftime('%H:%M:%S')
-        color = CON_T
-        if '✅' in msg or '🎉' in msg: color = GREEN
-        elif '❌' in msg: color = RED
-        elif '⚠️' in msg: color = AMBER
-        elif '🚀' in msg: color = '#a5b4fc'
-        elif '📄' in msg or '📁' in msg: color = TEXT3
-        elif '🎬' in msg: color = PRI
-        html = f'<span style="color:#6b7280">[{ts}]</span> <span style="color:{color}">{msg}</span>'
-        self.log_output.append(html)
-        self.log_output.verticalScrollBar().setValue(
-            self.log_output.verticalScrollBar().maximum())
-
-    def _clear_log(self):
-        self.log_output.clear()
+        self.log_panel.append(format_log(ts, msg))

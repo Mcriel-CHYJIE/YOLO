@@ -1481,21 +1481,20 @@ class LabelTab(QWidget):
             # 保存当前标注
             self._save_current_annotations()
             
-            # 打乱图片顺序
             import random
-            shuffled_paths = list(self._image_paths)
-            random.shuffle(shuffled_paths)
             
-            # 每3张为一组，保留第1张，删除后2张
+            # 按原顺序每3张一组，每组随机保留1张，删除2张
             paths_to_delete = []
             paths_to_keep = []
             
-            for i in range(0, len(shuffled_paths), 3):
-                group = shuffled_paths[i:i+3]
+            for i in range(0, len(self._image_paths), 3):
+                group = list(self._image_paths[i:i+3])
                 if group:
-                    paths_to_keep.append(group[0])  # 保留第一张
-                    if len(group) > 1:
-                        paths_to_delete.extend(group[1:])  # 删除其余的
+                    keep = random.choice(group)
+                    paths_to_keep.append(keep)
+                    for p in group:
+                        if p != keep:
+                            paths_to_delete.append(p)
             
             # 执行删除
             deleted_count = 0

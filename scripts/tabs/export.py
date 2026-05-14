@@ -44,22 +44,15 @@ class ExportTab(QWidget):
 
         right = QWidget()
         rl = QVBoxLayout(right); rl.setSpacing(5); rl.setContentsMargins(0,0,0,0)
-        lw = QWidget(); lw.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
-        ll2 = QVBoxLayout(lw); ll2.setContentsMargins(6,4,6,6); ll2.setSpacing(4)
-        h = QWidget(); h.setStyleSheet('background:transparent;border:none;')
-        hl = QHBoxLayout(h); hl.setContentsMargins(2,0,2,0)
-        hl.addWidget(QLabel('● Output', styleSheet=f'font-size:10px;font-weight:600;color:{TEXT3};')); hl.addStretch()
-        ll2.addWidget(h)
-        self.ex_log = QTextEdit(); self.ex_log.setReadOnly(True)
-        self.ex_log.setStyleSheet(f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:5px;padding:8px 10px;font-family:"Consolas","Courier New",monospace;font-size:13px;line-height:1.4;}}')
-        ll2.addWidget(self.ex_log); rl.addWidget(lw,1); lo.addWidget(right,1)
+        self.log_panel = LogPanel('● Output', max_lines=500)
+        rl.addWidget(self.log_panel, 1); lo.addWidget(right, 1)
 
     def _load_latest(self):
         w = find_latest_best()
         if w: self.ex_w.setText(w)
 
     def _ex_browse(self):
-        p,_ = QFileDialog.getOpenFileName(self,'Select Model','runs','PyTorch (*.pt)')
+        p,_ = QFileDialog.getOpenFileName(self,'Select Model','runs',MODEL_FILTER)
         if p: self.ex_w.setText(p)
 
     def _ex_run(self):
@@ -69,8 +62,8 @@ class ExportTab(QWidget):
             if w2: self.ex_w.setText(w2); w = w2
             else: QMessageBox.warning(self,'Error','No weights found'); return
         fmt = self.ex_fmt.currentText()
-        self.ex_log.clear(); self.ex_btn.setEnabled(False)
-        self.ex_log.append(f'📦 Exporting to {fmt.upper()}...')
+        self.log_panel.clear(); self.ex_btn.setEnabled(False)
+        self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'📦 Exporting to {fmt.upper()}...'))
         QApplication.processEvents()
         try:
             from ultralytics import YOLO
@@ -80,10 +73,10 @@ class ExportTab(QWidget):
                 nms=self.ex_nms.isChecked(), simplify=fmt=='onnx',
                 device='0' if self.studio.gpu_ok else 'cpu')
             sz = Path(out).stat().st_size / 1e6
-            self.ex_log.append(f'✅ {fmt.upper()} exported!')
-            self.ex_log.append(f'   Path: {out}'); self.ex_log.append(f'   Size: {sz:.2f} MB')
+            self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'✅ {fmt.upper()} exported!'))
+            self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'   Path: {out}'))
+            self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'   Size: {sz:.2f} MB'))
         except Exception as e:
             import traceback; traceback.print_exc()
-            self.ex_log.append(f'❌ Failed: {e}')
-            self.ex_log.append('   Hint: may need extra deps, see docs.ultralytics.com')
+            self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'❌ Failed: {e}'))
         finally: self.ex_btn.setEnabled(True)

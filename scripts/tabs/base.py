@@ -1,5 +1,5 @@
 """共享基础模块 — 常量、Chart、Worker 类"""
-import sys, os, json, time
+import sys, os, json, time, re
 from pathlib import Path
 from datetime import datetime
 
@@ -61,13 +61,131 @@ QCheckBox{{spacing:5px;font-size:11px;color:{TEXT};}}
 """
 
 
+# ── 共享常量 ──
+VIDEO_EXTS = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
+MODEL_FILTER = 'PyTorch (*.pt)'
+
+# ── 共享 UI 工具 ──
+
+def labeled_field(widget, label, grid, r, c, height=22):
+    """网格布局中放置带标签的控件"""
+    cw = QWidget()
+    cw.setStyleSheet(f'background:{BG};border-radius:4px;')
+    cl = QHBoxLayout(cw); cl.setContentsMargins(6, 1, 6, 1); cl.setSpacing(4)
+    lbl = QLabel(label)
+    lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
+    lbl.setFixedHeight(height); widget.setMinimumHeight(height)
+    cl.addWidget(lbl); cl.addWidget(widget, 1)
+    grid.addWidget(cw, r, c)
+
+def make_hparam_row(label, widget, height=24):
+    """水平布局中放置带标签的控件"""
+    cw = QWidget()
+    cw.setStyleSheet(f'background:{BG};border-radius:4px;')
+    cl = QHBoxLayout(cw); cl.setContentsMargins(8, 2, 8, 2); cl.setSpacing(6)
+    lbl = QLabel(label)
+    lbl.setStyleSheet(f'font-size:10px;color:{TEXT};font-weight:500;')
+    cl.addWidget(lbl); cl.addWidget(widget, 1)
+    return cw
+
+
+class MetricCard(QWidget):
+    """统计卡片：大号数值 + 描述文字"""
+
+    def __init__(self, label, color=TEXT, default='0', parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f'background:{BG};border-radius:6px;padding:6px;')
+        lo = QVBoxLayout(self); lo.setContentsMargins(8, 6, 8, 6); lo.setSpacing(2)
+        self.value_label = QLabel(default)
+        self.value_label.setStyleSheet(
+            f'font-size:18px;font-weight:600;color:{color};qproperty-alignment:AlignCenter;')
+        lo.addWidget(self.value_label)
+        lo.addWidget(QLabel(label, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
+
+
+class LogPanel(QWidget):
+    """统一日志面板：标题 + 行计数 + 清除按钮 + QTextEdit"""
+
+    def __init__(self, title='● Console', parent=None, max_lines=500):
+        super().__init__(parent)
+        self._max_lines = max_lines
+        self._log_lines = []
+
+        self.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
+        lo = QVBoxLayout(self); lo.setContentsMargins(6, 4, 6, 6); lo.setSpacing(4)
+
+        # 头部
+        h = QWidget(); h.setStyleSheet('background:transparent;border:none;')
+        hl = QHBoxLayout(h); hl.setContentsMargins(2, 0, 2, 0); hl.setSpacing(6)
+        hl.addWidget(QLabel(title, styleSheet=f'font-size:10px;font-weight:600;color:{TEXT3};'))
+        hl.addStretch()
+        self.line_count = QLabel('0 lines')
+        self.line_count.setStyleSheet(f'font-size:9px;color:{TEXT3};')
+        hl.addWidget(self.line_count)
+        clear_btn = QPushButton('Clear')
+        clear_btn.setObjectName('danger')
+        clear_btn.setStyleSheet('padding:2px 8px;min-height:18px;font-size:10px;')
+        clear_btn.clicked.connect(self.clear)
+        hl.addWidget(clear_btn)
+        lo.addWidget(h)
+
+        # 正文
+        self.editor = QTextEdit()
+        self.editor.setReadOnly(True)
+        self.editor.setStyleSheet(
+            f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:5px;'
+            'padding:8px 10px;font-family:"Consolas","Courier New",monospace;font-size:13px;line-height:1.4;}}')
+        lo.addWidget(self.editor)
+
+    def append(self, html_line):
+        """追加一行 HTML 日志"""
+        self._log_lines.append(html_line)
+        if len(self._log_lines) > self._max_lines:
+            self._log_lines = self._log_lines[-self._max_lines:]
+            self.editor.setHtml('\n'.join(self._log_lines))
+        else:
+            self.editor.append(html_line)
+        self.editor.verticalScrollBar().setValue(self.editor.verticalScrollBar().maximum())
+        self.line_count.setText(f'{len(self._log_lines)} lines')
+
+    def replace_last(self, html_line):
+        """替换最后一行（用于进度条更新）"""
+        if self._log_lines:
+            self._log_lines[-1] = html_line
+            self.editor.setHtml('\n'.join(self._log_lines))
+            self.editor.verticalScrollBar().setValue(self.editor.verticalScrollBar().maximum())
+
+    def clear(self):
+        self.editor.clear(); self._log_lines = []; self.line_count.setText('0 lines')
+
+
+# ── 共享日志格式化 ──
+
+def format_log(ts, msg):
+    """统一日志格式（返回 HTML 行）"""
+    color = CON_T
+    if '✅' in msg or '🎉' in msg or 'Done' in msg:
+        color = GREEN
+    elif '❌' in msg or 'Failed' in msg:
+        color = RED
+    elif '⚠️' in msg:
+        color = AMBER
+    elif '🚀' in msg or 'Epoch' in msg:
+        color = '#a5b4fc'
+    elif '📁' in msg or '📄' in msg:
+        color = TEXT3
+    elif '🎬' in msg:
+        color = PRI
+    return f'<span style="color:#6b7280">[{ts}]</span> <span style="color:{color}">{msg}</span>'
+
+
 # ── StreamEmitter ──
 class StreamEmitter:
     def __init__(self, signal):
         self.signal = signal; self.buffer = ''
     def write(self, text):
         if text:
-            import re; text = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+            text = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
             self.buffer += text
             self.buffer = self.buffer.replace('\r', '\n')
             while '\n' in self.buffer:
@@ -75,7 +193,6 @@ class StreamEmitter:
                 if line.strip(): self.signal.emit(line)
     def flush(self):
         if self.buffer.strip():
-            import re
             c = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', self.buffer.strip().replace('\r', ''))
             self.signal.emit(c); self.buffer = ''
 

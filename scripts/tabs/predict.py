@@ -2,7 +2,6 @@
 from scripts.tabs.base import *
 from PyQt5.QtCore import QPoint
 from PyQt5.QtGui import QCursor
-import cv2
 
 
 class PredictTab(QWidget):
@@ -13,16 +12,6 @@ class PredictTab(QWidget):
         self._source_path = None
         self._worker = None
         self._mode = None
-        self._build()
-        self._load_latest()
-
-    def _build(self):
-        lo = QHBoxLayout(self); lo.setContentsMargins(4,4,4,4); lo.setSpacing(6)
-
-        # ── Left Panel ──
-        left = QWidget(); left.setFixedWidth(320)
-        ll = QVBoxLayout(left); ll.setSpacing(5); ll.setContentsMargins(0,0,0,0)
-
         def _card(label=None):
             cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
             cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
@@ -30,6 +19,10 @@ class PredictTab(QWidget):
                 lbl = QLabel(label); lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
                 lbl.setFixedHeight(22); cl.addWidget(lbl)
             return cw, cl
+
+        lo = QHBoxLayout(self); lo.setContentsMargins(4, 4, 4, 4); lo.setSpacing(6)
+        left = QWidget(); left.setFixedWidth(280)
+        ll = QVBoxLayout(left); ll.setSpacing(4); ll.setContentsMargins(0, 0, 0, 0)
 
         # Input
         g1 = QGroupBox('Input')
@@ -79,13 +72,12 @@ class PredictTab(QWidget):
         self.btn_run.clicked.connect(self._run_batch); g3l.addWidget(self.btn_run)
         # Stats
         st = QHBoxLayout()
-        for lbl,col,attr in [('Images/Frame',PRI,'_st_imgs'),('Detections',GREEN,'_st_dets'),('Fallen',RED,'_st_fall')]:
-            cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:6px;padding:6px;')
-            cl2 = QVBoxLayout(cw); cl2.setContentsMargins(8,6,8,6); cl2.setSpacing(2)
-            v = QLabel('0'); v.setStyleSheet(f'font-size:18px;font-weight:600;color:{col};qproperty-alignment:AlignCenter;')
-            setattr(self, attr, v); cl2.addWidget(v)
-            cl2.addWidget(QLabel(lbl, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
-            st.addWidget(cw,1)
+        self._img_card = MetricCard('Images/Frame', PRI)
+        self._st_imgs = self._img_card.value_label; st.addWidget(self._img_card, 1)
+        self._det_card = MetricCard('Detections', GREEN)
+        self._st_dets = self._det_card.value_label; st.addWidget(self._det_card, 1)
+        self._fal_card = MetricCard('Fallen', RED)
+        self._st_fall = self._fal_card.value_label; st.addWidget(self._fal_card, 1)
         g3l.addLayout(st)
         self.lbl_fps = QLabel(''); self.lbl_fps.setStyleSheet(f'font-size:10px;color:{TEXT3};')
         g3l.addWidget(self.lbl_fps)
@@ -123,6 +115,7 @@ class PredictTab(QWidget):
         self.stack.addWidget(self.log_view)
         self.stack.setCurrentIndex(0)
         lo.addWidget(self.stack, 1)
+        self._load_latest()
 
     # ── Helpers ──
     def _load_latest(self):
@@ -130,7 +123,7 @@ class PredictTab(QWidget):
         if w: self.lbl_model.setText(f'[{Path(w).name}]'); self._model_path = Path(w)
 
     def _browse_model(self):
-        p,_ = QFileDialog.getOpenFileName(self,'Select Model','runs','PyTorch (*.pt)')
+        p,_ = QFileDialog.getOpenFileName(self,'Select Model','runs',MODEL_FILTER)
         if p: self._model_path = Path(p); self.lbl_model.setText(f'[{self._model_path.name}]')
 
     def _browse_src(self):
@@ -159,7 +152,7 @@ class PredictTab(QWidget):
         if not path:
             return
         p = Path(path)
-        if p.is_file() and p.suffix.lower() in ('.mp4','.avi','.mov','.mkv'):
+        if p.is_file() and p.suffix.lower() in VIDEO_EXTS:
             self._mode = 'video'; self._source_path = p
             self._show_video_controls()
         elif p.is_file() and p.suffix.lower() in ('.jpg','.jpeg','.png'):
