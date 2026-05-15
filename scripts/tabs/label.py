@@ -1,6 +1,6 @@
 """标注标签页 — 手动/自动标注 → 审核 → 导出YOLO格式数据集"""
 from scripts.tabs.base import *
-import cv2, json, random, shutil
+import cv2, json, random, shutil, hashlib
 
 # ═══════════════════════ 常量 ═══════════════════════
 
@@ -450,7 +450,7 @@ class ExportWorker(QThread):
     def run(self):
         try:
             items = list(self._annotations.items())
-            random.shuffle(items)
+            items.sort(key=lambda x: hashlib.md5(x[0].encode("utf-8")).hexdigest())
             split_idx = max(1, int(len(items) * self._train_ratio / 100.0))
             train_items = items[:split_idx]
             val_items = items[split_idx:]
@@ -587,39 +587,44 @@ class LabelTab(QWidget):
     def _build_nav_section(self):
         g = QGroupBox("Navigation")
         lo = QVBoxLayout(g)
-        lo.setSpacing(6)
-        lo.setContentsMargins(10, 10, 10, 10)
+        lo.setSpacing(4)
+        lo.setContentsMargins(8, 8, 8, 8)
+        
+        # 导航控件行
         row = QHBoxLayout()
         row.setSpacing(4)
         self._prev_btn = self._make_icon_btn("◀")
         self._prev_btn.clicked.connect(lambda: self._navigate(-1))
-        self._prev_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        row.addWidget(self._prev_btn, 1)
+        row.addWidget(self._prev_btn)
         self._next_btn = self._make_icon_btn("▶")
         self._next_btn.clicked.connect(lambda: self._navigate(1))
-        self._next_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        row.addWidget(self._next_btn, 1)
+        row.addWidget(self._next_btn)
+        
         self._idx_input = QSpinBox()
         self._idx_input.setMinimum(1)
         self._idx_input.setMaximum(99999)
         self._idx_input.setMinimumHeight(24)
         self._idx_input.valueChanged.connect(self._goto_idx)
-        self._idx_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         row.addWidget(self._idx_input, 1)
+        
         self._total_label = QLabel("/ 0")
-        self._total_label.setStyleSheet(f"font-size:11px;color:{TEXT3};font-weight:500;")
+        self._total_label.setStyleSheet(f"font-size:10px;color:{TEXT3};")
         row.addWidget(self._total_label)
         lo.addLayout(row)
+        
+        # 信息行
         info_row = QHBoxLayout()
         info_row.setSpacing(6)
         self._img_name_label = QLabel("—")
-        self._img_name_label.setStyleSheet(f"font-size:11px;font-weight:600;color:{TEXT};")
+        self._img_name_label.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
         info_row.addWidget(self._img_name_label, 1)
+        
         self._ann_count_label = QLabel("0 boxes")
-        self._ann_count_label.setStyleSheet(f"font-size:10px;color:{TEXT2};font-weight:500;")
+        self._ann_count_label.setStyleSheet(f"font-size:9px;color:{TEXT2};")
         info_row.addWidget(self._ann_count_label)
+        
         self._save_indicator = QLabel("")
-        self._save_indicator.setStyleSheet(f"font-size:10px;color:{GREEN};font-weight:600;")
+        self._save_indicator.setStyleSheet(f"font-size:9px;font-weight:600;")
         info_row.addWidget(self._save_indicator)
         lo.addLayout(info_row)
         
@@ -636,9 +641,8 @@ class LabelTab(QWidget):
         lo.setSpacing(6)
         lo.setContentsMargins(4, 4, 4, 4)
         lo.addWidget(self._build_source_section())
-        lo.addWidget(self._build_mode_section())
-        lo.addWidget(self._build_export_section())
-        lo.addWidget(self._build_shortcuts_section())
+        lo.addWidget(self._build_model_export_section())
+        lo.addWidget(self._build_stats_section())
         lo.addStretch()
         scroll.setWidget(panel)
         scroll.setFixedWidth(280)
@@ -698,7 +702,6 @@ class LabelTab(QWidget):
         lo.addWidget(self._build_annotation_section())
         lo.addWidget(self._build_class_section())
         lo.addWidget(self._build_nav_section())
-        lo.addWidget(self._build_filter_section())
         lo.addStretch()
         scroll.setWidget(panel)
         scroll.setFixedWidth(280)
@@ -715,7 +718,7 @@ class LabelTab(QWidget):
         self._src_combo.setMinimumHeight(28)
         self._src_combo.currentIndexChanged.connect(self._on_folder_selected)
         row.addWidget(self._src_combo, 2)
-        row.addWidget(self._make_tool_btn("", self._refresh_source_folders), 1)
+        row.addWidget(self._make_tool_btn("↻", self._refresh_source_folders), 1)
         lo.addLayout(row)
         self._src_path_label = QLabel()
         self._src_path_label.setStyleSheet(
@@ -733,97 +736,270 @@ class LabelTab(QWidget):
         sr.addWidget(self._annotated_label)
         sr.addStretch()
         lo.addLayout(sr)
+        
+        # 分隔线
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        sep.setStyleSheet(f"background:{BORDER};")
+        lo.addWidget(sep)
+        
+        # Filter 统计信息
+        self._filter_stats_label = QLabel("523 → 175 images")
+        self._filter_stats_label.setStyleSheet(
+            f"font-size:9px;color:{TEXT2};font-weight:500;padding:3px 5px;"
+            f"background:{BG};border-radius:3px;border:1px solid {BORDER};")
+        self._filter_stats_label.setAlignment(Qt.AlignCenter)
+        lo.addWidget(self._filter_stats_label)
+        
+        # Filter 按钮
+        filter_btn = QPushButton("🎲 Random Filter")
+        filter_btn.setObjectName("pri")
+        filter_btn.setMinimumHeight(26)
+        filter_btn.clicked.connect(self._random_filter_dataset)
+        lo.addWidget(filter_btn)
+        
         return g
 
     def _build_class_section(self):
-        g = QGroupBox("Classes")
+        g = QGroupBox("Classes & Shortcuts")
         lo = QVBoxLayout(g)
-        lo.setSpacing(5)
+        lo.setSpacing(6)
         lo.setContentsMargins(10, 10, 10, 10)
         self._class_layout = lo
         self._class_btns = []
         self._build_class_buttons()
+        
+        # 分隔线
+        sep1 = QFrame()
+        sep1.setFrameShape(QFrame.HLine)
+        sep1.setFrameShadow(QFrame.Sunken)
+        sep1.setStyleSheet(f"background:{BORDER};")
+        lo.addWidget(sep1)
+        
+        # 快捷键配置（两列布局）
+        if not hasattr(self, '_shortcut_inputs'):
+            self._shortcut_inputs = {}
+        
+        shortcuts = [
+            ("Prev", "prev", "A"),
+            ("Next", "next", "D"),
+            ("Del Box", "delete_box", "W"),
+            ("Del Img", "delete_img", "S"),
+        ]
+        
+        grid = QGridLayout()
+        grid.setSpacing(4)
+        
+        for idx, (label, key, default) in enumerate(shortcuts):
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"font-size:9px;color:{TEXT2};font-weight:500;")
+            grid.addWidget(lbl, 0, idx * 2)
+            
+            input_w = QLineEdit()
+            input_w.setMinimumHeight(24)
+            input_w.setAlignment(Qt.AlignCenter)
+            input_w.setStyleSheet(
+                f"QLineEdit {{ background:{BG}; border:1px solid {BORDER}; border-radius:4px;"
+                f"color:{TEXT}; font-size:10px; padding:2px; }}"
+                f"QLineEdit:focus {{ border-color:{PRI}; }}")
+            
+            input_w.installEventFilter(self)
+            input_w.setProperty("shortcut_key", key)
+            input_w.setReadOnly(True)
+            input_w.setText(default)
+            
+            grid.addWidget(input_w, 0, idx * 2 + 1)
+            self._shortcut_inputs[key] = input_w
+        
+        lo.addLayout(grid)
+        
+        # 分隔线
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setFrameShadow(QFrame.Sunken)
+        sep2.setStyleSheet(f"background:{BORDER};")
+        lo.addWidget(sep2)
         
         # 按钮两列布局
         btn_row = QHBoxLayout()
         btn_row.setSpacing(5)
         
         del_btn = QPushButton("Delete")
-        del_btn.setMinimumHeight(32)
+        del_btn.setMinimumHeight(30)
         del_btn.setStyleSheet(
             f"QPushButton {{ background:{BG}; border:1px solid {BORDER}; border-radius:5px;"
-            f"color:{RED}; font-size:11px; font-weight:500; padding:4px 8px; text-align:left; }}"
+            f"color:{RED}; font-size:10px; font-weight:500; padding:4px 8px; text-align:left; }}"
             f"QPushButton:hover {{ background:{PRI}20; border-color:{PRI}; }}")
         del_btn.clicked.connect(self._delete_selected)
         btn_row.addWidget(del_btn, 1)
         
         clear_btn = QPushButton("Clear")
-        clear_btn.setMinimumHeight(32)
+        clear_btn.setMinimumHeight(30)
         clear_btn.setStyleSheet(
             f"QPushButton {{ background:{BG}; border:1px solid {BORDER}; border-radius:5px;"
-            f"color:{RED}; font-size:11px; font-weight:500; padding:4px 8px; text-align:left; }}"
+            f"color:{RED}; font-size:10px; font-weight:500; padding:4px 8px; text-align:left; }}"
             f"QPushButton:hover {{ background:{PRI}20; border-color:{PRI}; }}")
         clear_btn.clicked.connect(self._clear_annotations)
         btn_row.addWidget(clear_btn, 1)
         
         lo.addLayout(btn_row)
+        
+        # 提示信息
+        hint = QLabel("Click input to set key | Click buttons to select class")
+        hint.setStyleSheet(f"font-size:8px;color:{TEXT3};font-style:italic;")
+        hint.setAlignment(Qt.AlignCenter)
+        lo.addWidget(hint)
+        
         return g
 
-    def _build_mode_section(self):
-        g = QGroupBox("Mode")
+    def _build_model_export_section(self):
+        g = QGroupBox("Model & Export")
         lo = QVBoxLayout(g)
-        lo.setSpacing(4)
+        lo.setSpacing(5)
         lo.setContentsMargins(8, 8, 8, 8)
-        row = QHBoxLayout()
-        row.setSpacing(10)
+        
+        # 模式选择
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(10)
         self._mode_manual = QRadioButton("Manual")
-        self._mode_manual.setStyleSheet(f"font-size:11px;font-weight:500;color:{TEXT};")
+        self._mode_manual.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
         self._mode_auto = QRadioButton("Auto")
-        self._mode_auto.setStyleSheet(f"font-size:11px;font-weight:500;color:{TEXT};")
+        self._mode_auto.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
         self._mode_manual.setChecked(True)
-        row.addWidget(self._mode_manual)
-        row.addWidget(self._mode_auto)
-        row.addStretch()
-        lo.addLayout(row)
+        mode_row.addWidget(self._mode_manual)
+        mode_row.addWidget(self._mode_auto)
+        mode_row.addStretch()
+        lo.addLayout(mode_row)
+        
+        # Auto 配置面板
         self._auto_panel = QWidget()
         alo = QVBoxLayout(self._auto_panel)
-        alo.setContentsMargins(0, 6, 0, 0)
-        alo.setSpacing(5)
+        alo.setContentsMargins(0, 4, 0, 0)
+        alo.setSpacing(4)
+        
+        # 模型选择和Auto Label按钮在同一行
         ml2 = QHBoxLayout()
         ml2.setSpacing(4)
         self._model_combo = QComboBox()
-        self._model_combo.setMinimumHeight(10)
+        self._model_combo.setMinimumHeight(24)
         ml2.addWidget(self._model_combo, 1)
-        ml2.addWidget(self._make_tool_btn("", self._browse_model))
+        ml2.addWidget(self._make_tool_btn("📁", self._browse_model))
+        self._auto_btn = QPushButton("▶")
+        self._auto_btn.setObjectName("pri")
+        self._auto_btn.setMinimumHeight(24)
+        self._auto_btn.setFixedWidth(32)
+        self._auto_btn.clicked.connect(self._start_auto)
+        ml2.addWidget(self._auto_btn)
         alo.addLayout(ml2)
+        
+        # Conf 和 IoU
         pr = QHBoxLayout()
-        pr.setSpacing(6)
+        pr.setSpacing(4)
         self._al_conf = QDoubleSpinBox()
         self._al_conf.setRange(0.01, 0.99)
         self._al_conf.setValue(0.25)
         self._al_conf.setSingleStep(0.05)
         self._al_conf.setDecimals(2)
-        self._al_conf.setMinimumHeight(10)
-        pr.addWidget(QLabel("Conf", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;min-width:32px;"))
+        self._al_conf.setMinimumHeight(24)
+        pr.addWidget(QLabel("Conf", styleSheet=f"font-size:9px;color:{TEXT2};min-width:32px;"))
         pr.addWidget(self._al_conf, 1)
         self._al_iou = QDoubleSpinBox()
         self._al_iou.setRange(0.01, 0.99)
         self._al_iou.setValue(0.45)
         self._al_iou.setSingleStep(0.05)
         self._al_iou.setDecimals(2)
-        self._al_iou.setMinimumHeight(10)
-        pr.addWidget(QLabel("IoU", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;min-width:32px;"))
+        self._al_iou.setMinimumHeight(24)
+        pr.addWidget(QLabel("IoU", styleSheet=f"font-size:9px;color:{TEXT2};min-width:28px;"))
         pr.addWidget(self._al_iou, 1)
         alo.addLayout(pr)
-        self._auto_btn = QPushButton("▶ Auto Label")
-        self._auto_btn.setObjectName("pri")
-        self._auto_btn.setMinimumHeight(12)
-        self._auto_btn.clicked.connect(self._start_auto)
-        alo.addWidget(self._auto_btn)
-        # 默认显示，但在Manual模式下禁用
+        
         self._auto_panel.setEnabled(False)
         lo.addWidget(self._auto_panel)
+        
+        # 分隔线
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        sep.setStyleSheet(f"background:{BORDER};")
+        lo.addWidget(sep)
+        
+        # Export 配置和按钮在同一行
+        export_row = QHBoxLayout()
+        export_row.setSpacing(6)
+        
+        # Train/Val 比例
+        sr = QHBoxLayout()
+        sr.setSpacing(4)
+        sr.addWidget(QLabel("Train", styleSheet=f"font-size:9px;color:{TEXT2};min-width:32px;"))
+        self._train_ratio = QSpinBox()
+        self._train_ratio.setRange(50, 99)
+        self._train_ratio.setValue(90)
+        self._train_ratio.setSuffix(" %")
+        self._train_ratio.setMinimumHeight(24)
+        sr.addWidget(self._train_ratio, 1)
+        sr.addWidget(QLabel("Val", styleSheet=f"font-size:9px;color:{TEXT3};min-width:24px;"))
+        self._val_label = QLabel("10%")
+        self._val_label.setStyleSheet(f"font-size:10px;color:{TEXT3};font-weight:600;")
+        sr.addWidget(self._val_label)
+        self._train_ratio.valueChanged.connect(lambda v: self._val_label.setText(f"{100 - v}%"))
+        export_row.addLayout(sr, 1)
+        
+        # 导出按钮
+        self._export_btn = QPushButton("📦 Export")
+        self._export_btn.setObjectName("pri")
+        self._export_btn.setMinimumHeight(24)
+        self._export_btn.clicked.connect(self._export)
+        export_row.addWidget(self._export_btn)
+        
+        lo.addLayout(export_row)
+        
+        # 进度条和状态
+        status_row = QHBoxLayout()
+        status_row.setSpacing(4)
+        self._export_bar = QProgressBar()
+        self._export_bar.setMinimumHeight(4)
+        self._export_bar.setTextVisible(False)
+        status_row.addWidget(self._export_bar, 1)
+        self._export_status = QLabel("Ready")
+        self._export_status.setStyleSheet(
+            f"font-size:8px;color:{TEXT3};padding:2px 4px;background:{BG};"
+            f"border-radius:3px;border:1px solid {BORDER};")
+        status_row.addWidget(self._export_status, 0)
+        lo.addLayout(status_row)
+        
         self._mode_manual.toggled.connect(self._on_mode_changed)
+        return g
+
+    def _build_stats_section(self):
+        g = QGroupBox("Class Distribution")
+        lo = QVBoxLayout(g)
+        lo.setSpacing(6)
+        lo.setContentsMargins(8, 8, 8, 8)
+        
+        # 表头
+        header = QHBoxLayout()
+        header.setSpacing(4)
+        header.addWidget(QLabel("Class", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;min-width:60px;"))
+        header.addWidget(QLabel("Count", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;min-width:40px;"))
+        header.addWidget(QLabel("%", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;min-width:36px;"))
+        header.addWidget(QLabel("Distribution", styleSheet=f"font-size:9px;color:{TEXT2};font-weight:500;"), 1)
+        lo.addLayout(header)
+        
+        # 总计信息
+        self._stats_summary = QLabel("0 images · 0 instances")
+        self._stats_summary.setStyleSheet(
+            f"font-size:9px;color:{TEXT3};padding:4px 6px;background:{BG};"
+            f"border-radius:4px;border:1px solid {BORDER};")
+        lo.addWidget(self._stats_summary)
+        
+        # 类别统计列表
+        self._stats_list = QWidget()
+        self._stats_layout = QVBoxLayout(self._stats_list)
+        self._stats_layout.setSpacing(4)
+        self._stats_layout.setContentsMargins(0, 0, 0, 0)
+        lo.addWidget(self._stats_list, 1)
+        
         return g
 
     def _build_annotation_section(self):
@@ -840,172 +1016,6 @@ class LabelTab(QWidget):
             f"QListWidget::item:selected {{ background:{PRI}25; color:{TEXT}; border:none; }}")
         self._ann_list.currentRowChanged.connect(self._on_ann_list_select)
         lo.addWidget(self._ann_list)
-        return g
-
-    def _build_export_section(self):
-        g = QGroupBox("Export")
-        lo = QVBoxLayout(g)
-        lo.setSpacing(6)
-        lo.setContentsMargins(10, 10, 10, 10)
-        sr = QHBoxLayout()
-        sr.setSpacing(6)
-        sr.addWidget(QLabel("Train", styleSheet=f"font-size:10px;color:{TEXT2};font-weight:500;min-width:36px;"))
-        self._train_ratio = QSpinBox()
-        self._train_ratio.setRange(50, 99)
-        self._train_ratio.setValue(90)
-        self._train_ratio.setSuffix(" %")
-        self._train_ratio.setMinimumHeight(26)
-        sr.addWidget(self._train_ratio, 1)
-        sr.addWidget(QLabel("Val", styleSheet=f"font-size:10px;color:{TEXT3};font-weight:500;min-width:28px;"))
-        self._val_label = QLabel("10%")
-        self._val_label.setStyleSheet(f"font-size:11px;color:{TEXT3};font-weight:600;")
-        sr.addWidget(self._val_label)
-        lo.addLayout(sr)
-        self._train_ratio.valueChanged.connect(lambda v: self._val_label.setText(f"{100 - v}%"))
-        self._export_btn = QPushButton("📦 Export Dataset")
-        self._export_btn.setObjectName("pri")
-        self._export_btn.setMinimumHeight(32)
-        self._export_btn.clicked.connect(self._export)
-        lo.addWidget(self._export_btn)
-        
-        # 进度条和状态在同一行
-        status_row = QHBoxLayout()
-        status_row.setSpacing(6)
-        self._export_bar = QProgressBar()
-        self._export_bar.setMinimumHeight(6)
-        self._export_bar.setTextVisible(False)
-        status_row.addWidget(self._export_bar, 1)
-        self._export_status = QLabel("Ready")
-        self._export_status.setStyleSheet(
-            f"font-size:9px;color:{TEXT3};padding:4px 6px;background:{BG};"
-            f"border-radius:4px;border:1px solid {BORDER};")
-        self._export_status.setWordWrap(False)
-        status_row.addWidget(self._export_status, 0)
-        lo.addLayout(status_row)
-        return g
-
-    def _build_shortcuts_section(self):
-        g = QGroupBox("Shortcuts")
-        lo = QVBoxLayout(g)
-        lo.setSpacing(6)
-        lo.setContentsMargins(10, 10, 10, 10)
-        
-        # 初始化快捷键映射
-        if not hasattr(self, '_shortcut_inputs'):
-            self._shortcut_inputs = {}
-        
-        # 快捷键配置（两列布局）
-        shortcuts = [
-            ("Previous Image", "prev", "A"),
-            ("Next Image", "next", "D"),
-            ("Delete Box", "delete_box", "W"),
-            ("Delete Image", "delete_img", "S"),
-        ]
-        
-        # 使用QGridLayout实现两列布局
-        grid = QGridLayout()
-        grid.setSpacing(6)
-        
-        for idx, (label, key, default) in enumerate(shortcuts):
-            row = idx // 2  # 每行2个
-            col = idx % 2   # 0或1
-            
-            lbl = QLabel(label)
-            lbl.setStyleSheet(f"font-size:10px;color:{TEXT2};font-weight:500;")
-            grid.addWidget(lbl, row, col * 2)
-            
-            # 快捷键输入框
-            input_w = QLineEdit()
-            input_w.setMinimumHeight(26)
-            input_w.setAlignment(Qt.AlignCenter)
-            input_w.setStyleSheet(
-                f"QLineEdit {{ background:{BG}; border:1px solid {BORDER}; border-radius:4px;"
-                f"color:{TEXT}; font-size:11px; padding:2px; }}"
-                f"QLineEdit:focus {{ border-color:{PRI}; }}")
-            
-            # 安装事件过滤器捕获按键
-            input_w.installEventFilter(self)
-            input_w.setProperty("shortcut_key", key)
-            input_w.setReadOnly(True)
-            input_w.setText(default)
-            
-            grid.addWidget(input_w, row, col * 2 + 1)
-            self._shortcut_inputs[key] = input_w
-        
-        lo.addLayout(grid)
-        
-        # 分隔线
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        separator.setStyleSheet(f"background:{BORDER};")
-        lo.addWidget(separator)
-        
-        # 四个类别快速映射按钮（映射到class_id 0-3）
-        class_row = QHBoxLayout()
-        class_row.setSpacing(4)
-        self._class_quick_btns = []
-        for class_id in range(4):  # class_id: 0, 1, 2, 3
-            btn = QPushButton(str(class_id))  # 显示为0、1、2、3
-            btn.setMinimumHeight(28)
-            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            btn.setStyleSheet(
-                f"QPushButton {{ background:{BG}; border:1px solid {BORDER}; border-radius:4px;"
-                f"color:{TEXT}; font-size:12px; font-weight:600; }}"
-                f"QPushButton:hover {{ background:{PRI}20; border-color:{PRI}; }}"
-                f"QPushButton:checked {{ background:{PRI}; color:#fff; border:1px solid {PRI}; }}")
-            btn.setCheckable(True)
-            btn.setProperty("class_id", class_id)
-            btn.clicked.connect(lambda checked, cid=class_id: self._on_class_selected(cid))
-            if class_id == 0:
-                btn.setChecked(True)
-            class_row.addWidget(btn)
-            self._class_quick_btns.append(btn)
-        lo.addLayout(class_row)
-        
-        # 提示信息
-        hint = QLabel("Click to set key | Click buttons to select class")
-        hint.setStyleSheet(f"font-size:9px;color:{TEXT3};font-style:italic;")
-        hint.setAlignment(Qt.AlignCenter)
-        lo.addWidget(hint)
-        
-        return g
-
-    def _build_filter_section(self):
-        """构建数据集随机筛选组件"""
-        g = QGroupBox("Dataset Filter")
-        lo = QVBoxLayout(g)
-        lo.setSpacing(4)
-        lo.setContentsMargins(8, 6, 8, 6)
-        
-        # 说明文字
-        info_label = QLabel("Keep 1 image per 3 images group")
-        info_label.setStyleSheet(f"font-size:9px;color:{TEXT2};font-weight:500;")
-        info_label.setWordWrap(True)
-        lo.addWidget(info_label)
-        
-        # 统计信息
-        stats_label = QLabel("Current: 0 images → After: 0 images")
-        self._filter_stats_label = stats_label
-        self._filter_stats_label.setStyleSheet(
-            f"font-size:9px;color:{TEXT3};padding:3px 5px;background:{BG};"
-            f"border-radius:3px;border:1px solid {BORDER};")
-        self._filter_stats_label.setWordWrap(True)
-        lo.addWidget(self._filter_stats_label)
-        
-        # 筛选按钮
-        filter_btn = QPushButton("🎲 Random Filter")
-        filter_btn.setObjectName("pri")
-        filter_btn.setMinimumHeight(28)
-        filter_btn.clicked.connect(self._random_filter_dataset)
-        lo.addWidget(filter_btn)
-        
-        # 警告提示
-        warning = QLabel("⚠️ This will permanently delete images")
-        warning.setStyleSheet(f"font-size:8px;color:{AMBER};font-style:italic;")
-        warning.setWordWrap(True)
-        lo.addWidget(warning)
-        
         return g
 
     def eventFilter(self, obj, event):
@@ -1165,11 +1175,6 @@ class LabelTab(QWidget):
         for i, btn in enumerate(self._class_btns):
             btn.setChecked(i == btn_idx)
         
-        # 同步更新快速类别按钮（class_id 0-3）
-        if hasattr(self, '_class_quick_btns') and self._class_quick_btns:
-            for i, btn in enumerate(self._class_quick_btns):
-                btn.setChecked(i == class_id)
-        
         self.canvas.set_current_class(class_id)
         if self.canvas.selected_idx >= 0:
             self.canvas.annotations[self.canvas.selected_idx].class_id = class_id
@@ -1187,6 +1192,7 @@ class LabelTab(QWidget):
         self._save_indicator.setText("● Unsaved")
         self._save_indicator.setStyleSheet(f"font-size:10px;color:{AMBER};font-weight:600;")
         self._update_ann_list()
+        self._update_stats()
         self._save_session()
 
     def _on_ann_list_select(self, row):
@@ -1222,6 +1228,7 @@ class LabelTab(QWidget):
             except Exception as e:
                 print(f"Load annotations error: {e}")
         self._update_counts()
+        self._update_stats()
         if self._image_paths:
             self._show_image(self._current_idx)
         else:
@@ -1331,8 +1338,8 @@ class LabelTab(QWidget):
             # 处理类别快捷键（1-4）
             elif current_key_name in ["1", "2", "3", "4"]:
                 class_id = int(current_key_name) - 1
-                if hasattr(self, '_class_quick_btns') and class_id < len(self._class_quick_btns):
-                    self._on_class_selected(class_id)
+                if 0 <= class_id < len(self._class_ids):
+                    self._on_class_selected(self._class_ids[class_id])
                     return
         
         super().keyPressEvent(event)
@@ -1372,6 +1379,7 @@ class LabelTab(QWidget):
 
     def _delete_selected(self):
         self.canvas.delete_selected()
+        self._update_stats()
 
     def _delete_image(self):
         """删除当前图片及其标注"""
@@ -1433,6 +1441,7 @@ class LabelTab(QWidget):
             
             # 更新计数
             self._update_counts()
+            self._update_stats()
             
             # 保存session
             self._save_session()
@@ -1443,6 +1452,7 @@ class LabelTab(QWidget):
 
     def _clear_annotations(self):
         self.canvas.clear_annotations()
+        self._update_stats()
 
     def _random_filter_dataset(self):
         """数据集随机筛选：每3张图片为一组，随机删除2张，保留1张"""
@@ -1539,6 +1549,7 @@ class LabelTab(QWidget):
             
             # 更新计数
             self._update_counts()
+            self._update_stats()
             
             # 保存session
             self._save_session()
@@ -1577,10 +1588,90 @@ class LabelTab(QWidget):
         self._count_label.setText(f"{n} images")
         self._annotated_label.setText(f"{annotated} annotated")
         
-        # 更新筛选统计
         if hasattr(self, '_filter_stats_label'):
             remaining = (n + 2) // 3 if n >= 3 else n
-            self._filter_stats_label.setText(f"Current: {n} images → After: {remaining} images")
+            self._filter_stats_label.setText(f"{n} → {remaining} images")
+        
+        self._update_stats()
+
+    def _update_stats(self):
+        """更新类别统计信息"""
+        if not hasattr(self, '_stats_layout'):
+            return
+        
+        # 清除旧控件
+        while self._stats_layout.count():
+            item = self._stats_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # 统计所有标注中的类别
+        class_counts = {}
+        total_boxes = 0
+        total_images = len(self._annotations)
+        
+        for anns in self._annotations.values():
+            for ann in anns:
+                class_id = ann.class_id
+                class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                total_boxes += 1
+        
+        # 更新总计信息
+        self._stats_summary.setText(f"{total_images} images · {total_boxes} instances")
+        
+        # 显示每个类别的统计
+        if class_counts:
+            for class_id in sorted(class_counts.keys()):
+                count = class_counts[class_id]
+                name = resolve_class_name(class_id)
+                color = CLASS_COLORS[class_id % len(CLASS_COLORS)]
+                percentage = (count / total_boxes * 100) if total_boxes > 0 else 0
+                
+                # 创建行容器
+                row_widget = QWidget()
+                row_layout = QHBoxLayout(row_widget)
+                row_layout.setSpacing(6)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                
+                # 颜色点 + 类别名
+                name_layout = QHBoxLayout()
+                name_layout.setSpacing(4)
+                dot = QLabel("●")
+                dot.setStyleSheet(f"color:{color};font-size:12px;")
+                name_layout.addWidget(dot)
+                name_label = QLabel(name)
+                name_label.setStyleSheet(f"font-size:10px;color:{TEXT};font-weight:500;")
+                name_layout.addWidget(name_label)
+                name_layout.addStretch()
+                row_layout.addLayout(name_layout, 1)
+                
+                # 数量
+                count_label = QLabel(str(count))
+                count_label.setStyleSheet(f"font-size:10px;color:{TEXT};font-weight:500;min-width:36px;")
+                row_layout.addWidget(count_label)
+                
+                # 百分比
+                pct_label = QLabel(f"{percentage:.1f}%")
+                pct_label.setStyleSheet(f"font-size:10px;color:{TEXT2};min-width:40px;")
+                row_layout.addWidget(pct_label)
+                
+                # 进度条
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setValue(int(percentage))
+                bar.setTextVisible(False)
+                bar.setFixedHeight(8)
+                bar.setStyleSheet(
+                    f"QProgressBar {{ background:#f0f0f0; border-radius:4px; border:none; }}"
+                    f"QProgressBar::chunk {{ background:{color}; border-radius:4px; }}")
+                row_layout.addWidget(bar, 1)
+                
+                self._stats_layout.addWidget(row_widget)
+        else:
+            no_data = QLabel("No annotations yet")
+            no_data.setStyleSheet(f"font-size:10px;color:{TEXT3};padding:8px;text-align:center;")
+            no_data.setAlignment(Qt.AlignCenter)
+            self._stats_layout.addWidget(no_data)
 
     # ═══════════════ SOURCE ═══════════════
 
@@ -1632,7 +1723,7 @@ class LabelTab(QWidget):
                 return
         self._auto_anns = {}
         self._auto_btn.setEnabled(False)
-        self._auto_btn.setText("⏳ Working...")
+        self._auto_btn.setText("⏳")
         self._export_bar.setValue(0)
         self._worker = AutoLabelWorker(
             model_path=model_path,
@@ -1651,7 +1742,7 @@ class LabelTab(QWidget):
 
     def _on_auto_done(self, ok, msg):
         self._auto_btn.setEnabled(True)
-        self._auto_btn.setText("▶ Auto Label")
+        self._auto_btn.setText("▶")
         if ok and self._auto_anns:
             for img_path, ann_dicts in self._auto_anns.items():
                 if ann_dicts:
@@ -1661,6 +1752,7 @@ class LabelTab(QWidget):
                 self.canvas.set_annotations(self._annotations[key])
             self._save_session()
             self._update_counts()
+            self._update_stats()
         self._export_bar.setValue(100 if ok else 0)
 
     # ═══════════════ EXPORT ═══════════════

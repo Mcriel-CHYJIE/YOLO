@@ -2,7 +2,7 @@
 from scripts.tabs.base import *
 
 TABS = [
-    ("Training", "配置并启动 YOLO 模型训练", "Model / Epochs / Batch / ImgSz / Optimizer / Scheduler 等超参数设置，支持 GPU/CPU 切换，实时显示 Loss、mAP 曲线及系统资源监控", PRI),
+    ("Training", "配置并启动 YOLO 模型训练", "Model / Epochs / Batch / ImgSz / Optimizer / Scheduler 等超参数设置，支持 GPU/CPU 切换，实时显示 Loss、mAP 曲线及系统资源监控\n\nAlgorithm 参数说明:\n• Focal γ: 控制难分样本权重，γ越大对难分样本关注度越高（默认0.0）\n• Smoothing: 标签平滑防止过度自信，提升泛化能力（默认0.10）\n• IoU: NMS过滤重复检测框的阈值，目标密集时调低（默认0.7）\n• Close Mosaic: 最后N个epoch关闭Mosaic增强进行微调（默认15）\n• Copy-Paste: 随机复制目标粘贴到其他位置增加多样性（默认0.0）\n• Rotation: 随机旋转角度范围，适应多角度目标（默认15°）\n• Multi-Scale: 训练时随机改变输入尺寸提升尺度鲁棒性（默认关闭）", PRI),
     ("Validate", "验证已训练模型的性能", "加载训练好的权重，在验证集上计算 mAP@0.5 / mAP@0.5:0.95 / Precision / Recall 等指标", GREEN),
     ("Predict", "对图片或视频进行实时目标检测", "加载模型并推理，实时显示检测结果、FPS、各类别统计信息", AMBER),
     ("Dataset", "数据集管理与预处理", "数据集结构概览、类别分布统计，方便检查标注质量与数据平衡", "#8b5cf6"),

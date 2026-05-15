@@ -2,6 +2,7 @@
 from scripts.tabs.base import *
 import cv2
 import os
+import time
 os.environ['OPENCV_FFMPEG_LOGLEVEL'] = 'error'
 
 
@@ -124,9 +125,36 @@ class VideoPreprocessWorker(QThread):
                         # 随机选择该秒中的一帧
                         random_frame = random.randint(start_frame, end_frame - 1)
                         
-                        # 跳转到随机帧
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
-                        ret, frame = cap.read()
+                        # 尝试读取帧，最多重试3次
+                        frame = None
+                        ret = False
+                        max_retries = 3
+                        
+                        for attempt in range(max_retries):
+                            # 第一次尝试直接跳转，后续尝试使用不同策略
+                            if attempt == 0:
+                                cap.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
+                            elif attempt == 1:
+                                # 第二次尝试：跳转到该秒的起始帧
+                                cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+                            else:
+                                # 第三次尝试：跳转到前一秒的最后一帧，然后顺序读取
+                                prev_frame = max(0, start_frame - 1)
+                                cap.set(cv2.CAP_PROP_POS_FRAMES, prev_frame)
+                                # 顺序读取到目标帧
+                                skip_frames = random_frame - prev_frame
+                                for _ in range(skip_frames):
+                                    cap.read()
+                            
+                            ret, frame = cap.read()
+                            
+                            # 验证帧是否有效
+                            if ret and frame is not None and frame.size > 0:
+                                break
+                            
+                            # 如果失败，等待一小段时间再重试
+                            if attempt < max_retries - 1:
+                                time.sleep(0.01)
                         
                         if ret and frame is not None and frame.size > 0:
                             # 缩放到640×640
@@ -142,7 +170,9 @@ class VideoPreprocessWorker(QThread):
                         else:
                             decode_errors += 1
                             if decode_errors <= 3:
-                                self.log.emit(f' ⚠️ Frame decode failed at second {second}')
+                                self.log.emit(f' ⚠️ Frame decode failed at second {second} (frame {random_frame})')
+                            elif decode_errors == 4:
+                                self.log.emit(f' ⚠️ Too many decode errors, suppressing further messages...')
                     except Exception as e:
                         decode_errors += 1
                         if decode_errors <= 3:
