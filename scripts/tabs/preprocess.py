@@ -25,18 +25,16 @@ class VideoPreprocessWorker(QThread):
         self._stop = True
 
     @staticmethod
-    def _letterbox_resize(img, size=640):
-        """保持宽高比缩放到目标尺寸，不足补黑边"""
+    def _resize_image(img, target_size=640):
+        """保持宽高比缩放到目标尺寸（长边不超过target_size）"""
         h, w = img.shape[:2]
-        scale = size / max(h, w)
+        # 计算缩放比例，以长边为准
+        scale = target_size / max(h, w)
         nw, nh = int(w * scale), int(h * scale)
         # 使用INTER_AREA进行缩小（减少混叠），INTER_CUBIC进行放大（更高质量）
         interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
         resized = cv2.resize(img, (nw, nh), interpolation=interpolation)
-        out = np.zeros((size, size, 3), dtype=np.uint8)
-        y0, x0 = (size - nh) // 2, (size - nw) // 2
-        out[y0:y0 + nh, x0:x0 + nw] = resized
-        return out
+        return resized
 
     def run(self):
         try:
@@ -157,8 +155,8 @@ class VideoPreprocessWorker(QThread):
                                 time.sleep(0.01)
                         
                         if ret and frame is not None and frame.size > 0:
-                            # 缩放到640×640
-                            resized = self._letterbox_resize(frame, self.target_size)
+                            # 保持原始宽高比缩放
+                            resized = self._resize_image(frame, self.target_size)
                             # 命名格式：文件夹名-视频序号-秒数.jpg
                             out_filename = f'{folder_name}-{video_num}-{second:04d}.jpg'
                             out_path = self.out_folder / out_filename

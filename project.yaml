@@ -6,7 +6,7 @@
 
 # ── Project Identity ──
 project:
-  name: Fall Detection Studio          # Window title
+  name: YOLO Training Studio         # Window title
   task: detect                         # YOLO task (detect / segment / classify)
   classes: ['standing', 'sitting', 'squatting', 'fallen']
   names:                               # YOLO class definitions with descriptions
@@ -26,28 +26,36 @@ training:
     - yolo11m.pt
     - yolo11l.pt
     - yolo11x.pt
-  epochs: 300
-  batch: 32
+  epochs: 150                          # Reduced to prevent overfitting
+  batch: 32                            # Keep batch size at 32
   imgsz: 640
   imgsz_options: [416, 512, 640, 800]
-  optimizer: AdamW
+  optimizer: SGD                       # Changed to SGD for better generalization
   optimizer_options: [AdamW, Adam, SGD]
   device: auto                         # auto = detect GPU; fallback to CPU
   scheduler: cosine                    # cosine / linear
   scheduler_options: [Cosine, Linear]
-  patience: 50
-  lr0: 0.001
-  lrf: 0.01
-  warmup_epochs: 3
+  patience: 20                         # Reduced for earlier stopping
+  lr0: 0.0003                          # Further reduced for stable training
+  lrf: 0.001                           # Lower final learning rate
+  warmup_epochs: 10                    # Increased for smoother start
   workers: 8
-  # Algorithm
-  fl_gamma: 0.0                        # Focal loss gamma (0 = off)
-  label_smoothing: 0.10
-  iou: 0.7
-  close_mosaic: 15
-  copy_paste: 0.0                      # 0 = off
-  degrees: 15.0                        # Rotation degrees
-  multi_scale: false                   # Multi-scale training
+  momentum: 0.937                      # SGD momentum
+  weight_decay: 0.0005                 # L2 regularization
+  # Algorithm - Enhanced augmentation
+  fl_gamma: 2.0                        # Increased for better class balance
+  label_smoothing: 0.2                 # Stronger regularization
+  iou: 0.65                            # Stricter matching
+  close_mosaic: 25                     # Close mosaic earlier
+  copy_paste: 0.5                      # Stronger copy-paste augmentation
+  degrees: 30.0                        # More rotation variety
+  multi_scale: true                    # Scale invariance
+  hsv_h: 0.015                         # Hue augmentation
+  hsv_s: 0.7                           # Saturation augmentation
+  hsv_v: 0.4                           # Value (brightness) augmentation
+  translate: 0.1                       # Translation augmentation
+  scale: 0.9                           # Scale range 0.9-1.1
+  flip_lr: 0.5                         # Horizontal flip
 
 # ── Validation Defaults ──
 validation:

@@ -3,7 +3,7 @@ Config Loader — reads project.yaml from project root.
 
 Usage:
     from scripts.tabs.config import cfg
-    cfg['project']['name']       # → 'Fall Detection Studio'
+    cfg['project']['name']       # → 'YOLO Training Studio'
     cfg['training']['epochs']    # → 300
     cfg['predict']['conf']       # → 0.25
 
