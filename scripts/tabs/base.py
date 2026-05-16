@@ -64,6 +64,8 @@ QCheckBox{{spacing:5px;font-size:11px;color:{TEXT};}}
 # ── 共享常量 ──
 VIDEO_EXTS = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
 MODEL_FILTER = 'PyTorch (*.pt)'
+CLASS_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444',
+                '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
 
 # ── 共享 UI 工具 ──
 
@@ -294,27 +296,32 @@ class Trainer(QThread):
                 cfg['lr0'] = 0.001; self.log.emit(f'⚠️  LR0 was 0, reset to 0.001')
             def cb(t):
                 if self._stop: t.stop = True; return
-                ep = t.epoch; loss = 0.0
                 try:
-                    if hasattr(t,'loss') and t.loss is not None: loss = float(t.loss)
-                    if loss == 0.0 and hasattr(t,'tloss') and t.tloss is not None: loss = float(t.tloss)
-                except: pass
-                mt = getattr(t,'metrics',None) or {}
-                m50 = float(mt.get('metrics/mAP50(B)',0)); m95 = 0.0
-                for k in ['metrics/mAP50_95(B)','metrics/mAP50_95','metrics/mAP_0.5:0.95']:
-                    v = mt.get(k)
-                    if v is not None:
-                        try: m95 = float(v); break
-                        except: pass
-                p = float(mt.get('metrics/precision(B)',0)); r = float(mt.get('metrics/recall(B)',0))
-                self.history['epoch'].append(ep); self.history['train_loss'].append(loss)
-                self.history['mAP50'].append(m50); self.history['mAP50_95'].append(m95)
-                self.history['precision'].append(p); self.history['recall'].append(r)
-                if m50 > self.best_map: self.best_map = m50
-                total_epochs = max(cfg['epochs'], 1)
-                progress = min(ep / total_epochs, 1.0)
-                self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', progress, self.best_map, m50)
-                self.chart.emit()
+                    ep = t.epoch; loss = 0.0
+                    try:
+                        if hasattr(t,'loss') and t.loss is not None: loss = float(t.loss)
+                        if loss == 0.0 and hasattr(t,'tloss') and t.tloss is not None: loss = float(t.tloss)
+                    except: pass
+                    mt = getattr(t,'metrics',None) or {}
+                    m50 = float(mt.get('metrics/mAP50(B)',0)); m95 = 0.0
+                    for k in ['metrics/mAP50_95(B)','metrics/mAP50_95','metrics/mAP_0.5:0.95']:
+                        v = mt.get(k)
+                        if v is not None:
+                            try: m95 = float(v); break
+                            except: pass
+                    p = float(mt.get('metrics/precision(B)',0)); r = float(mt.get('metrics/recall(B)',0))
+                    self.history['epoch'].append(ep); self.history['train_loss'].append(loss)
+                    self.history['mAP50'].append(m50); self.history['mAP50_95'].append(m95)
+                    self.history['precision'].append(p); self.history['recall'].append(r)
+                    if m50 > self.best_map: self.best_map = m50
+                    total_epochs = max(cfg['epochs'], 1)
+                    progress = min(ep / total_epochs, 1.0)
+                    self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', progress, self.best_map, m50)
+                    self.chart.emit()
+                except Exception as e:
+                    try:
+                        self.log.emit(f'⚠️ Callback error: {e}')
+                    except: pass
             m.add_callback('on_train_epoch_end', cb)
             train_args = dict(data=DATA_YAML, epochs=cfg['epochs'], batch=cfg['batch'], imgsz=cfg['imgsz'],
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
@@ -346,6 +353,33 @@ def find_latest_best():
     return str(m[-1]) if m else None
 
 
+# ── Distillation Loss Wrapper (picklable) ──
+class DistillationLossWrapper:
+    """Wrapper class for distillation loss (picklable for multiprocessing)"""
+    def __init__(self, orig_loss, teacher_model, alpha, device):
+        self.orig_loss = orig_loss
+        self.teacher_model = teacher_model
+        self.alpha = alpha
+        self.device = device
+    
+    def __call__(self, preds, batch):
+        import torch
+        import torch.nn.functional as F
+        det_loss, loss_items = self.orig_loss(batch, preds=preds)
+        with torch.no_grad():
+            to = self.teacher_model(batch['img'].to(self.device))
+            t_feats = to[1]['feats'] if isinstance(to, tuple) else to.get('feats', [])
+        s_feats = preds.get('feats', [])
+        distill = 0.0
+        n = min(len(s_feats), len(t_feats))
+        for i in range(n):
+            sp = s_feats[i].view(s_feats[i].size(0), -1)
+            tp = t_feats[i].view(t_feats[i].size(0), -1)
+            md = min(sp.size(-1), tp.size(-1))
+            distill += F.mse_loss(sp[:, :md], tp[:, :md].detach())
+        return (1.0 - self.alpha) * det_loss.sum() + self.alpha * distill / max(n, 1), loss_items
+
+
 # ── DistillWorker ──
 class DistillWorker(QThread):
     log = pyqtSignal(str); progress = pyqtSignal(int, dict); done = pyqtSignal(bool, str)
@@ -360,7 +394,7 @@ class DistillWorker(QThread):
     def _train(self):
         import torch, torch.nn.functional as F, torch.optim as optim
         from torch.optim.lr_scheduler import CosineAnnealingLR
-        import numpy as np, shutil, json
+        import numpy as np, shutil, json, time
         from ultralytics import YOLO
         from ultralytics.data import build_dataloader, build_yolo_dataset
         from ultralytics.data.utils import check_det_dataset
@@ -378,39 +412,45 @@ class DistillWorker(QThread):
         for p in student.model.parameters(): p.requires_grad = True
         student.model.to(device); student.model.train()
         alpha = cfg['alpha']; orig_loss = student.model.loss
-        def combined_loss(preds, batch):
-            det_loss, loss_items = orig_loss(batch, preds=preds)
-            with torch.no_grad():
-                to = teacher.model(batch['img'])
-                t_feats = to[1]['feats'] if isinstance(to, tuple) else to['feats']
-            s_feats = preds['feats']; distill = 0.0; n = min(len(s_feats), len(t_feats))
-            for i in range(n):
-                sp = s_feats[i].view(s_feats[i].size(0), -1)
-                tp = t_feats[i].view(t_feats[i].size(0), -1)
-                md = min(sp.size(-1), tp.size(-1))
-                distill += F.mse_loss(sp[:, :md], tp[:, :md].detach())
-            return (1.0 - alpha) * det_loss.sum() + alpha * distill / max(n, 1), loss_items
-        student.model.loss = combined_loss
+        # Use picklable wrapper class instead of local function
+        loss_wrapper = DistillationLossWrapper(orig_loss, teacher.model, alpha, device)
+        student.model.loss = loss_wrapper
         self.log.emit(f'[Data] {cfg["data"]}')
         data_dict = check_det_dataset(cfg['data'])
-        cfg_ns = SimpleNamespace(imgsz=cfg['imgsz'], batch=cfg['batch'], workers=cfg['workers'],
-            lr0=cfg['lr0'], weight_decay=0.0005, momentum=0.937, rect=False, cache=None,
+        cfg_ns = SimpleNamespace(imgsz=cfg['imgsz'], batch=cfg['batch'], workers=0,
+            lr0=cfg['lr0'], weight_decay=cfg.get('weight_decay', 0.0005), momentum=cfg.get('momentum', 0.937), rect=False, cache=None,
             single_cls=False, stride=32, pad=0.0, prefix=colorstr('train: '), task='detect',
             classes=None, fraction=1.0, augment=True, hyp=None, data=data_dict,
-            mosaic=1.0, mixup=0.0, copy_paste=0.0, cutmix=0.0, degrees=0.0,
+            mosaic=1.0, mixup=0.0, copy_paste=0.0, copy_paste_mode='flip', cutmix=0.0, degrees=0.0,
             translate=0.1, scale=0.5, shear=0.0, perspective=0.0, flipud=0.0,
-            fliplr=0.5, bgr=0.0, hsv_h=0.015, hsv_s=0.7, hsv_v=0.4, erasing=0.4)
+            fliplr=0.5, bgr=0.0, hsv_h=0.015, hsv_s=0.7, hsv_v=0.4, erasing=0.4, mask_ratio=4, overlap_mask=False)
         ds = build_yolo_dataset(cfg_ns, data_dict['train'], cfg['batch'], data_dict, mode='train', rect=False, stride=32)
-        dl = build_dataloader(ds, cfg['batch'], workers=cfg['workers'], shuffle=True)
+        # Use workers=0 to avoid pickle issues on Windows with local functions/classes
+        dl = build_dataloader(ds, batch=cfg['batch'], workers=0, shuffle=True)
         self.log.emit(f'[Data] {len(ds)} samples, {len(dl)} batches/epoch')
-        opt = optim.AdamW(student.model.parameters(), lr=cfg['lr0'], weight_decay=0.0005, betas=(0.937, 0.999))
-        sch = CosineAnnealingLR(opt, T_max=cfg['epochs'], eta_min=cfg['lr0'] * 0.01)
+        # Optimizer with configurable parameters
+        weight_decay = cfg.get('weight_decay', 0.0005)
+        momentum_beta = cfg.get('momentum', 0.937)
+        opt = optim.AdamW(student.model.parameters(), lr=cfg['lr0'], weight_decay=weight_decay, betas=(momentum_beta, 0.999))
+        warmup_epochs = cfg.get('warmup_epochs', 5)
+        sch = CosineAnnealingLR(opt, T_max=cfg['epochs'] - warmup_epochs, eta_min=cfg['lr0'] * 0.01)
         save_dir = ROOT2 / 'runs' / 'distill' / cfg['name']; save_dir.mkdir(parents=True, exist_ok=True)
         best_map50, best_epoch, pc, hist = 0.0, 0, 0, {'epoch':[],'loss':[],'map50':[],'map50_95':[]}
+        total_batches = len(dl)
+        self.log.emit(f'\n🚀 Starting distillation training...')
         for ep in range(1, cfg['epochs'] + 1):
             if self._stop: break
+            # Warmup learning rate
+            if ep <= warmup_epochs:
+                warmup_factor = ep / warmup_epochs
+                for param_group in opt.param_groups:
+                    param_group['lr'] = cfg['lr0'] * warmup_factor
             student.model.train(); el, nb = 0.0, 0
-            for batch in dl:
+            # Log epoch start with progress
+            epoch_progress = f'{ep}/{cfg["epochs"]}'
+            self.log.emit(f'\n[Epoch {epoch_progress}] LR: {opt.param_groups[0]["lr"]:.6f} | Batches: {total_batches}')
+            batch_start_time = time.time()
+            for bi, batch in enumerate(dl):
                 if self._stop: break
                 try:
                     img = batch['img'].to(device, non_blocking=True)
@@ -421,27 +461,52 @@ class DistillWorker(QThread):
                     loss, _ = student.model.loss(student.model(img), batch)
                     opt.zero_grad(); loss.backward(); opt.step()
                     el += loss.item(); nb += 1
+                    
+                    # Log batch progress every 10% or last batch
+                    batch_idx = bi + 1
+                    if batch_idx % max(total_batches // 10, 1) == 0 or batch_idx == total_batches:
+                        batch_pct = batch_idx / total_batches * 100
+                        elapsed = time.time() - batch_start_time
+                        avg_time = elapsed / batch_idx
+                        eta = avg_time * (total_batches - batch_idx)
+                        self.log.emit(f'  [{batch_idx}/{total_batches}] ({batch_pct:.0f}%) | Loss: {loss.item():.4f} | ETA: {eta:.0f}s')
                 except RuntimeError as e:
                     if 'CUDA out of memory' in str(e):
                         self.log.emit('[OOM] skip batch'); torch.cuda.empty_cache(); continue
                     raise
             sch.step(); avg = el / max(nb, 1); vm50, vm95 = 0.0, 0.0
-            if ep % max(cfg['epochs']//10, 1) == 0 or ep == 1:
+            # Validate every epoch for distillation
+            validate_now = True
+            if validate_now:
                 try:
-                    vm = YOLO(cfg['student']); vm.model.load_state_dict(student.model.state_dict())
-                    r = vm.val(data=cfg['data'], device=device, batch=cfg['batch'], imgsz=cfg['imgsz'], plots=False, verbose=False, save=False)
-                    vm50, vm95 = r.box.map50, r.box.map
-                except: pass
+                    # Use a fresh YOLO instance for validation to avoid custom loss interference
+                    vm = YOLO(cfg['student'])
+                    vm.model.load_state_dict(student.model.state_dict())
+                    vm.model.to(device)
+                    vm.model.eval()
+                    r = vm.val(data=cfg['data'], device=device, batch=min(cfg['batch'], 16), imgsz=cfg['imgsz'], 
+                              plots=False, verbose=False, save=False, rect=True)
+                    vm50, vm95 = float(r.box.map50), float(r.box.map)
+                    self.log.emit(f'  [Val] mAP50: {vm50:.4f}, mAP50-95: {vm95:.4f}')
+                except Exception as ve:
+                    # Log validation errors for debugging
+                    import traceback
+                    self.log.emit(f'[Val Error] {ve}')
+                    self.log.emit(traceback.format_exc())
+                    vm50, vm95 = 0.0, 0.0
                 if vm50 > best_map50:
                     best_map50, best_epoch, pc = vm50, ep, 0
                     torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / 'best.pt'))
+                    self.log.emit(f'  🎉 New best mAP50: {vm50:.4f} (epoch {ep})')
                 else: pc += 1
             if ep % 10 == 0:
                 torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / f'epoch_{ep}.pt'))
             hist['epoch'].append(ep); hist['loss'].append(avg); hist['map50'].append(vm50); hist['map50_95'].append(vm95)
             self.log.emit(f'Epoch {ep}/{cfg["epochs"]} | Loss: {avg:.4f} | mAP50: {vm50:.4f}' + (f' | Best: {best_map50:.4f}@{best_epoch}' if best_map50 > 0 else ''))
-            self.progress.emit(ep, {'epoch': ep, 'total': cfg['epochs'], 'loss': avg, 'map50': vm50, 'best_map50': best_map50, 'best_epoch': best_epoch, 'lr': sch.get_last_lr()[0], 'history': dict(hist)})
-            if pc >= cfg['patience'] and ep > 50: self.log.emit('[Early Stop]'); break
+            self.progress.emit(ep, {'epoch': ep, 'total': cfg['epochs'], 'loss': avg, 'map50': vm50, 'best_map50': best_map50, 'best_epoch': best_epoch, 'lr': opt.param_groups[0]['lr'], 'history': dict(hist)})
+            # Early stopping: only after warmup and sufficient training
+            if pc >= cfg['patience'] and ep > warmup_epochs + 20: 
+                self.log.emit(f'[Early Stop] No improvement for {pc} epochs'); break
         torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / 'last.pt'))
         with open(str(save_dir / 'history.json'), 'w') as f: json.dump(hist, f, indent=2)
         self.log.emit(f'Done! Best mAP50: {best_map50:.4f}')
@@ -457,6 +522,7 @@ class DetectWorker(QThread):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
         self.conf = conf; self.iou = iou; self._pause = False; self._stop = False
+        self.export_path = None  # Path to save detected video
     def stop(self): self._stop = True; self._pause = False
     def toggle_pause(self): self._pause = not self._pause
     def run(self):
@@ -468,6 +534,21 @@ class DetectWorker(QThread):
             if not cap.isOpened(): self.log_signal.emit('Failed to open video'); self.finished.emit(); return
             total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.log_signal.emit(f'🎬 {self.video_path.name}  {total}帧')
+            
+            # Setup video writer if export is enabled
+            writer = None
+            if self.export_path:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                writer = cv2.VideoWriter(str(self.export_path), fourcc, fps, (w, h))
+                if writer.isOpened():
+                    self.log_signal.emit(f'💾 Saving to: {Path(self.export_path).name}')
+                else:
+                    self.log_signal.emit('⚠️ Failed to create video writer')
+                    writer = None
+            
             idx, t_prev = 0, datetime.now()
             while not self._stop and cap.isOpened():
                 if self._pause: self.msleep(50); continue
@@ -476,6 +557,11 @@ class DetectWorker(QThread):
                 idx += 1
                 results = model(frame, conf=self.conf, iou=self.iou, verbose=False)[0]
                 annotated = results.plot(line_width=2, font_size=8)
+                
+                # Write frame to video if exporting
+                if writer is not None:
+                    writer.write(annotated)
+                
                 now = datetime.now(); fps = 1.0 / max((now - t_prev).total_seconds(), 0.001); t_prev = now
                 stats = {}
                 if results.boxes is not None:
@@ -484,6 +570,11 @@ class DetectWorker(QThread):
                         stats[name] = stats.get(name, 0) + 1
                 self.frame_ready.emit(annotated, idx, total)
                 self.fps_updated.emit(fps); self.stats_updated.emit(stats)
+            
+            # Release resources
+            if writer is not None:
+                writer.release()
+                self.log_signal.emit(f'✅ Video saved: {Path(self.export_path).name}')
             cap.release()
         except Exception as e:
             import traceback; traceback.print_exc()

@@ -19,42 +19,42 @@ project:
 
 # ── Training Defaults ──
 training:
-  model: yolo11n.pt                    # Model combo default
+  model: yolo11n.pt                    # Nano model - lightweight, suitable for RTX 5070 Ti
   model_options:                       # Available models in dropdown
     - yolo11n.pt
     - yolo11s.pt
     - yolo11m.pt
     - yolo11l.pt
     - yolo11x.pt
-  epochs: 150                          # Reduced to prevent overfitting
-  batch: 32                            # Keep batch size at 32
-  imgsz: 640
+  epochs: 800                          # Extended training for maximum accuracy (time not a concern)
+  batch: 32                            # Optimized batch size for yolo11n on 16GB VRAM
+  imgsz: 640                           # Fixed image size as requested
   imgsz_options: [416, 512, 640, 800]
-  optimizer: SGD                       # Changed to SGD for better generalization
+  optimizer: AdamW                     # Best optimizer for long training with stable convergence
   optimizer_options: [AdamW, Adam, SGD]
   device: auto                         # auto = detect GPU; fallback to CPU
-  scheduler: cosine                    # cosine / linear
+  scheduler: cosine                    # Cosine annealing with warmup for optimal learning
   scheduler_options: [Cosine, Linear]
-  patience: 20                         # Reduced for earlier stopping
-  lr0: 0.0003                          # Further reduced for stable training
-  lrf: 0.001                           # Lower final learning rate
-  warmup_epochs: 10                    # Increased for smoother start
-  workers: 8
-  momentum: 0.937                      # SGD momentum
+  patience: 100                        # Extended patience for thorough best model search
+  lr0: 0.002                           # Slightly higher LR for better exploration
+  lrf: 0.01                            # Final LR = 0.002 * 0.01 = 0.00002
+  warmup_epochs: 15                    # Longer warmup for stable training start
+  workers: 8                           # Increased workers for faster data loading
+  momentum: 0.937                      # Optimizer momentum
   weight_decay: 0.0005                 # L2 regularization
-  # Algorithm - Enhanced augmentation
-  fl_gamma: 2.0                        # Increased for better class balance
-  label_smoothing: 0.2                 # Stronger regularization
-  iou: 0.65                            # Stricter matching
-  close_mosaic: 25                     # Close mosaic earlier
-  copy_paste: 0.5                      # Stronger copy-paste augmentation
-  degrees: 30.0                        # More rotation variety
-  multi_scale: true                    # Scale invariance
+  # Algorithm - Enhanced augmentation for maximum accuracy
+  fl_gamma: 1.5                        # Stronger focal loss for hard examples
+  label_smoothing: 0.1                 # Moderate smoothing for better generalization
+  iou: 0.7                             # Standard IoU threshold
+  close_mosaic: 30                     # Close mosaic last 30 epochs for fine-tuning
+  copy_paste: 0.2                      # Aggressive copy-paste augmentation
+  degrees: 15.0                        # Increased rotation augmentation
+  multi_scale: false                   # DISABLED to maintain consistent 640 input size
   hsv_h: 0.015                         # Hue augmentation
   hsv_s: 0.7                           # Saturation augmentation
-  hsv_v: 0.4                           # Value (brightness) augmentation
-  translate: 0.1                       # Translation augmentation
-  scale: 0.9                           # Scale range 0.9-1.1
+  hsv_v: 0.4                           # Brightness augmentation
+  translate: 0.15                      # Increased translation
+  scale: 0.6                           # Wider scale range 0.4-1.6x
   flip_lr: 0.5                         # Horizontal flip
 
 # ── Validation Defaults ──
@@ -67,13 +67,16 @@ validation:
 # ── Distillation Defaults ──
 distill:
   teacher: ''                          # Empty = auto-find latest runs/*/weights/best.pt
-  student: yolo11n.pt
-  epochs: 100
-  batch: 16
-  lr0: 0.001
-  alpha: 0.3
-  patience: 30
-  imgsz: 640
+  student: yolo11n.pt                  # Student model (smaller than teacher)
+  epochs: 150                          # Extended epochs for better knowledge transfer
+  batch: 24                            # Optimized batch size for distillation (teacher frozen, less memory)
+  lr0: 0.002                           # Higher LR for faster convergence in distillation
+  alpha: 0.5                           # Balanced weight: 50% detection loss + 50% distillation loss
+  patience: 40                         # Extended patience for thorough search
+  imgsz: 640                           # Same as training for consistency
+  warmup_epochs: 5                     # Shorter warmup for distillation
+  weight_decay: 0.0005                 # L2 regularization
+  momentum: 0.937                      # Optimizer momentum
 
 # ── Prediction / Inference Defaults ──
 predict:

@@ -1759,13 +1759,49 @@ class LabelTab(QWidget):
 
     def _export(self):
         self._save_current_annotations()
+        
+        # 确保所有已加载的图片在 _annotations 中都有条目（未标注的初始化为空列表）
+        for p in self._image_paths:
+            key = self._img_key(p)
+            if key not in self._annotations:
+                self._annotations[key] = []
+        
+        # Check for images with empty annotations
         labeled = {k: v for k, v in self._annotations.items() if v}
-        if not labeled:
+        unlabeled = {k: v for k, v in self._annotations.items() if not v}
+        
+        total = len(self._annotations)
+        labeled_count = len(labeled)
+        unlabeled_count = len(unlabeled)
+        
+        if total == 0:
             QMessageBox.warning(self, "Warning", "No annotation data to export")
             return
+        
+        # Prompt confirmation if there are images with empty annotations
+        if unlabeled_count > 0:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Export Dataset")
+            msg.setText("Some images have empty annotations.")
+            msg.setInformativeText(
+                f"Total images: {total}\n"
+                f"With annotations: {labeled_count}\n"
+                f"Empty annotations: {unlabeled_count}\n\n"
+                f"Images with empty annotations will still be exported\n"
+                f"(with empty .txt files). Continue?"
+            )
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg.setDefaultButton(QMessageBox.Yes)
+            reply = msg.exec_()
+            
+            if reply != QMessageBox.Yes:
+                return
+        
         self._export_btn.setEnabled(False)
         self._export_bar.setValue(0)
-        self._export_worker = ExportWorker(labeled, self._label_root, self._train_ratio.value(), ROOT)
+        self._export_worker = ExportWorker(
+            self._annotations, self._label_root, self._train_ratio.value(), ROOT)
         self._export_worker.progress.connect(lambda v: self._export_bar.setValue(v))
         self._export_worker.log.connect(lambda m: self._export_status.setText(m))
         self._export_worker.done.connect(self._on_export_done)

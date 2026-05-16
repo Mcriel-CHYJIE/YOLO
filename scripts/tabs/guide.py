@@ -8,7 +8,7 @@ TABS = [
     ("Dataset", "数据集管理与预处理", "数据集结构概览、类别分布统计，方便检查标注质量与数据平衡", "#8b5cf6"),
     ("Preprocess", "视频预处理：重命名 + 缩放 + 抽帧", "将原始视频统一重命名、保持宽高比缩放到指定尺寸、每秒随机抽取一帧保存为 JPG 图片", "#14b8a6"),
     ("Label", "手动/自动标注与审核", "支持手动绘制标注框、移动/调整/删除框，集成 YOLO 自动标注，审核后导出为 YOLO 格式数据集", "#ec4899"),
-    ("Distill", "知识蒸馏：Teacher → Student", "以大模型为教师、小模型为学生进行知识蒸馏训练，在保持精度的同时获得更轻量的模型", "#f97316"),
+    ("Distill", "知识蒸馏：Teacher → Student", "以大模型为教师、小模型为学生进行知识蒸馏训练，在保持精度的同时获得更轻量的模型\n\nDistillation Parameters:\n• Alpha: Distillation weight (0.5 = balanced detection + distillation loss)\n• LR: Learning rate (0.002 for faster convergence with warmup)\n• Batch: Batch size (can be larger since teacher is frozen)\n• Warmup: Epochs for learning rate warmup (gradually increase LR)\n• Weight Decay: L2 regularization (prevents overfitting)\n• Momentum: Optimizer momentum (AdamW beta1 parameter)\n• Patience: Early stopping patience (epochs without improvement)\n\nTip: Larger batch size is safe during distillation as the teacher model is frozen (no gradients).", "#f97316"),
     ("Export", "导出训练好的模型", "支持 ONNX / TorchScript / NCNN / OpenVINO / TensorRT / TFLite / EdgeTPU / CoreML 等多种格式", RED),
 ]
 

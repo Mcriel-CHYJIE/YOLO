@@ -52,6 +52,14 @@ class PredictTab(QWidget):
         for name, w, rc in [('Conf',self.sp_conf,(0,0)),('IoU',self.sp_iou,(0,1))]:
             cw, cl = _card(name)
             w.setMinimumHeight(22); cl.addWidget(w,1); g2l.addWidget(cw,*rc)
+        
+        # Export options
+        export_w = QWidget(); export_w.setStyleSheet(f'background:{BG};border-radius:4px;')
+        export_l = QHBoxLayout(export_w); export_l.setContentsMargins(6,1,6,1); export_l.setSpacing(4)
+        lbl_export = QLabel('Export'); lbl_export.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
+        self.cb_export = QCheckBox('Save Results'); self.cb_export.setChecked(True)
+        export_l.addWidget(lbl_export); export_l.addWidget(self.cb_export); export_l.addStretch()
+        g2l.addWidget(export_w, 1, 0, 1, 2)
         ll.addWidget(g2)
 
         # Control
@@ -185,6 +193,17 @@ class PredictTab(QWidget):
         if self._worker and self._worker.isRunning():
             self._worker.toggle_pause()
             self.btn_pause.setText('Resume' if self._worker._pause else 'Pause'); return
+        
+        # Ask for export path if export is enabled
+        export_path = None
+        if self.cb_export.isChecked():
+            default_name = f"detected_{self._source_path.stem}_{datetime.now().strftime('%m%d_%H%M')}.mp4"
+            export_path, _ = QFileDialog.getSaveFileName(
+                self, 'Save Detected Video', default_name, 'Video Files (*.mp4 *.avi)'
+            )
+            if not export_path:  # User cancelled
+                return
+        
         self._worker = DetectWorker(self._model_path, self._source_path,
                                     self.sp_conf.value(), self.sp_iou.value())
         self._worker.frame_ready.connect(self._on_frame)
@@ -196,6 +215,7 @@ class PredictTab(QWidget):
         self.btn_pause.setText('Pause')
         self.lbl_fps.setText(''); self._st_imgs.setText('0'); self._st_dets.setText('0'); self._st_fall.setText('0')
         self.lbl_cls.setText('Detecting...')
+        self._worker.export_path = export_path  # Pass export path to worker
         self._worker.start()
 
     def _toggle_pause(self):
@@ -241,9 +261,10 @@ class PredictTab(QWidget):
         try:
             from ultralytics import YOLO
             model = YOLO(str(w))
+            save_results = self.cb_export.isChecked()
             results = model.predict(source=str(src), conf=self.sp_conf.value(), iou=self.sp_iou.value(),
                 imgsz=cfg['predict']['imgsz'], device='0' if self.studio.gpu_ok else 'cpu',
-                save=True, save_txt=False, verbose=False,
+                save=save_results, save_txt=False, verbose=False,
                 project='runs', name=f'predict_{datetime.now().strftime("%m%d_%H%M")}')
             total_imgs = len(results)
             total_dets = sum(len(r.boxes) for r in results if r.boxes is not None)
@@ -259,7 +280,10 @@ class PredictTab(QWidget):
             lines = [f'{n}: {c}' for n,c in sorted(cls_counts.items(), key=lambda x:-x[1])]
             self.lbl_cls.setText('\n'.join(lines) if lines else 'No detections')
             self.log_view.append(f'Done! {total_imgs} sources, {total_dets} detections')
-            if results and hasattr(results[0],'save_dir'): self.log_view.append(f'   Saved: {results[0].save_dir}')
+            if save_results and results and hasattr(results[0],'save_dir'):
+                self.log_view.append(f'   Saved: {results[0].save_dir}')
+            elif not save_results:
+                self.log_view.append('   Results not saved (export disabled)')
         except Exception as e:
             import traceback; traceback.print_exc()
             self.log_view.append(f'Error: {e}')
