@@ -584,52 +584,6 @@ class LabelTab(QWidget):
         # 设置焦点策略，确保键盘事件可以被捕获
         self.setFocusPolicy(Qt.StrongFocus)
 
-    def _build_nav_section(self):
-        g = QGroupBox("Navigation")
-        lo = QVBoxLayout(g)
-        lo.setSpacing(4)
-        lo.setContentsMargins(8, 8, 8, 8)
-        
-        # 导航控件行
-        row = QHBoxLayout()
-        row.setSpacing(4)
-        self._prev_btn = self._make_icon_btn("◀")
-        self._prev_btn.clicked.connect(lambda: self._navigate(-1))
-        row.addWidget(self._prev_btn)
-        self._next_btn = self._make_icon_btn("▶")
-        self._next_btn.clicked.connect(lambda: self._navigate(1))
-        row.addWidget(self._next_btn)
-        
-        self._idx_input = QSpinBox()
-        self._idx_input.setMinimum(1)
-        self._idx_input.setMaximum(99999)
-        self._idx_input.setMinimumHeight(24)
-        self._idx_input.valueChanged.connect(self._goto_idx)
-        row.addWidget(self._idx_input, 1)
-        
-        self._total_label = QLabel("/ 0")
-        self._total_label.setStyleSheet(f"font-size:10px;color:{TEXT3};")
-        row.addWidget(self._total_label)
-        lo.addLayout(row)
-        
-        # 信息行
-        info_row = QHBoxLayout()
-        info_row.setSpacing(6)
-        self._img_name_label = QLabel("—")
-        self._img_name_label.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
-        info_row.addWidget(self._img_name_label, 1)
-        
-        self._ann_count_label = QLabel("0 boxes")
-        self._ann_count_label.setStyleSheet(f"font-size:9px;color:{TEXT2};")
-        info_row.addWidget(self._ann_count_label)
-        
-        self._save_indicator = QLabel("")
-        self._save_indicator.setStyleSheet(f"font-size:9px;font-weight:600;")
-        info_row.addWidget(self._save_indicator)
-        lo.addLayout(info_row)
-        
-        return g
-
     def _build_left_panel(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -700,8 +654,7 @@ class LabelTab(QWidget):
         lo.setSpacing(6)
         lo.setContentsMargins(4, 4, 4, 4)
         lo.addWidget(self._build_annotation_section())
-        lo.addWidget(self._build_class_section())
-        lo.addWidget(self._build_nav_section())
+        lo.addWidget(self._build_class_nav_section())
         lo.addStretch()
         scroll.setWidget(panel)
         scroll.setFixedWidth(280)
@@ -761,7 +714,7 @@ class LabelTab(QWidget):
         
         return g
 
-    def _build_class_section(self):
+    def _build_class_nav_section(self):
         g = QGroupBox("Classes & Shortcuts")
         lo = QVBoxLayout(g)
         lo.setSpacing(6)
@@ -850,6 +803,52 @@ class LabelTab(QWidget):
         hint.setStyleSheet(f"font-size:8px;color:{TEXT3};font-style:italic;")
         hint.setAlignment(Qt.AlignCenter)
         lo.addWidget(hint)
+        
+        # 分隔线
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.HLine)
+        sep3.setFrameShadow(QFrame.Sunken)
+        sep3.setStyleSheet(f"background:{BORDER};")
+        lo.addWidget(sep3)
+        
+        # Navigation 部分
+        # 导航控件行
+        nav_row = QHBoxLayout()
+        nav_row.setSpacing(4)
+        self._prev_btn = self._make_icon_btn("◀")
+        self._prev_btn.clicked.connect(lambda: self._navigate(-1))
+        nav_row.addWidget(self._prev_btn, 1)
+        self._next_btn = self._make_icon_btn("▶")
+        self._next_btn.clicked.connect(lambda: self._navigate(1))
+        nav_row.addWidget(self._next_btn, 1)
+        
+        self._idx_input = QSpinBox()
+        self._idx_input.setMinimum(1)
+        self._idx_input.setMaximum(99999)
+        self._idx_input.setMinimumHeight(24)
+        self._idx_input.valueChanged.connect(self._goto_idx)
+        nav_row.addWidget(self._idx_input, 1)
+        
+        self._total_label = QLabel("/ 0")
+        self._total_label.setStyleSheet(f"font-size:10px;color:{TEXT3};")
+        nav_row.addWidget(self._total_label, 1)
+        lo.addLayout(nav_row)
+        
+        # 信息行
+        info_row = QHBoxLayout()
+        info_row.setSpacing(6)
+        self._img_name_label = QLabel("—")
+        self._img_name_label.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
+        info_row.addWidget(self._img_name_label, 1)
+        
+        self._ann_count_label = QLabel("0 boxes")
+        self._ann_count_label.setStyleSheet(f"font-size:9px;color:{TEXT2};")
+        info_row.addWidget(self._ann_count_label)
+        
+        self._save_indicator = QLabel("")
+        self._save_indicator.setStyleSheet(f"font-size:9px;font-weight:600;")
+        info_row.addWidget(self._save_indicator)
+        lo.addLayout(info_row)
         
         return g
 
@@ -1280,6 +1279,11 @@ class LabelTab(QWidget):
 
     def keyPressEvent(self, event):
         """处理键盘快捷键"""
+        # 当删除确认框可见时，阻止所有快捷键操作
+        if hasattr(self, '_delete_confirm') and self._delete_confirm.isVisible():
+            event.ignore()
+            return
+        
         # 检查是否有自定义快捷键配置
         if not hasattr(self, '_shortcut_inputs') or not self._shortcut_inputs:
             super().keyPressEvent(event)

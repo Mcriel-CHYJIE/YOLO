@@ -253,6 +253,26 @@ class Trainer(QThread):
         self.stdout_emitter = StreamEmitter(self.log)
         self.stderr_emitter = StreamEmitter(self.log)
     def stop(self): self._stop = True
+    
+    def _check_gpu_memory(self):
+        """Check GPU memory and return available memory in GB"""
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        try:
+            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            allocated_mem = torch.cuda.memory_allocated(0) / (1024**3)
+            reserved_mem = torch.cuda.memory_reserved(0) / (1024**3)
+            free_mem = total_mem - allocated_mem
+            return {
+                'total': total_mem,
+                'allocated': allocated_mem,
+                'reserved': reserved_mem,
+                'free': free_mem
+            }
+        except Exception as e:
+            self.log.emit(f'⚠️ GPU memory check error: {e}')
+            return None
     def _save_log(self, ok, error=''):
         try:
             d = ROOT / 'runs' / 'training_logs'; d.mkdir(parents=True, exist_ok=True)
@@ -284,7 +304,7 @@ class Trainer(QThread):
             import traceback; traceback.print_exc()
             self.log.emit(f'⚠️ Log save failed: {e}')
     def run(self):
-        import sys
+        import sys, torch
         original_stdout = sys.stdout; original_stderr = sys.stderr
         try:
             sys.stdout = self.stdout_emitter; sys.stderr = self.stderr_emitter
@@ -294,6 +314,21 @@ class Trainer(QThread):
             self.log.emit(f'🚀 {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
             if cfg.get('lr0', 0) <= 0:
                 cfg['lr0'] = 0.001; self.log.emit(f'⚠️  LR0 was 0, reset to 0.001')
+            
+            # Monitor GPU memory before training
+            if torch.cuda.is_available() and cfg['device'] != 'cpu':
+                try:
+                    gpu_info = self._check_gpu_memory()
+                    if gpu_info:
+                        self.log.emit(f'💻 GPU Memory: {gpu_info["total"]:.1f}GB total, {gpu_info["free"]:.1f}GB free')
+                        # Warn if free memory is low
+                        if gpu_info['free'] < 2.0:  # Less than 2GB free
+                            self.log.emit('⚠️ Low GPU memory! Consider reducing batch size or image size')
+                    # Clear cache
+                    torch.cuda.empty_cache()
+                except Exception as e:
+                    self.log.emit(f'⚠️ GPU info error: {e}')
+            
             def cb(t):
                 if self._stop: t.stop = True; return
                 try:
@@ -318,6 +353,15 @@ class Trainer(QThread):
                     progress = min(ep / total_epochs, 1.0)
                     self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', progress, self.best_map, m50)
                     self.chart.emit()
+                    
+                    # Monitor GPU memory every 10 epochs
+                    if ep % 10 == 0 and torch.cuda.is_available() and cfg['device'] != 'cpu':
+                        try:
+                            gpu_info = self._check_gpu_memory()
+                            if gpu_info:
+                                self.log.emit(f'📊 GPU Memory (Epoch {ep}): {gpu_info["allocated"]:.1f}GB allocated, {gpu_info["free"]:.1f}GB free')
+                        except Exception as e:
+                            pass  # Don't let memory check errors interrupt training
                 except Exception as e:
                     try:
                         self.log.emit(f'⚠️ Callback error: {e}')
@@ -327,13 +371,31 @@ class Trainer(QThread):
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
                 device=cfg['device'], warmup_epochs=3, warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
                 flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=0.2, workers=cfg.get('workers', 4),
+                fl_gamma=cfg.get('fl_gamma', 1.5),
                 label_smoothing=cfg['label_smoothing'] if cfg['label_smoothing'] > 0 else 0,
                 iou=cfg['iou'], close_mosaic=cfg['close_mosaic'],
                 copy_paste=cfg['copy_paste'] if cfg['copy_paste'] > 0 else 0,
                 degrees=cfg['degrees'] if cfg['degrees'] > 0 else 0, multi_scale=cfg['multi_scale'],
+                hsv_h=cfg.get('hsv_h', 0.015), hsv_s=cfg.get('hsv_s', 0.7), hsv_v=cfg.get('hsv_v', 0.4),
+                translate=cfg.get('translate', 0.15), scale=cfg.get('scale', 0.6),
                 project='runs', name=exp, exist_ok=True, amp=True, verbose=False)
             train_args = {k: v for k, v in train_args.items() if v is not None}
-            m.train(**train_args)
+            
+            # Add error handling for training
+            try:
+                m.train(**train_args)
+            except RuntimeError as e:
+                if 'CUDA out of memory' in str(e):
+                    self.log.emit(f'❌ CUDA OOM Error: {e}')
+                    self.log.emit('💡 Suggestion: Reduce batch size or image size')
+                    raise
+                else:
+                    self.log.emit(f'❌ Training Runtime Error: {e}')
+                    raise
+            except Exception as e:
+                self.log.emit(f'❌ Training Error: {e}')
+                raise
+                
             stopped = self._stop
             self._save_log(ok=not stopped, error='Stopped by user' if stopped else '')
             self.done.emit(not stopped, f'⏹ Stopped' if stopped else f'✅ Done | Best mAP@0.5 = {self.best_map:.4f}')
@@ -390,7 +452,8 @@ class DistillWorker(QThread):
         try: self._train()
         except BaseException as e:
             import traceback; traceback.print_exc()
-            self.log.emit(f'❌ {e}'); self.done.emit(False, str(e))
+            self.log.emit(f'❌ {e}')
+            self.done.emit(False, str(e))
     def _train(self):
         import torch, torch.nn.functional as F, torch.optim as optim
         from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -401,6 +464,21 @@ class DistillWorker(QThread):
         from ultralytics.utils import colorstr
         from types import SimpleNamespace; from copy import deepcopy
         cfg = self.cfg; device = cfg['device']; ROOT2 = ROOT
+        
+        # Monitor GPU memory before distillation
+        if torch.cuda.is_available() and 'cuda' in str(device):
+            try:
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                reserved = torch.cuda.memory_reserved(0) / (1024**3)
+                free_mem = gpu_mem - allocated
+                self.log.emit(f'💻 GPU Memory: {gpu_mem:.1f}GB total, {free_mem:.1f}GB free')
+                if free_mem < 2.0:  # Less than 2GB free
+                    self.log.emit('⚠️ Low GPU memory! Consider reducing batch size or image size')
+                torch.cuda.empty_cache()
+            except Exception as e:
+                self.log.emit(f'⚠️ GPU info error: {e}')
+        
         self.log.emit(f'[Teacher] {cfg["teacher"]}')
         teacher = YOLO(cfg['teacher']); teacher.model.to(device); teacher.model.eval()
         for p in teacher.model.parameters(): p.requires_grad = False
@@ -496,18 +574,46 @@ class DistillWorker(QThread):
                     vm50, vm95 = 0.0, 0.0
                 if vm50 > best_map50:
                     best_map50, best_epoch, pc = vm50, ep, 0
-                    torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / 'best.pt'))
+                    # Save only model weights (state_dict) to reduce file size
+                    torch.save({
+                        'model': student.model.state_dict(),
+                        'names': student.names,
+                        'args': student.model.args,
+                        'version': '8.0.0'
+                    }, str(save_dir / 'best.pt'))
                     self.log.emit(f'  🎉 New best mAP50: {vm50:.4f} (epoch {ep})')
                 else: pc += 1
             if ep % 10 == 0:
-                torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / f'epoch_{ep}.pt'))
+                # Save only model weights for checkpoint files
+                torch.save({
+                    'model': student.model.state_dict(),
+                    'names': student.names,
+                    'args': student.model.args,
+                    'version': '8.0.0'
+                }, str(save_dir / f'epoch_{ep}.pt'))
             hist['epoch'].append(ep); hist['loss'].append(avg); hist['map50'].append(vm50); hist['map50_95'].append(vm95)
             self.log.emit(f'Epoch {ep}/{cfg["epochs"]} | Loss: {avg:.4f} | mAP50: {vm50:.4f}' + (f' | Best: {best_map50:.4f}@{best_epoch}' if best_map50 > 0 else ''))
+            
+            # Monitor GPU memory every 10 epochs
+            if ep % 10 == 0 and torch.cuda.is_available() and 'cuda' in str(device):
+                try:
+                    allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                    reserved = torch.cuda.memory_reserved(0) / (1024**3)
+                    self.log.emit(f'📊 GPU Memory (Epoch {ep}): {allocated:.1f}GB allocated, {reserved:.1f}GB reserved')
+                except Exception as e:
+                    pass  # Don't let memory check errors interrupt training
+            
             self.progress.emit(ep, {'epoch': ep, 'total': cfg['epochs'], 'loss': avg, 'map50': vm50, 'best_map50': best_map50, 'best_epoch': best_epoch, 'lr': opt.param_groups[0]['lr'], 'history': dict(hist)})
             # Early stopping: only after warmup and sufficient training
             if pc >= cfg['patience'] and ep > warmup_epochs + 20: 
                 self.log.emit(f'[Early Stop] No improvement for {pc} epochs'); break
-        torch.save({'model': deepcopy(student.model), 'names': student.names}, str(save_dir / 'last.pt'))
+        # Save last checkpoint with only weights
+        torch.save({
+            'model': student.model.state_dict(),
+            'names': student.names,
+            'args': student.model.args,
+            'version': '8.0.0'
+        }, str(save_dir / 'last.pt'))
         with open(str(save_dir / 'history.json'), 'w') as f: json.dump(hist, f, indent=2)
         self.log.emit(f'Done! Best mAP50: {best_map50:.4f}')
         self.done.emit(True, str(save_dir))

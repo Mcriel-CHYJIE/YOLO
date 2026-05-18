@@ -183,13 +183,16 @@ class TrainTab(QWidget):
         s = lambda w: w.currentText()
         lr0_val = self.lr0.value()
         if lr0_val <= 0: lr0_val = 0.001
+        g = cfg['training']
         return dict(model=s(self.m), epochs=self.ep.value(), batch=self.bs.value(), imgsz=int(s(self.sz)),
             lr0=lr0_val, lrf=self.lrf.value(), optimizer=s(self.opt), patience=self.pt.value(),
             device='0' if self.studio.gpu_ok and self.dev.currentIndex()==0 else 'cpu',
             cos_lr=self.sch.currentIndex()==0, warmup_epochs=self.wu.value(), workers=self.wk.value(),
             fl_gamma=self.fl.value(), label_smoothing=self.sm.value(), iou=self.iou_thresh.value(),
             close_mosaic=self.cm.value(), copy_paste=self.cp.value(), degrees=self.dg.value(),
-            multi_scale=self.ms.isChecked())
+            multi_scale=self.ms.isChecked(),
+            hsv_h=g.get('hsv_h', 0.015), hsv_s=g.get('hsv_s', 0.7), hsv_v=g.get('hsv_v', 0.4),
+            translate=g.get('translate', 0.15), scale=g.get('scale', 0.6))
 
     def _s(self):
         if self.trainer and self.trainer.isRunning():

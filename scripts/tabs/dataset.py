@@ -284,29 +284,57 @@ class DatasetTab(QWidget):
                 self.dp_status.setText(f'❌ Image dir not found: {img_dir}')
                 self.dp_rf.setEnabled(True); return
 
-            # ── Stats summary ──
-            total = sum(1 for f in img_dir.iterdir()
-                        if f.suffix.lower() in ('.jpg','.jpeg','.png'))
-            all_imgs = list(img_dir.glob('*.jpg')) + list(img_dir.glob('*.png'))
+            # ─ Optimized Stats summary (sample-based for large datasets) ──
+            all_imgs = list(img_dir.glob('*.jpg')) + list(img_dir.glob('*.png')) + list(img_dir.glob('*.jpeg'))
+            total = len(all_imgs)
+            
+            # For large datasets, use sampling to avoid slow full scan
+            if total > 1000:
+                # Sample up to 1000 images for statistics
+                sample_size = min(1000, total)
+                # Use fixed seed for reproducible results
+                rng = random.Random(42)
+                sampled_imgs = rng.sample(all_imgs, sample_size)
+                scale_factor = total / sample_size
+            else:
+                sampled_imgs = all_imgs
+                scale_factor = 1.0
+            
             cls_counter = Counter()
-            for f in all_imgs:
+            labeled_imgs = 0
+            for f in sampled_imgs:
                 lf = lbl_dir / (f.stem+'.txt')
                 if lf.exists():
-                    for line in open(lf, encoding='utf-8'):
-                        parts = line.strip().split()
-                        if len(parts) == 5:
-                            cls_counter[int(parts[0])] += 1
+                    labeled_imgs += 1
+                    try:
+                        with open(lf, encoding='utf-8') as label_file:
+                            for line in label_file:
+                                parts = line.strip().split()
+                                if len(parts) == 5:
+                                    cls_counter[int(parts[0])] += 1
+                    except:
+                        pass
+            
+            # Scale up if we used sampling
+            if scale_factor > 1.0:
+                labeled_imgs = int(labeled_imgs * scale_factor)
+                cls_counter = Counter({k: int(v * scale_factor) for k, v in cls_counter.items()})
+            
             labeled = sum(cls_counter.values())
-            labeled_imgs = sum(1 for f in all_imgs
-                               if (lbl_dir / (f.stem+'.txt')).exists())
             self._update_stats(total, labeled_imgs, labeled, cls_counter)
 
-            # ── Image list ──
+            # ── Image list (limit to avoid memory issues) ──
             self._images = []
+            max_preview = 100  # Limit preview to 100 images max
+            preview_count = 0
+            
             for f in all_imgs:
+                if preview_count >= max_preview:
+                    break
                 lbl_path = lbl_dir / (f.stem+'.txt')
                 if lbl_path.exists():
                     self._images.append((str(f), str(lbl_path)))
+                    preview_count += 1
 
             if not self._images:
                 self.dp_status.setText(f'❌ No labeled images in {split}')
@@ -335,7 +363,7 @@ class DatasetTab(QWidget):
             if error_count > 0:
                 self.dp_status.setText(f'⚠️ Showing {shown}/{len(selected)} ({error_count} errors)')
             else:
-                self.dp_status.setText(f'✅ Showing {shown}/{len(self._images)} from {split}')
+                self.dp_status.setText(f'✅ Showing {shown}/{len(self._images)} from {split} (total: {total})')
 
         except ImportError:
             self.dp_status.setText('❌ pip install Pillow PyYAML')
