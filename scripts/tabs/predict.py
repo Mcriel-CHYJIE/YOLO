@@ -116,7 +116,46 @@ class PredictTab(QWidget):
         self.video_view.setStyleSheet(f'background:{CON};color:{TEXT3};border-radius:7px;font-size:14px;')
         self.video_view.setMinimumHeight(400)
         self.stack.addWidget(self.video_view)
-        # Page 1: Batch results log
+        # Page 1: Image preview with detection results
+        self.preview_widget = QWidget()
+        preview_layout = QVBoxLayout(self.preview_widget)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(4)
+        
+        # Image display area
+        self.image_view = QLabel('No image to display')
+        self.image_view.setAlignment(Qt.AlignCenter)
+        self.image_view.setStyleSheet(f'background:{CON};color:{TEXT3};border-radius:7px;font-size:14px;')
+        self.image_view.setMinimumHeight(350)
+        preview_layout.addWidget(self.image_view, 1)
+        
+        # Navigation controls
+        nav_widget = QWidget()
+        nav_layout = QHBoxLayout(nav_widget)
+        nav_layout.setContentsMargins(4, 4, 4, 4)
+        nav_layout.setSpacing(8)
+        
+        self.btn_prev = QPushButton('◀ Previous')
+        self.btn_prev.setEnabled(False)
+        self.btn_prev.clicked.connect(self._prev_image)
+        self.btn_prev.setStyleSheet('padding:4px 12px;')
+        
+        self.btn_next = QPushButton('Next ▶')
+        self.btn_next.setEnabled(False)
+        self.btn_next.clicked.connect(self._next_image)
+        self.btn_next.setStyleSheet('padding:4px 12px;')
+        
+        self.lbl_image_index = QLabel('0 / 0')
+        self.lbl_image_index.setStyleSheet(f'font-size:11px;font-weight:600;color:{TEXT};min-width:80px;')
+        self.lbl_image_index.setAlignment(Qt.AlignCenter)
+        
+        nav_layout.addWidget(self.btn_prev)
+        nav_layout.addWidget(self.lbl_image_index, 1)
+        nav_layout.addWidget(self.btn_next)
+        
+        preview_layout.addWidget(nav_widget)
+        self.stack.addWidget(self.preview_widget)
+        # Page 2: Batch results log
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setStyleSheet(f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:7px;padding:10px 12px;font-family:"Consolas","Courier New",monospace;font-size:13px;}}')
@@ -124,6 +163,10 @@ class PredictTab(QWidget):
         self.stack.setCurrentIndex(0)
         lo.addWidget(self.stack, 1)
         self._load_latest()
+        
+        # Image preview state
+        self._image_results = []
+        self._current_image_idx = 0
 
     # ── Helpers ──
     def _load_latest(self):
@@ -197,7 +240,9 @@ class PredictTab(QWidget):
         # Ask for export path if export is enabled
         export_path = None
         if self.cb_export.isChecked():
-            default_name = f"detected_{self._source_path.stem}_{datetime.now().strftime('%m%d_%H%M')}.mp4"
+            default_dir = ROOT / 'output'
+            default_dir.mkdir(parents=True, exist_ok=True)
+            default_name = str(default_dir / f"detected_{self._source_path.stem}_{datetime.now().strftime('%m%d_%H%M')}.mp4")
             export_path, _ = QFileDialog.getSaveFileName(
                 self, 'Save Detected Video', default_name, 'Video Files (*.mp4 *.avi)'
             )
@@ -265,7 +310,12 @@ class PredictTab(QWidget):
             results = model.predict(source=str(src), conf=self.sp_conf.value(), iou=self.sp_iou.value(),
                 imgsz=cfg['predict']['imgsz'], device='0' if self.studio.gpu_ok else 'cpu',
                 save=save_results, save_txt=False, verbose=False,
-                project='runs', name=f'predict_{datetime.now().strftime("%m%d_%H%M")}')
+                project=str(ROOT / 'output'), name=f'predict_{datetime.now().strftime("%m%d_%H%M")}')
+            
+            # Store results for preview
+            self._image_results = results
+            self._current_image_idx = 0
+            
             total_imgs = len(results)
             total_dets = sum(len(r.boxes) for r in results if r.boxes is not None)
             fallen = 0; cls_counts = {}
@@ -284,7 +334,61 @@ class PredictTab(QWidget):
                 self.log_view.append(f'   Saved: {results[0].save_dir}')
             elif not save_results:
                 self.log_view.append('   Results not saved (export disabled)')
+            
+            # Show first image preview
+            if total_imgs > 0:
+                self._show_image_preview(0)
         except Exception as e:
             import traceback; traceback.print_exc()
             self.log_view.append(f'Error: {e}')
         finally: self.btn_run.setEnabled(True)
+    
+    def _show_image_preview(self, idx):
+        """显示带检测框的图片预览"""
+        if not self._image_results or idx < 0 or idx >= len(self._image_results):
+            return
+        
+        result = self._image_results[idx]
+        
+        # Get annotated image
+        if hasattr(result, 'plot'):
+            # Ultralytics results object
+            annotated_img = result.plot()
+        else:
+            # Fallback: load original image
+            if hasattr(result, 'path'):
+                annotated_img = cv2.imread(result.path)
+            else:
+                self.image_view.setText('Cannot load image')
+                return
+        
+        # Display image
+        if annotated_img is not None:
+            h, w = annotated_img.shape[:2]
+            # Scale to fit view
+            view_w = self.image_view.width() - 10
+            view_h = self.image_view.height() - 10
+            scale = min(view_w / max(w, 1), view_h / max(h, 1), 1.0)
+            if scale < 1.0:
+                annotated_img = cv2.resize(annotated_img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR)
+            
+            rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+            qi = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format_RGB888)
+            self.image_view.setPixmap(QPixmap.fromImage(qi))
+            self.image_view.setStyleSheet('')
+        
+        # Update navigation
+        self._current_image_idx = idx
+        self.lbl_image_index.setText(f'{idx + 1} / {len(self._image_results)}')
+        self.btn_prev.setEnabled(idx > 0)
+        self.btn_next.setEnabled(idx < len(self._image_results) - 1)
+    
+    def _prev_image(self):
+        """上一张图片"""
+        if self._current_image_idx > 0:
+            self._show_image_preview(self._current_image_idx - 1)
+    
+    def _next_image(self):
+        """下一张图片"""
+        if self._current_image_idx < len(self._image_results) - 1:
+            self._show_image_preview(self._current_image_idx + 1)

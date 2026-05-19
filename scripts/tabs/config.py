@@ -44,8 +44,6 @@ _DEFAULTS = {
         'lrf': 0.01,
         'warmup_epochs': 3,
         'workers': 8,
-        'fl_gamma': 0.0,
-        'label_smoothing': 0.10,
         'iou': 0.7,
         'close_mosaic': 15,
         'copy_paste': 0.0,

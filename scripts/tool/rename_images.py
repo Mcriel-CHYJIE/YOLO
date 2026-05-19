@@ -53,7 +53,7 @@ def main():
     parser.add_argument('folder', help='目标文件夹路径')
     parser.add_argument('--prefix', default='',
                         help='文件名前缀（可选，如 "zero"）')
-    parser.add_argument('--digits', type=int, default=4,
+    parser.add_argument('--digits', type=int, default=6,
                         help='编号位数（默认 4 位，即 0000-9999）')
     parser.add_argument('--ext', default=None,
                         help='输出格式扩展名（可选，如 "png"；不指定则保持原格式）')

@@ -371,8 +371,6 @@ class Trainer(QThread):
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
                 device=cfg['device'], warmup_epochs=3, warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
                 flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=0.2, workers=cfg.get('workers', 4),
-                fl_gamma=cfg.get('fl_gamma', 1.5),
-                label_smoothing=cfg['label_smoothing'] if cfg['label_smoothing'] > 0 else 0,
                 iou=cfg['iou'], close_mosaic=cfg['close_mosaic'],
                 copy_paste=cfg['copy_paste'] if cfg['copy_paste'] > 0 else 0,
                 degrees=cfg['degrees'] if cfg['degrees'] > 0 else 0, multi_scale=cfg['multi_scale'],
@@ -624,11 +622,12 @@ class DetectWorker(QThread):
     frame_ready = pyqtSignal(np.ndarray, int, int)
     fps_updated = pyqtSignal(float); stats_updated = pyqtSignal(dict)
     log_signal = pyqtSignal(str); finished = pyqtSignal()
-    def __init__(self, model_path, video_path, conf=0.25, iou=0.45):
+    def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=24):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
         self.conf = conf; self.iou = iou; self._pause = False; self._stop = False
         self.export_path = None  # Path to save detected video
+        self.target_fps = target_fps  # Target playback FPS
     def stop(self): self._stop = True; self._pause = False
     def toggle_pause(self): self._pause = not self._pause
     def run(self):
@@ -656,6 +655,7 @@ class DetectWorker(QThread):
                     writer = None
             
             idx, t_prev = 0, datetime.now()
+            frame_interval = 1.0 / self.target_fps  # Time interval between frames (seconds)
             while not self._stop and cap.isOpened():
                 if self._pause: self.msleep(50); continue
                 ret, frame = cap.read()
@@ -676,6 +676,12 @@ class DetectWorker(QThread):
                         stats[name] = stats.get(name, 0) + 1
                 self.frame_ready.emit(annotated, idx, total)
                 self.fps_updated.emit(fps); self.stats_updated.emit(stats)
+                
+                # Control playback speed to target FPS
+                elapsed = (datetime.now() - t_prev).total_seconds()
+                sleep_time = max(0, frame_interval - elapsed)
+                if sleep_time > 0:
+                    self.msleep(int(sleep_time * 1000))
             
             # Release resources
             if writer is not None:

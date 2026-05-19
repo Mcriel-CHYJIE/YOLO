@@ -1192,7 +1192,8 @@ class LabelTab(QWidget):
         self._save_indicator.setStyleSheet(f"font-size:10px;color:{AMBER};font-weight:600;")
         self._update_ann_list()
         self._update_stats()
-        self._save_session()
+        if getattr(self, '_canvas_save', True):
+            self._save_session()
 
     def _on_ann_list_select(self, row):
         if 0 <= row < len(self.canvas.annotations) and self.canvas.selected_idx != row:
@@ -1229,7 +1230,7 @@ class LabelTab(QWidget):
         self._update_counts()
         self._update_stats()
         if self._image_paths:
-            self._show_image(self._current_idx)
+            self._show_image(self._current_idx, save=False)
         else:
             self._count_label.setText("0 images")
 
@@ -1254,13 +1255,14 @@ class LabelTab(QWidget):
                 self._current_idx = idx
                 self._show_image(idx)
 
-    def _show_image(self, idx):
+    def _show_image(self, idx, save=True):
         if idx < 0 or idx >= len(self._image_paths):
             return
         img_path = self._image_paths[idx]
         self._current_image = cv2.imread(str(img_path))
         if self._current_image is None:
             return
+        self._canvas_save = save
         self.canvas.set_image(self._current_image)
         key = self._img_key(img_path)
         if key in self._annotations:
@@ -1770,30 +1772,29 @@ class LabelTab(QWidget):
             if key not in self._annotations:
                 self._annotations[key] = []
         
+        total = len(self._annotations)
+        
+        if total == 0:
+            QMessageBox.warning(self, "Warning", "No images to export")
+            return
+        
         # Check for images with empty annotations
         labeled = {k: v for k, v in self._annotations.items() if v}
         unlabeled = {k: v for k, v in self._annotations.items() if not v}
-        
-        total = len(self._annotations)
         labeled_count = len(labeled)
         unlabeled_count = len(unlabeled)
-        
-        if total == 0:
-            QMessageBox.warning(self, "Warning", "No annotation data to export")
-            return
         
         # Prompt confirmation if there are images with empty annotations
         if unlabeled_count > 0:
             msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Warning)
+            msg.setIcon(QMessageBox.Information)
             msg.setWindowTitle("Export Dataset")
-            msg.setText("Some images have empty annotations.")
+            msg.setText(f"Ready to export {total} images.")
             msg.setInformativeText(
-                f"Total images: {total}\n"
                 f"With annotations: {labeled_count}\n"
-                f"Empty annotations: {unlabeled_count}\n\n"
-                f"Images with empty annotations will still be exported\n"
-                f"(with empty .txt files). Continue?"
+                f"Empty annotations (negative samples): {unlabeled_count}\n\n"
+                f"Images with empty annotations will be exported\n"
+                f"(with empty .txt files for negative samples). Continue?"
             )
             msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
             msg.setDefaultButton(QMessageBox.Yes)

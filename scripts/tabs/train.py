@@ -60,39 +60,33 @@ class TrainTab(QWidget):
         g2l = QGridLayout(g2); g2l.setSpacing(3); g2l.setContentsMargins(6,12,6,6)
         g2l.setColumnStretch(0,1); g2l.setColumnStretch(1,1)
         a = cfg['training']
-        self.fl = QDoubleSpinBox(); self.fl.setRange(0,5); self.fl.setDecimals(1); self.fl.setSingleStep(0.5)
-        self.fl.setValue(a['fl_gamma'])
-        labeled_field(self.fl,'Focal γ',g2l,0,0)
-        self.sm = QDoubleSpinBox(); self.sm.setRange(0,.5); self.sm.setDecimals(2); self.sm.setSingleStep(.05)
-        self.sm.setValue(a['label_smoothing'])
-        labeled_field(self.sm,'Smoothing',g2l,0,1)
         self.iou_thresh = QDoubleSpinBox(); self.iou_thresh.setRange(0.1,0.9); self.iou_thresh.setDecimals(2); self.iou_thresh.setSingleStep(0.05)
         self.iou_thresh.setValue(a['iou'])
-        labeled_field(self.iou_thresh,'IoU',g2l,1,0)
+        labeled_field(self.iou_thresh,'IoU',g2l,0,0)
         self.cm = QSpinBox(); self.cm.setRange(0,100); self.cm.setValue(a['close_mosaic'])
-        labeled_field(self.cm,'Close Mosaic',g2l,1,1)
+        labeled_field(self.cm,'Close Mosaic',g2l,0,1)
         self.cp = QDoubleSpinBox(); self.cp.setRange(0,1); self.cp.setDecimals(2); self.cp.setSingleStep(.1)
         self.cp.setValue(a['copy_paste'])
-        labeled_field(self.cp,'Copy-Paste',g2l,2,0)
+        labeled_field(self.cp,'Copy-Paste',g2l,1,0)
         self.dg = QDoubleSpinBox(); self.dg.setRange(0,45); self.dg.setDecimals(1); self.dg.setSingleStep(5)
         self.dg.setValue(a['degrees'])
-        labeled_field(self.dg,'Rotation',g2l,2,1)
+        labeled_field(self.dg,'Rotation',g2l,1,1)
         cw = QWidget(); cw.setStyleSheet(f'background:{BG};border-radius:4px;')
         cl = QHBoxLayout(cw); cl.setContentsMargins(6,1,6,1); cl.setSpacing(4)
         lbl = QLabel('Multi-Scale'); lbl.setStyleSheet(f'font-size:9px;color:{TEXT};background:transparent;font-weight:500;')
         self.ms = QCheckBox(); self.ms.setChecked(a['multi_scale'])
         cl.addWidget(lbl); cl.addWidget(self.ms); cl.addStretch()
-        g2l.addWidget(cw,3,0)
+        g2l.addWidget(cw,2,0)
         hw = QWidget(); hw.setStyleSheet(f'background:#eef2ff;border-radius:4px;')
         hwl = QHBoxLayout(hw); hwl.setContentsMargins(6,1,6,1); hwl.setSpacing(0)
         ht = QLabel(cfg['project']['tip'])
         ht.setStyleSheet(f'font-size:8px;font-weight:600;color:{PRI};background:transparent;')
-        hwl.addWidget(ht); g2l.addWidget(hw,3,1)
+        hwl.addWidget(ht); g2l.addWidget(hw,2,1)
         ll.addWidget(g2)
 
         self._params = [self.m, self.ep, self.bs, self.sz, self.opt, self.dev,
             self.sch, self.pt, self.lr0, self.lrf, self.wu, self.wk,
-            self.fl, self.sm, self.iou_thresh, self.cm, self.cp, self.dg, self.ms]
+            self.iou_thresh, self.cm, self.cp, self.dg, self.ms]
 
         g3 = QGroupBox('Control')
         g3l = QVBoxLayout(g3); g3l.setSpacing(4); g3l.setContentsMargins(8,12,8,8)
@@ -188,7 +182,7 @@ class TrainTab(QWidget):
             lr0=lr0_val, lrf=self.lrf.value(), optimizer=s(self.opt), patience=self.pt.value(),
             device='0' if self.studio.gpu_ok and self.dev.currentIndex()==0 else 'cpu',
             cos_lr=self.sch.currentIndex()==0, warmup_epochs=self.wu.value(), workers=self.wk.value(),
-            fl_gamma=self.fl.value(), label_smoothing=self.sm.value(), iou=self.iou_thresh.value(),
+            iou=self.iou_thresh.value(),
             close_mosaic=self.cm.value(), copy_paste=self.cp.value(), degrees=self.dg.value(),
             multi_scale=self.ms.isChecked(),
             hsv_h=g.get('hsv_h', 0.015), hsv_s=g.get('hsv_s', 0.7), hsv_v=g.get('hsv_v', 0.4),

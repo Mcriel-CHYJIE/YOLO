@@ -43,11 +43,9 @@ training:
   momentum: 0.937                      # Optimizer momentum
   weight_decay: 0.0005                 # L2 regularization
   # Algorithm - Enhanced augmentation for maximum accuracy
-  fl_gamma: 1.5                        # Stronger focal loss for hard examples
-  label_smoothing: 0.1                 # Moderate smoothing for better generalization
   iou: 0.7                             # Standard IoU threshold
   close_mosaic: 30                     # Close mosaic last 30 epochs for fine-tuning
-  copy_paste: 0.2                      # Aggressive copy-paste augmentation
+  copy_paste: 0.3                      # Aggressive copy-paste augmentation
   degrees: 15.0                        # Increased rotation augmentation
   multi_scale: false                   # DISABLED to maintain consistent 640 input size
   hsv_h: 0.015                         # Hue augmentation

@@ -28,8 +28,6 @@ preset_maximum_accuracy:
   momentum: 0.937
   weight_decay: 0.0005
   # Algorithm - Aggressive augmentation for maximum generalization
-  fl_gamma: 1.5                        # Strong focal loss for hard cases
-  label_smoothing: 0.1                 # Prevent overfitting
   iou: 0.7                             # Standard IoU
   close_mosaic: 30                     # Fine-tuning phase
   copy_paste: 0.2                      # Aggressive augmentation
@@ -67,8 +65,6 @@ preset_balanced:
   momentum: 0.937
   weight_decay: 0.0005
   # Algorithm - Moderate augmentation for stability
-  fl_gamma: 1.0                        # Mild focal loss
-  label_smoothing: 0.05                # Light smoothing
   iou: 0.7
   close_mosaic: 15                     # Shorter fine-tuning
   copy_paste: 0.1                      # Moderate augmentation
@@ -106,8 +102,6 @@ preset_fast_experiment:
   momentum: 0.937
   weight_decay: 0.0005
   # Algorithm - Light augmentation for quick training
-  fl_gamma: 0.0                        # No focal loss
-  label_smoothing: 0.0                 # No smoothing
   iou: 0.7
   close_mosaic: 5                      # Minimal fine-tuning
   copy_paste: 0.0                      # No copy-paste
@@ -146,8 +140,6 @@ preset_large_model_precision:
   momentum: 0.937
   weight_decay: 0.0005
   # Algorithm - Strong augmentation for large model
-  fl_gamma: 1.5
-  label_smoothing: 0.1
   iou: 0.7
   close_mosaic: 25
   copy_paste: 0.15
