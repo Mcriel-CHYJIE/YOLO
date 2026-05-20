@@ -726,7 +726,7 @@ degrees: 20.0             # 增加旋转多样性
 如果有预训练模型:
 ```yaml
 # 使用之前训练的最佳模型作为起点
-model: runs/detect/xxx/weights/best.pt
+model: runs/detect/xxx/weights/best5.20.pt
 lr0: 0.0005               # 降低学习率
 warmup_epochs: 5          # 缩短热身期
 ```
@@ -914,7 +914,7 @@ A: multi-scale会导致显存占用不可预测,可能出现突发峰值导致OO
 A: 
 ```python
 from ultralytics import YOLO
-model = YOLO('runs/detect/runs/xxx/weights/best.pt')
+model = YOLO('runs/detect/runs/xxx/weights/best5.20.pt')
 results = model.predict(source='test.jpg', conf=0.25)
 ```
 

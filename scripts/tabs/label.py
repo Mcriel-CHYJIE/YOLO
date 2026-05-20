@@ -1708,7 +1708,7 @@ class LabelTab(QWidget):
 
     def _scan_models(self):
         self._model_combo.clear()
-        models = sorted(ROOT.rglob("weights/best.pt"))
+        models = sorted(ROOT.rglob("weights/best5.20.pt"))
         for m in models:
             display = str(m.relative_to(ROOT))
             self._model_combo.addItem(display, str(m))

@@ -64,7 +64,7 @@ validation:
 
 # ── Distillation Defaults ──
 distill:
-  teacher: ''                          # Empty = auto-find latest runs/*/weights/best.pt
+  teacher: ''                          # Empty = auto-find latest runs/*/weights/best5.20.pt
   student: yolo11n.pt                  # Student model (smaller than teacher)
   epochs: 150                          # Extended epochs for better knowledge transfer
   batch: 24                            # Optimized batch size for distillation (teacher frozen, less memory)

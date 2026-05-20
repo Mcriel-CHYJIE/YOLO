@@ -11,10 +11,9 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from scripts.tabs.train import TrainTab
-from scripts.tabs.val import ValTab
 from scripts.tabs.distill import DistillTab
 from scripts.tabs.dataset import DatasetTab
-from scripts.tabs.export import ExportTab
+from scripts.tabs.deploy import DeployTab
 from scripts.tabs.predict import PredictTab
 from scripts.tabs.preprocess import PreprocessTab
 from scripts.tabs.label import LabelTab
@@ -61,16 +60,15 @@ class Studio(QMainWindow):
         tabs = QTabWidget(); ml.addWidget(tabs, 1)
 
         self.train_tab = TrainTab(self); tabs.addTab(self.train_tab, 'Training')
-        self.val_tab = ValTab(self); tabs.addTab(self.val_tab, 'Validate')
 
         self.predict_tab = PredictTab(self); tabs.addTab(self.predict_tab, 'Predict')
         self.dataset_tab = DatasetTab(self); tabs.addTab(self.dataset_tab, 'Dataset')
-        
+
         self.preprocess_tab = PreprocessTab(self); tabs.addTab(self.preprocess_tab, 'Preprocess')
         self.label_tab = LabelTab(self); tabs.addTab(self.label_tab, 'Label')
 
         self.distill_tab = DistillTab(self); tabs.addTab(self.distill_tab, 'Distill')
-        self.export_tab = ExportTab(self); tabs.addTab(self.export_tab, 'Export')
+        self.deploy_tab = DeployTab(self); tabs.addTab(self.deploy_tab, 'Deploy')
 
         self.guide_tab = GuideTab(self); tabs.addTab(self.guide_tab, 'Guide')
 
