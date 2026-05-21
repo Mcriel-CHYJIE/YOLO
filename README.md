@@ -227,9 +227,11 @@ python -c "from ultralytics import YOLO; YOLO('runs/detect/runs/11_fall_0515_170
 4. 查看性能指标和混淆矩阵
 
 或使用Python代码：
+
 ```python
 from ultralytics import YOLO
-model = YOLO('models/best5.15.pt')
+
+model = YOLO('models/runs/best5.15.pt')
 metrics = model.val(data='datasets/data.yaml')
 print(f'mAP@0.5: {metrics.box.map50:.3f}')
 print(f'mAP@0.5:0.95: {metrics.box.map:.3f}')
@@ -244,9 +246,11 @@ print(f'mAP@0.5:0.95: {metrics.box.map:.3f}')
 4. 点击 "Run" 开始推理
 
 或使用Python代码：
+
 ```python
 from ultralytics import YOLO
-model = YOLO('models/best5.15.pt')
+
+model = YOLO('models/runs/best5.15.pt')
 
 # 单张图片
 results = model.predict('test.jpg', conf=0.25)
@@ -268,9 +272,11 @@ results = model.predict(0, conf=0.25, show=True)
 4. 点击 "Export"
 
 或使用Python代码：
+
 ```python
 from ultralytics import YOLO
-model = YOLO('models/best5.15.pt')
+
+model = YOLO('models/runs/best5.15.pt')
 
 # 导出为ONNX（通用格式）
 model.export(format='onnx', imgsz=640)
@@ -363,7 +369,7 @@ model.export(format='engine', imgsz=640, half=True)
 1. **导出模型**
    ```python
    from ultralytics import YOLO
-   model = YOLO('models/best5.15.pt')
+   model = YOLO('models/runs/best5.15.pt')
    model.export(format='ncnn', imgsz=640, half=True)
    ```
 

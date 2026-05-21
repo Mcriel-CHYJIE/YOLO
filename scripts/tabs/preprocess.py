@@ -86,10 +86,10 @@ class VideoPreprocessWorker(QThread):
                             self.image_saved.emit(str(self.out_folder / fn))
                         else:
                             errs += 1
-                            if errs <= 3: self.log.emit(f' ⚠️ Frame decode failed at second {s}')
+                            if errs <= 3: self.log.emit(f'  Frame decode failed at second {s}')
                     except Exception as e:
                         errs += 1
-                        if errs <= 3: self.log.emit(f' ⚠️ Error at {s}: {str(e)[:50]}')
+                        if errs <= 3: self.log.emit(f'  Error at {s}: {str(e)[:50]}')
                 cap.release()
                 self.log.emit(f' {nm} → {saved} 帧{" (" + str(errs) + " decode errors)" if errs else ""}')
             self.log.emit(f' 全部完成！共处理 {n} 个视频')
@@ -154,7 +154,7 @@ class PreprocessTab(QWidget):
         if folder:
             fp = Path(folder)
             self.src_input.setText(str(fp))
-            self.input_info.setText(f'📂 {fp}')
+            self.input_info.setText(f' {fp}')
             self.out_input.setText(str(self._after_root / fp.name))
             self._refresh_video_list(fp)
 
@@ -173,7 +173,7 @@ class PreprocessTab(QWidget):
                 self.input_info.setText(f' {s}'); self._refresh_video_list(s); return
         self.src_input.clear(); self.out_input.clear()
         if not self._before_root.exists():
-            self.input_info.setText(f'❌ 目录不存在: {self._before_root}')
+            self.input_info.setText(f' 目录不存在: {self._before_root}')
             self.video_list.clear(); self.video_count.setText('0 videos')
 
     def _refresh_video_list(self, folder: Path):
@@ -207,7 +207,7 @@ class PreprocessTab(QWidget):
 
     def _stop(self):
         if self._worker and self._worker.isRunning():
-            self._worker.stop(); self.stop_btn.setEnabled(False); self._log('⏹ 停止中...')
+            self._worker.stop(); self.stop_btn.setEnabled(False); self._log(' 停止中...')
 
     def _on_image_saved(self, image_path: str):
         try:
@@ -226,7 +226,7 @@ class PreprocessTab(QWidget):
         self.start_btn.setEnabled(True); self.stop_btn.setEnabled(False)
         self.src_input.setEnabled(True); self.out_input.setEnabled(True)
         self.progress_bar.setValue(100 if ok else 0)
-        self._log(f'{"🎉" if ok else "❌"} {msg}')
+        self._log(f'{"" if ok else ""} {msg}')
         self.status_label.setText(msg); self._worker = None
 
     def _log(self, msg):

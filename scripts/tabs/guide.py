@@ -1,20 +1,182 @@
-"""引导标签页 — 介绍各面板功能"""
+"""引导标签页 — 功能导览（文档式分段布局）"""
 from scripts.tabs.base import *
 
-TABS = [
-    ("Training", "配置并启动 YOLO 模型训练", "Model / Epochs / Batch / ImgSz / Optimizer / Scheduler 等超参数设置，支持 GPU/CPU 切换，实时显示 Loss、mAP 曲线及系统资源监控\n\nAlgorithm 参数说明:\n• Focal γ: 控制难分样本权重，γ越大对难分样本关注度越高（默认0.0）\n• Smoothing: 标签平滑防止过度自信，提升泛化能力（默认0.10）\n• IoU: NMS过滤重复检测框的阈值，目标密集时调低（默认0.7）\n• Close Mosaic: 最后N个epoch关闭Mosaic增强进行微调（默认15）\n• Copy-Paste: 随机复制目标粘贴到其他位置增加多样性（默认0.0）\n• Rotation: 随机旋转角度范围，适应多角度目标（默认15°）\n• Multi-Scale: 训练时随机改变输入尺寸提升尺度鲁棒性（默认关闭）", PRI),
-    ("Validate", "验证已训练模型的性能", "加载训练好的权重，在验证集上计算 mAP@0.5 / mAP@0.5:0.95 / Precision / Recall 等指标", GREEN),
-    ("Predict", "对图片或视频进行实时目标检测", "加载模型并推理，实时显示检测结果、FPS、各类别统计信息", AMBER),
-    ("Dataset", "数据集管理与预处理", "数据集结构概览、类别分布统计，方便检查标注质量与数据平衡", "#8b5cf6"),
-    ("Preprocess", "视频预处理：重命名 + 缩放 + 抽帧", "将原始视频统一重命名、保持宽高比缩放到指定尺寸、每秒随机抽取一帧保存为 JPG 图片", "#14b8a6"),
-    ("Label", "手动/自动标注与审核", "支持手动绘制标注框、移动/调整/删除框，集成 YOLO 自动标注，审核后导出为 YOLO 格式数据集", "#ec4899"),
-    ("Distill", "知识蒸馏：Teacher → Student", "以大模型为教师、小模型为学生进行知识蒸馏训练，在保持精度的同时获得更轻量的模型\n\nDistillation Parameters:\n• Alpha: Distillation weight (0.5 = balanced detection + distillation loss)\n• LR: Learning rate (0.002 for faster convergence with warmup)\n• Batch: Batch size (can be larger since teacher is frozen)\n• Warmup: Epochs for learning rate warmup (gradually increase LR)\n• Weight Decay: L2 regularization (prevents overfitting)\n• Momentum: Optimizer momentum (AdamW beta1 parameter)\n• Patience: Early stopping patience (epochs without improvement)\n\nTip: Larger batch size is safe during distillation as the teacher model is frozen (no gradients).", "#f97316"),
-    ("Export", "导出训练好的模型", "支持 ONNX / TorchScript / NCNN / OpenVINO / TensorRT / TFLite / EdgeTPU / CoreML 等多种格式", RED),
+
+SECTIONS = [
+    {
+        'name': 'Training',
+        'brief': '配置并启动 YOLO 模型训练，实时监控收敛过程',
+        'color': PRI,
+        'items': [
+            'Model — 从 models/ 文件夹中选择预训练权重（yolo11/yolov8 系列），下拉框自动扫描',
+            'Epochs — 总训练轮数，摔倒项目推荐 800 轮（早停机制自动控制实际轮数）',
+            'Batch — 每次迭代的图片数，RTX 5070 Ti 16GB 推荐 32，大数据集可降至 24',
+            'ImgSz — 输入分辨率 640/800，640 为推荐值（精度与显存的平衡点）',
+            'Optimizer — AdamW（推荐）/ Adam / SGD，AdamW 收敛更稳定',
+            'Device — GPU/CPU 自动检测，无 GPU 时默认 CPU',
+            'Scheduler — Cosine（余弦退火，平滑衰减）/ Linear（线性衰减）',
+            'LR / LR Final — 初始学习率 0.002、最终学习率比例 0.01（最终 LR = LR × LRF）',
+            'Patience — 早停耐心值 100 轮，验证 mAP 不提升即停止',
+            'Warmup — 前 15 轮线性升温，防止初期梯度震荡',
+            'Workers — 数据加载线程数，默认 CPU 核数的一半',
+        ],
+    },
+    {
+        'name': 'Algorithm',
+        'brief': '数据增强与训练策略参数',
+        'color': '#8b5cf6',
+        'items': [
+            'Focal γ — Focal Loss 系数，难分样本权重（默认 0.0 = 关闭）',
+            'Label Smoothing — 标签平滑，0.10 推荐值，抑制过拟合提升泛化',
+            'IoU — NMS IoU 阈值 0.7，控制检测框去重严格度',
+            'Close Mosaic — 最后 N 轮关闭 Mosaic 增强做微调，默认 30 轮',
+            'Copy-Paste — 目标复制粘贴增强，0.3 可提升目标密度（多目标场景）',
+            'Rotation — 随机旋转 ±15°，增强多角度检测能力',
+            'Multi-Scale — 训练时随机缩放输入尺寸，提升尺度鲁棒性',
+        ],
+    },
+    {
+        'name': 'Validate',
+        'brief': '验证已训练模型的检测性能',
+        'color': GREEN,
+        'items': [
+            '加载 runs/*/weights/best.pt 自动发现最新训练结果',
+            '在验证集上计算 mAP@0.5 / mAP@0.5:0.95 / Precision / Recall',
+            '显示混淆矩阵（Confusion Matrix），直观分析类别间的误检情况',
+            '验证结果保存到 runs/val/ 目录，包含曲线图和详细指标',
+        ],
+    },
+    {
+        'name': 'Predict',
+        'brief': '对图片或视频进行实时目标检测推理',
+        'color': AMBER,
+        'items': [
+            '支持图片（jpg/png）和视频（mp4/avi/mov）输入',
+            '实时显示检测结果，带类别标签和置信度',
+            '显示 FPS、各类别检测数量统计',
+            '可调整置信度阈值和 IoU 阈值控制检测敏感度',
+        ],
+    },
+    {
+        'name': 'Dataset',
+        'brief': '数据集结构与分布概览',
+        'color': '#8b5cf6',
+        'items': [
+            '显示数据集总图片数、已标注标注数、总实例数',
+            '类别分布直方图，检查各类别是否平衡',
+            '每类标注框数量统计，快速发现类别不平衡问题',
+            '支持 train / val 切换查看',
+        ],
+    },
+    {
+        'name': 'Preprocess',
+        'brief': '视频预处理：统一命名 + 缩放 + 抽帧',
+        'color': '#14b8a6',
+        'items': [
+            '第一步：视频集中 — 将散落子文件夹的视频统一收集到同一目录',
+            '第二步：重命名 — 按文件名排序统一命名为 00.ext, 01.ext...',
+            '第三步：缩放 — 保持宽高比 letterbox 缩放至指定尺寸，黑边填充',
+            '第四步：抽帧 — 按目标 FPS（推荐 1-2 fps）均匀抽取帧，JPEG 95 质量',
+            '输出命名格式：{视频源}-{编号}-{秒数:04d}.jpg',
+        ],
+    },
+    {
+        'name': 'Label',
+        'brief': '手动/自动标注与审核导出',
+        'color': '#ec4899',
+        'items': [
+            '手动标注 — 选择类别后在图片上拖拽绘制矩形框',
+            '自动标注 — 选择 YOLO 模型对全部图片自动检测标注，再人工审核修正',
+            '标注操作 — 单击选框移动、四角手柄调整、右键删除、类别按钮切换',
+            '导出数据集 — 按比例随机切分 train/val，生成 YOLO 格式 .txt 和 data.yaml',
+            '支持多轮标注会话自动保存，避免意外丢失',
+        ],
+    },
+    {
+        'name': 'Distill',
+        'brief': '知识蒸馏：大模型（Teacher）教小模型（Student）',
+        'color': '#f97316',
+        'items': [
+            '核心原理 — Teacher 模型冻结权重，Student 同时学习真实标签和 Teacher 的 soft prediction',
+            'Alpha — 蒸馏权重比例 0.5（50% 检测 loss + 50% 蒸馏 loss），控制两个目标的平衡',
+            'Teacher — 自动搜索 runs/ 下最新的 best.pt，也可手动指定更大模型（如 yolo11m）',
+            'Student — 通常选小模型（yolo11n），蒸馏后保持推理速度但精度接近大模型',
+            'LR — 蒸馏学习率 0.002，略高于普通训练以加速知识迁移',
+            'Batch — 蒸馏时可使用更大 batch（Teacher 冻结无梯度），推荐 24',
+            'Warmup / Weight Decay / Momentum — 与普通训练一致，预热 5 轮',
+            '收益 — yolo11n 蒸馏后可提升 mAP50 约 6-11%，推理速度不变',
+        ],
+    },
+    {
+        'name': 'Export',
+        'brief': '导出训练好的模型到部署格式',
+        'color': RED,
+        'items': [
+            'ONNX — 通用格式，适用于 ONNX Runtime，边缘设备首选',
+            'TorchScript — PyTorch 原生部署格式',
+            'NCNN — ARM 平台优化（树莓派/Orange Pi），INT8 量化后体积压缩 4 倍',
+            'OpenVINO — Intel 平台加速推理',
+            'TensorRT — NVIDIA GPU 加速，适合 Jetson 系列',
+            'TFLite / EdgeTPU — 移动端/嵌入式 Google Coral 部署',
+            'CoreML — Apple 设备（iPhone/Mac）部署',
+        ],
+    },
 ]
 
 
+def _make_section(name, brief, items, color):
+    """创建文档式分段组件"""
+    section = QWidget()
+    section.setStyleSheet(f"""
+        background:{CARD};
+        border:1px solid {BORDER};
+        border-left:4px solid {color};
+        border-radius:0 7px 7px 0;
+    """)
+    layout = QVBoxLayout(section)
+    layout.setContentsMargins(16, 12, 16, 12)
+    layout.setSpacing(6)
+
+    # 标题行
+    h = QHBoxLayout()
+    h.setSpacing(8)
+    dot = QLabel("●")
+    dot.setStyleSheet(f"color:{color};font-size:12px;border:none;")
+    h.addWidget(dot)
+    lbl = QLabel(name)
+    lbl.setStyleSheet(f"font-size:16px;font-weight:700;color:{TEXT};border:none;")
+    h.addWidget(lbl)
+    h.addStretch()
+    layout.addLayout(h)
+
+    # 简短说明
+    brief_lbl = QLabel(brief)
+    brief_lbl.setStyleSheet(f"font-size:12px;color:{TEXT2};border:none;font-weight:500;")
+    brief_lbl.setWordWrap(True)
+    layout.addWidget(brief_lbl)
+
+    # 详细项列表
+    for item in items:
+        w = QWidget()
+        w.setStyleSheet("background:transparent;border:none;")
+        wl = QHBoxLayout(w)
+        wl.setContentsMargins(4, 1, 0, 1)
+        wl.setSpacing(6)
+        bullet = QLabel("·")
+        bullet.setStyleSheet(f"font-size:12px;color:{color};border:none;font-weight:700;")
+        bullet.setFixedWidth(10)
+        wl.addWidget(bullet)
+        text = QLabel(item)
+        text.setStyleSheet(f"font-size:11px;color:{TEXT3};border:none;")
+        text.setWordWrap(True)
+        wl.addWidget(text, 1)
+        layout.addWidget(w)
+
+    return section
+
+
 class GuideTab(QWidget):
-    """引导标签页"""
+    """引导标签页 — 文档式分段布局"""
 
     def __init__(self, studio):
         super().__init__()
@@ -22,62 +184,38 @@ class GuideTab(QWidget):
         self._build()
 
     def _build(self):
-        lo = QVBoxLayout(self)
-        lo.setContentsMargins(20, 20, 20, 20)
-        lo.setSpacing(14)
+        # 外层 ScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"QScrollArea{{border:none;background:transparent;}}")
+
+        inner = QWidget()
+        inner.setStyleSheet("background:transparent;")
+        lo = QVBoxLayout(inner)
+        lo.setContentsMargins(24, 20, 24, 20)
+        lo.setSpacing(10)
 
         # 标题
-        title = QLabel("YOLO Training Studio — 功能导览")
-        title.setStyleSheet(f"font-size:24px;font-weight:700;color:{TEXT};border:none;")
+        title = QLabel("YOLO Training Studio")
+        title.setStyleSheet(f"font-size:26px;font-weight:700;color:{TEXT};border:none;")
         lo.addWidget(title)
 
-        subtitle = QLabel("选择一个标签页开始你的深度学习工作流")
-        subtitle.setStyleSheet(f"font-size:14px;color:{TEXT3};border:none;margin-bottom:4px;")
+        subtitle = QLabel("功能导览 — 每个标签页的作用与参数说明")
+        subtitle.setStyleSheet(f"font-size:13px;color:{TEXT3};border:none;margin-bottom:2px;")
         lo.addWidget(subtitle)
 
-        # 卡片网格
-        grid = QGridLayout()
-        grid.setSpacing(10)
+        # 分隔线
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet(f"border:none;border-top:1px solid {BORDER};margin:4px 0 6px;")
+        lo.addWidget(sep)
 
-        for i, (name, brief, detail, color) in enumerate(TABS):
-            row, col = divmod(i, 4)
+        # 文档式分段
+        for s in SECTIONS:
+            section = _make_section(s['name'], s['brief'], s['items'], s['color'])
+            lo.addWidget(section)
 
-            card = QWidget()
-            card.setStyleSheet(f"background:{CARD};border:1px solid {BORDER};border-radius:8px;")
-            card.setMinimumHeight(160)
-
-            cl = QVBoxLayout(card)
-            cl.setContentsMargins(14, 14, 14, 14)
-            cl.setSpacing(8)
-
-            # 圆点 + 标题
-            h = QHBoxLayout()
-            h.setSpacing(8)
-            dot = QLabel("●")
-            dot.setStyleSheet(f"color:{color};font-size:14px;border:none;")
-            h.addWidget(dot)
-
-            lbl = QLabel(name)
-            lbl.setStyleSheet(f"font-size:18px;font-weight:700;color:{TEXT};border:none;")
-            h.addWidget(lbl)
-            h.addStretch()
-            cl.addLayout(h)
-
-            # 简短说明
-            brief_lbl = QLabel(brief)
-            brief_lbl.setStyleSheet(f"font-size:13px;color:{TEXT2};border:none;font-weight:500;")
-            brief_lbl.setWordWrap(True)
-            cl.addWidget(brief_lbl)
-
-            # 详细说明
-            detail_lbl = QLabel(detail)
-            detail_lbl.setStyleSheet(f"font-size:12px;color:{TEXT3};border:none;line-height:1.4;")
-            detail_lbl.setWordWrap(True)
-            cl.addWidget(detail_lbl, 1)
-
-            grid.addWidget(card, row, col)
-
-        lo.addLayout(grid, 1)
+        lo.addStretch()
 
         # 底部信息栏
         footer = QWidget()
@@ -86,8 +224,15 @@ class GuideTab(QWidget):
         fl.setContentsMargins(12, 8, 12, 8)
         fl.addWidget(QLabel(f"项目: {TITLE}", styleSheet=f"font-size:12px;color:{TEXT2};border:none;"))
         fl.addStretch()
-        fl.addWidget(QLabel(f"类别数: {len(CLASSES)}", styleSheet=f"font-size:12px;color:{TEXT2};border:none;"))
+        fl.addWidget(QLabel(f"类别: {', '.join(CLASSES)}", styleSheet=f"font-size:12px;color:{TEXT2};border:none;"))
         fl.addWidget(QLabel("|", styleSheet=f"font-size:12px;color:{BORDER};border:none;"))
-        fl.addWidget(QLabel("快捷键: A 上一张 | D 下一张 | W 删除框 | S 删除图片",
+        fl.addWidget(QLabel(f"模型: models/*.pt ({len(CLASSES)} 类)",
                             styleSheet=f"font-size:12px;color:{TEXT3};border:none;"))
         lo.addWidget(footer)
+
+        scroll.setWidget(inner)
+
+        # 主布局
+        main_lo = QVBoxLayout(self)
+        main_lo.setContentsMargins(0, 0, 0, 0)
+        main_lo.addWidget(scroll)

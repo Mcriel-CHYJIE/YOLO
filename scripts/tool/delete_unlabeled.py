@@ -55,7 +55,7 @@ def _no_ann(fname: str) -> bool:
 def mode_per_json(images: dict, json_dir: Path, dry_run: bool):
     """逐文件 JSON 模式：每张图对应一个同名 .json"""
     if not json_dir.is_dir():
-        print(f'❌ JSON 目录不存在: {json_dir}'); return
+        print(f' JSON 目录不存在: {json_dir}'); return
 
     to_del = []
     for stem, img_path in images.items():
@@ -69,17 +69,17 @@ def mode_per_json(images: dict, json_dir: Path, dry_run: bool):
 def mode_coco(images: dict, coco_path: Path, dry_run: bool):
     """简单列表 JSON 模式：annotations 数组存有标注的文件名"""
     if not coco_path.exists():
-        print(f'❌ COCO JSON 不存在: {coco_path}'); return
+        print(f' COCO JSON 不存在: {coco_path}'); return
 
     try:
         data = json.loads(coco_path.read_text(encoding='utf-8'))
     except Exception as e:
-        print(f'❌ 解析 JSON 失败: {e}'); return
+        print(f' 解析 JSON 失败: {e}'); return
 
     # annotations 是 dict(key=路径)/list(文件名)/标准COCO?
     ann_raw = data.get('annotations', [])
     if not ann_raw:
-        print('⚠ annotations 为空'); return
+        print(' annotations 为空'); return
 
     # dict 模式: {路径: [标注...]}
     if isinstance(ann_raw, dict):
@@ -137,7 +137,7 @@ def _delete_images(paths: list, dry_run: bool, reason: str):
                 p.unlink()
                 print(f'  ✗ 已删除: {p.name}')
             except Exception as e:
-                print(f'  ⚠ 删除失败 {p.name}: {e}')
+                print(f'   删除失败 {p.name}: {e}')
         print(f'✓ 共删除 {len(paths)} 张')
     else:
         print(f'  (dry-run，未实际删除)')
@@ -154,11 +154,11 @@ def main():
 
     img_dir = Path(args.img_dir)
     if not img_dir.is_dir():
-        print(f'❌ 图片目录不存在: {img_dir}'); sys.exit(1)
+        print(f' 图片目录不存在: {img_dir}'); sys.exit(1)
 
     images = collect_images(img_dir)
     if not images:
-        print(f'❌ 目录中未找到图片: {img_dir}'); sys.exit(1)
+        print(f' 目录中未找到图片: {img_dir}'); sys.exit(1)
     print(f'📷 扫描到 {len(images)} 张图片')
 
     if args.coco:

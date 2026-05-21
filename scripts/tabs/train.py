@@ -23,11 +23,13 @@ class TrainTab(QWidget):
         if hasattr(self, 'configGrid'):
             self.configGrid.setColumnStretch(0, 0)
             self.configGrid.setColumnStretch(1, 1)
-            self.configGrid.setColumnStretch(2, 1)
+            self.configGrid.setColumnStretch(2, 0)
+            self.configGrid.setColumnStretch(3, 1)
         if hasattr(self, 'algoGrid'):
             self.algoGrid.setColumnStretch(0, 0)
             self.algoGrid.setColumnStretch(1, 1)
-            self.algoGrid.setColumnStretch(2, 1)
+            self.algoGrid.setColumnStretch(2, 0)
+            self.algoGrid.setColumnStretch(3, 1)
 
     def _init_widgets(self):
         t = cfg['training']
@@ -35,8 +37,15 @@ class TrainTab(QWidget):
         self.configGrid.setColumnStretch(1, 1)
         self.configGrid.setColumnStretch(2, 0)
         self.configGrid.setColumnStretch(3, 1)
-        self.m.addItems(t['model_options'])
-        self.m.setCurrentText(t['model'])
+        models_dir = ROOT / 'models'
+        if models_dir.exists():
+            model_files = sorted([p.name for p in models_dir.glob('*.pt')])
+            self.m.addItems(model_files)
+            if t['model'] in model_files:
+                self.m.setCurrentText(t['model'])
+        else:
+            self.m.addItems(t['model_options'])
+            self.m.setCurrentText(t['model'])
         self.sz.addItems([str(v) for v in t['imgsz_options']])
         self.sz.setCurrentText(str(t['imgsz']))
         self.opt.addItems(t['optimizer_options'])
@@ -44,7 +53,6 @@ class TrainTab(QWidget):
         self.dev.addItems(['GPU', 'CPU'])
         self.sch.addItems(t['scheduler_options'])
         self.sch.setCurrentText(t['scheduler'].capitalize())
-        self.tipLabel.setText(cfg['project']['tip'])
         if not self.studio.gpu_ok:
             self.dev.setCurrentIndex(1)
         else:
@@ -89,9 +97,33 @@ class TrainTab(QWidget):
             mvl.addWidget(item)
             self.studio._sys_data[key] = [val]
 
+        # 新 UI 控件初始值（从 project.yaml 读取）
+        self.ep.setValue(t['epochs'])
+        self.bs.setValue(t['batch'])
+        self.pt.setValue(t['patience'])
+        self.lr0.setValue(t['lr0'])
+        self.lrf.setValue(t['lrf'])
+        self.wu.setValue(t['warmup_epochs'])
+        self.wk.setValue(min(t['workers'], self.studio.cpu_count))
+        self.iou_thresh.setValue(t['iou'])
+        self.cm.setValue(t['close_mosaic'])
+        self.cp.setValue(t['copy_paste'])
+        self.dg.setValue(t['degrees'])
+        self.ms.setChecked(t['multi_scale'])
+        self.momentum.setValue(t.get('momentum', 0.937))
+        self.wd.setValue(t.get('weight_decay', 0.0005))
+        self.hsv_h.setValue(t.get('hsv_h', 0.015))
+        self.hsv_s.setValue(t.get('hsv_s', 0.7))
+        self.hsv_v.setValue(t.get('hsv_v', 0.4))
+        self.translate.setValue(t.get('translate', 0.15))
+        self.scale.setValue(t.get('scale', 0.6))
+        self.cls_pw.setValue(t.get('cls_pw', 0.75))
+
         self._params = [self.m, self.ep, self.bs, self.sz, self.opt, self.dev,
             self.sch, self.pt, self.lr0, self.lrf, self.wu, self.wk,
-            self.iou_thresh, self.cm, self.cp, self.dg, self.ms]
+            self.iou_thresh, self.cm, self.cp, self.dg, self.ms,
+            self.momentum, self.wd, self.hsv_h, self.hsv_s,
+            self.hsv_v, self.translate, self.scale, self.cls_pw]
 
     def _connect_signals(self):
         self.bs1.setObjectName('pri')
@@ -104,16 +136,17 @@ class TrainTab(QWidget):
         s = lambda w: w.currentText()
         lr0_val = self.lr0.value()
         if lr0_val <= 0: lr0_val = 0.001
-        g = cfg['training']
-        return dict(model=s(self.m), epochs=self.ep.value(), batch=self.bs.value(), imgsz=int(s(self.sz)),
+        return dict(model=f'models/{s(self.m)}', epochs=self.ep.value(), batch=self.bs.value(), imgsz=int(s(self.sz)),
             lr0=lr0_val, lrf=self.lrf.value(), optimizer=s(self.opt), patience=self.pt.value(),
             device='0' if self.studio.gpu_ok and self.dev.currentIndex() == 0 else 'cpu',
             cos_lr=self.sch.currentIndex() == 0, warmup_epochs=self.wu.value(), workers=self.wk.value(),
+            momentum=self.momentum.value(), weight_decay=self.wd.value(),
+            cls_pw=self.cls_pw.value(),
             iou=self.iou_thresh.value(),
             close_mosaic=self.cm.value(), copy_paste=self.cp.value(), degrees=self.dg.value(),
             multi_scale=self.ms.isChecked(),
-            hsv_h=g.get('hsv_h', 0.015), hsv_s=g.get('hsv_s', 0.7), hsv_v=g.get('hsv_v', 0.4),
-            translate=g.get('translate', 0.15), scale=g.get('scale', 0.6))
+            hsv_h=self.hsv_h.value(), hsv_s=self.hsv_s.value(), hsv_v=self.hsv_v.value(),
+            translate=self.translate.value(), scale=self.scale.value())
 
     def _s(self):
         if self.trainer and self.trainer.isRunning():
@@ -125,7 +158,7 @@ class TrainTab(QWidget):
         self._me.setText('0'); self._mm.setText('—'); self._mb.setText('—')
         self._lc.upd({}); self._mc.upd({})
         cfg = self._config()
-        self._log(f'🚀 {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
+        self._log(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
         self.trainer = Trainer(cfg)
         self.trainer.log.connect(self._log)
         self.trainer.status.connect(lambda t, p, b, c: (
@@ -141,7 +174,7 @@ class TrainTab(QWidget):
     def _st(self):
         if self.trainer and self.trainer.isRunning():
             self.trainer.stop(); self.bs2.setEnabled(False); self.bs2.setText('Stopping…')
-            self._log('⏳  Stopping after current epoch…')
+            self._log('  Stopping after current epoch…')
 
     def _dn(self, ok, msg):
         self._log(msg); self.bs1.setEnabled(True); self.bs2.setEnabled(True); self.bs2.setText('Stop')

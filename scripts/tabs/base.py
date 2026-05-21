@@ -149,12 +149,17 @@ class LogPanel(QWidget):
 
 def format_log(ts, msg):
     color = CON_T
-    if '✅' in msg or '🎉' in msg or 'Done' in msg: color = GREEN
-    elif '❌' in msg or 'Failed' in msg: color = RED
-    elif '⚠️' in msg: color = AMBER
-    elif '🚀' in msg or 'Epoch' in msg: color = '#a5b4fc'
-    elif '📁' in msg or '📄' in msg: color = TEXT3
-    elif '🎬' in msg: color = PRI
+    if ('Done' in msg or 'complete' in msg.lower() or 'exported' in msg
+        or 'saved' in msg or 'New best' in msg or 'Best mAP' in msg):
+        color = GREEN
+    elif ('Failed' in msg or 'fail' in msg.lower() or 'Error' in msg
+          or 'error' in msg.lower()):
+        color = RED
+    elif ('Warning' in msg or 'warn' in msg.lower() or 'Skip' in msg
+          or 'skip' in msg.lower()):
+        color = AMBER
+    elif ('Epoch' in msg or 'Start' in msg or 'Starting' in msg):
+        color = '#a5b4fc'
     return f'<span style="color:#6b7280">[{ts}]</span> <span style="color:{color}">{msg}</span>'
 
 

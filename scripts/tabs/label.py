@@ -405,10 +405,10 @@ class AutoLabelWorker(QThread):
     def run(self):
         try:
             from ultralytics import YOLO
-            self.log.emit(f"🚀 加载模型: {Path(self._model_path).name}")
+            self.log.emit(f" 加载模型: {Path(self._model_path).name}")
             model = YOLO(self._model_path)
             n = len(self._image_paths)
-            self.log.emit(f"📸 开始自动标注 {n} 张图片...")
+            self.log.emit(f" 开始自动标注 {n} 张图片...")
             for i, img_path in enumerate(self._image_paths):
                 if self._stop_flag:
                     self.done.emit(False, "Stopped")
@@ -424,12 +424,12 @@ class AutoLabelWorker(QThread):
                                              w=xywhn[2], h=xywhn[3]))
                 self.image_done.emit(str(img_path), anns)
                 self.progress.emit(i + 1, n)
-            self.log.emit("✅ 自动标注完成")
+            self.log.emit(" 自动标注完成")
             self.done.emit(True, "Auto-label complete")
         except Exception as e:
             import traceback
             traceback.print_exc()
-            self.log.emit(f"❌ {e}")
+            self.log.emit(f" {e}")
             self.done.emit(False, str(e))
 
 
@@ -510,7 +510,7 @@ class ExportWorker(QThread):
                 f"{names_lines}\n"
             )
             (self._out_root / "data.yaml").write_text(yaml_content, "utf-8")
-            self.log.emit(f"✅ Export complete: {exported_count} images (train {len(train_items)}/val {len(val_items)})")
+            self.log.emit(f" Export complete: {exported_count} images (train {len(train_items)}/val {len(val_items)})")
             msg = f"Total: {exported_count} images | Train: {len(train_items)} | Val: {len(val_items)}"
             if skipped_count > 0:
                 msg += f" | Skipped: {skipped_count} (already exists)"
@@ -518,7 +518,7 @@ class ExportWorker(QThread):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            self.log.emit(f"❌ Export failed: {e}")
+            self.log.emit(f" Export failed: {e}")
             self.done.emit(False, str(e))
 # ═══════════════════════ LabelTab ═══════════════════════
 
@@ -706,7 +706,7 @@ class LabelTab(QWidget):
         lo.addWidget(self._filter_stats_label)
         
         # Filter 按钮
-        filter_btn = QPushButton("🎲 Random Filter")
+        filter_btn = QPushButton(" Random Filter")
         filter_btn.setObjectName("pri")
         filter_btn.setMinimumHeight(26)
         filter_btn.clicked.connect(self._random_filter_dataset)
@@ -883,7 +883,7 @@ class LabelTab(QWidget):
         self._model_combo = QComboBox()
         self._model_combo.setMinimumHeight(24)
         ml2.addWidget(self._model_combo, 1)
-        ml2.addWidget(self._make_tool_btn("📁", self._browse_model))
+        ml2.addWidget(self._make_tool_btn("", self._browse_model))
         self._auto_btn = QPushButton("▶")
         self._auto_btn.setObjectName("pri")
         self._auto_btn.setMinimumHeight(24)
@@ -945,7 +945,7 @@ class LabelTab(QWidget):
         export_row.addLayout(sr, 1)
         
         # 导出按钮
-        self._export_btn = QPushButton("📦 Export")
+        self._export_btn = QPushButton(" Export")
         self._export_btn.setObjectName("pri")
         self._export_btn.setMinimumHeight(24)
         self._export_btn.clicked.connect(self._export)
@@ -1205,7 +1205,7 @@ class LabelTab(QWidget):
         if not folder:
             return
         src = self._after_root / folder
-        self._src_path_label.setText(f"📂 {src}")
+        self._src_path_label.setText(f" {src}")
         self._load_images(src)
 
     # ═══════════════ IMAGE LOADING ═══════════════
@@ -1692,7 +1692,7 @@ class LabelTab(QWidget):
                 self._on_folder_selected()
                 return
         self._src_combo.blockSignals(False)
-        self._src_path_label.setText(f"⚠️ No subfolders in {self._after_root}")
+        self._src_path_label.setText(f" No subfolders in {self._after_root}")
 
     # ═══════════════ AUTO LABEL ═══════════════
 
@@ -1729,7 +1729,7 @@ class LabelTab(QWidget):
                 return
         self._auto_anns = {}
         self._auto_btn.setEnabled(False)
-        self._auto_btn.setText("⏳")
+        self._auto_btn.setText("")
         self._export_bar.setValue(0)
         self._worker = AutoLabelWorker(
             model_path=model_path,

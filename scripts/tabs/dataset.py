@@ -1,4 +1,4 @@
-"""数据集预览标签页 — 优化排布"""
+"""数据集预览标签页"""
 from scripts.tabs.base import *
 from PyQt5 import uic
 import yaml, random, shutil
@@ -27,27 +27,67 @@ class DatasetTab(QWidget):
         self.rightPanel.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
         self.sa.setStyleSheet('QScrollArea{background:transparent;border:none;}')
         self.dp_grid.setStyleSheet('background:transparent;')
-        self.dp_split.addItems(['train', 'val'])
         self._cols = 3
         self.dp_status.setText('Ready - Click Refresh to load dataset preview')
+        # 设置按钮最小高度
+        for btn in [self.btn_train, self.btn_val, self.dp_rf, self.dp_import, self.dp_fix_yaml]:
+            btn.setMinimumHeight(32)
+        # 设置 split 按钮样式
+        for btn in [self.btn_train, self.btn_val]:
+            btn.setStyleSheet(f'''
+                QPushButton {{
+                    background: {BG};
+                    border: 1px solid {BORDER};
+                    border-radius: 4px;
+                    color: {TEXT};
+                    font-size: 11px;
+                    font-weight: 500;
+                    padding: 0 8px;
+                }}
+                QPushButton:checked {{
+                    background: #6366f1;
+                    border-color: #6366f1;
+                    color: white;
+                }}
+                QPushButton:hover:!checked {{
+                    background: {CARD};
+                }}
+            ''')
+        # 设置按钮互斥逻辑
+        self.btn_train.clicked.connect(self._on_split_click)
+        self.btn_val.clicked.connect(self._on_split_click)
+
+    def _on_split_click(self):
+        """处理 split 按钮点击，实现互斥选中"""
+        sender = self.sender()
+        if sender.isChecked():
+            if sender == self.btn_train:
+                self.btn_val.setChecked(False)
+            else:
+                self.btn_train.setChecked(False)
+        else:
+            sender.setChecked(True)  # 至少保持一个选中
+        self._dp_refresh()
 
     def _connect_signals(self):
-        self.dp_split.currentIndexChanged.connect(lambda: self._dp_refresh())
         self.dp_rf.setObjectName('pri')
         self.dp_rf.clicked.connect(self._dp_refresh)
+        self.dp_import.setObjectName('sec')
         self.dp_import.clicked.connect(self._import_dataset)
+        self.dp_fix_yaml.setObjectName('warn')
         self.dp_fix_yaml.clicked.connect(self._fix_yaml_config)
 
     def _dp_refresh(self):
         self.dp_status.setText('Loading...'); QApplication.processEvents()
-        split = self.dp_split.currentText()
+        # 根据按钮选中状态确定 split
+        split = 'train' if self.btn_train.isChecked() else 'val'
         img_dir = ROOT / 'datasets' / 'images' / split
         lbl_dir = ROOT / 'datasets' / 'labels' / split
         if not img_dir.exists() or not lbl_dir.exists():
-            self.dp_status.setText(f'❌ Split "{split}" not found in datasets/'); return
+            self.dp_status.setText(f'Split "{split}" not found in datasets/'); return
         imgs = sorted(img_dir.glob('*.jpg')) + sorted(img_dir.glob('*.png')) + \
                sorted(img_dir.glob('*.jpeg')) + sorted(img_dir.glob('*.webp'))
-        if not imgs: self.dp_status.setText(f'⚠ No images in {split}'); return
+        if not imgs: self.dp_status.setText(f'No images in {split}'); return
         self._images = []; labeled = 0; cls_counter = Counter()
         for img_path in imgs:
             lbl_path = lbl_dir / f'{img_path.stem}.txt'
@@ -59,13 +99,26 @@ class DatasetTab(QWidget):
                     if line.strip(): cls_counter[int(line.strip().split()[0])] += 1
         self._st_total_v.setText(f'{len(imgs)}')
         self._st_lbl_v.setText(f'{labeled}')
-        self._st_cls_v.setText(f'{len(cls_counter)}')
+        unlabeled = len(imgs) - labeled
+        total_instances = sum(cls_counter.values())
+        self._st_cls_v.setText(f'{total_instances}')
+        self._st_cls_text.setText('Instances')
+        self._st_total_lbl.setText('Total')
+        self._st_lbl_text.setText('Labeled')
         self._update_class_stats(cls_counter, labeled)
         self._clear_grid()
-        for idx, (img_path, lbl_path) in enumerate(self._images):
+        # 随机选9张预览，少于9张则全显示
+        preview = random.sample(self._images, min(9, len(self._images)))
+        for idx, (img_path, lbl_path) in enumerate(preview):
             r, c = divmod(idx, self._cols)
             self.dp_gl.addWidget(self._make_card(img_path, lbl_path), r, c)
-        self.dp_status.setText(f'✅ {len(imgs)} images ({len(self._images)} total)')
+        shown = len(preview)
+        status_parts = [f'{len(imgs)} images']
+        if unlabeled:
+            status_parts.append(f'{unlabeled} unlabeled')
+        if shown < len(imgs):
+            status_parts.append(f'{shown} previewed')
+        self.dp_status.setText(' | '.join(status_parts))
 
     def _update_class_stats(self, cls_counter, total_imgs):
         self._clear_layout(self._cs_grid)
@@ -96,33 +149,80 @@ class DatasetTab(QWidget):
 
     def _make_card(self, img_path, lbl_path):
         card = QWidget(); card.setStyleSheet(f'background:{BG};border-radius:6px;')
-        cv = QVBoxLayout(card); cv.setContentsMargins(4,4,4,4); cv.setSpacing(2)
+        hl = QHBoxLayout(card); hl.setContentsMargins(4,4,4,4); hl.setSpacing(6)
         has_lbl = lbl_path.exists() and lbl_path.stat().st_size > 0
+
+        # ── 左侧：图片(含标注框) + 文件名 ──
+        left = QWidget(); left.setStyleSheet('background:transparent;border:none;')
+        ll = QVBoxLayout(left); ll.setContentsMargins(0,0,0,0); ll.setSpacing(2)
+
         thumb = QLabel(); thumb.setAlignment(Qt.AlignCenter)
-        thumb.setFixedSize(200, 150); thumb.setStyleSheet('background:transparent;')
+        thumb.setFixedSize(180, 180); thumb.setStyleSheet('background:transparent;')
         try:
-            pil_img = Image.open(img_path); pil_img.thumbnail((198, 148), Image.LANCZOS)
-            from PIL.ImageQt import toqpixmap
-            thumb.setPixmap(toqpixmap(pil_img))
-        except: thumb.setText(img_path.name); thumb.setStyleSheet(f'color:{TEXT3};font-size:9px;')
-        cv.addWidget(thumb)
-        tr = QWidget(); tr.setStyleSheet('background:transparent;border:none;')
-        tl = QHBoxLayout(tr); tl.setContentsMargins(2,0,2,0); tl.setSpacing(3)
-        fn = QLabel(img_path.name); fn.setStyleSheet(f'font-size:8px;color:{TEXT2};')
-        fn.setWordWrap(True); tl.addWidget(fn, 1)
-        st = QLabel('✅' if has_lbl else '⏳'); st.setStyleSheet('font-size:10px;'); st.setFixedWidth(18)
-        tl.addWidget(st); cv.addWidget(tr)
+            pil_img = Image.open(str(img_path)).convert('RGB')
+            ow, oh = pil_img.size
+            scale = min(178 / ow, 178 / oh)
+            nw, nh = int(ow * scale), int(oh * scale)
+            pil_img = pil_img.resize((nw, nh), Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS)
+
+            if has_lbl:
+                from PIL import ImageDraw
+                draw = ImageDraw.Draw(pil_img)
+                lbl_lines = [l.strip() for l in lbl_path.read_text().strip().split('\n') if l.strip()]
+                for line in lbl_lines:
+                    parts = line.split()
+                    cid = int(parts[0])
+                    xc, yc, w, h = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+                    x1 = int((xc - w / 2) * nw)
+                    y1 = int((yc - h / 2) * nh)
+                    x2 = int((xc + w / 2) * nw)
+                    y2 = int((yc + h / 2) * nh)
+                    color = self.COLORS[cid % len(self.COLORS)]
+                    draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
+                    nm = CLASSES[cid] if cid < len(CLASSES) else f'cls{cid}'
+                    bb = draw.textbbox((0, 0), nm, font=None) if hasattr(draw, 'textbbox') else (0, 0, len(nm) * 7, 10)
+                    tw, th = bb[2] - bb[0], bb[3] - bb[1]
+                    draw.rectangle([x1, y1 - th - 2, x1 + tw + 4, y1], fill=color)
+                    draw.text((x1 + 2, y1 - th - 1), nm, fill='#fff')
+
+            canvas = Image.new('RGB', (180, 180), '#f5f5f4')
+            cx, cy = (180 - nw) // 2, (180 - nh) // 2
+            canvas.paste(pil_img, (cx, cy))
+            from PyQt5.QtGui import QPixmap
+            from io import BytesIO
+            buffer = BytesIO(); canvas.save(buffer, format='PNG')
+            pixmap = QPixmap(); pixmap.loadFromData(buffer.getvalue())
+            thumb.setPixmap(pixmap)
+        except:
+            thumb.setText(img_path.name)
+            thumb.setStyleSheet(f'color:{TEXT3};font-size:9px;')
+        ll.addWidget(thumb)
+
+        # 文件名过长时缩略中间
+        name = img_path.name
+        if len(name) > 25:
+            half = 10
+            name = name[:half] + '...' + name[-half:]
+        fn = QLabel(name); fn.setStyleSheet(f'font-size:8px;color:{TEXT2};')
+        fn.setAlignment(Qt.AlignCenter)
+        ll.addWidget(fn)
+        hl.addWidget(left)
+
+        # ── 右侧：类别列表 ──
+        right = QWidget(); right.setStyleSheet('background:transparent;border:none;')
+        rl = QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(2)
+
         if has_lbl:
-            ci = QLabel(); ci.setStyleSheet(f'font-size:7px;color:{TEXT3};')
-            try:
-                cids = [int(l.strip().split()[0]) for l in lbl_path.read_text().strip().split('\n') if l.strip()]
-                parts = []
-                for cid, cnt in Counter(cids).items():
-                    nm = CLASSES[cid] if cid < len(CLASSES) else f'cls_{cid}'
-                    parts.append(f'<span style="color:{self.COLORS[cid % len(self.COLORS)]}">{nm}:{cnt}</span>')
-                ci.setText(' '.join(parts))
-            except: pass
-            cv.addWidget(ci)
+            cids = [int(l.strip().split()[0]) for l in lbl_path.read_text().strip().split('\n') if l.strip()]
+            for cid, cnt in sorted(Counter(cids).items()):
+                color = self.COLORS[cid % len(self.COLORS)]
+                nm = CLASSES[cid] if cid < len(CLASSES) else f'cls{cid}'
+                cl = QLabel(f'{nm} x{cnt}')
+                cl.setStyleSheet(f'font-size:8px;color:{color};font-weight:500;background:transparent;')
+                rl.addWidget(cl)
+
+        rl.addStretch()
+        hl.addWidget(right, 1)
         return card
 
     def _fix_yaml_config(self):
@@ -145,26 +245,79 @@ class DatasetTab(QWidget):
             data = {'path': str(data_dir).replace('\\', '/'), 'train': 'images/train', 'val': 'images/val',
                     'nc': nc, 'names': {i: CLASSES[i] if i < len(CLASSES) else f'class_{i}' for i in range(nc)}}
             with open(yaml_path, 'w') as f: yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-            self.dp_status.setText(f'✅ data.yaml generated: {nc} classes')
+            self.dp_status.setText(f'data.yaml generated: {nc} classes')
             QMessageBox.information(self, 'YAML Fixed', f'{yaml_path}\n{nc} classes, {len(splits)} splits')
         except Exception as e: QMessageBox.critical(self, 'Error', f'Failed: {e}')
 
     def _import_dataset(self):
-        src = Path(QFileDialog.getExistingDirectory(self, 'Select Dataset Folder (with images+labels)'))
-        if not src or not src.exists(): return
-        img_dirs = [d for d in src.iterdir() if d.is_dir() and d.name in ('train', 'val')]
-        if not img_dirs: QMessageBox.warning(self, 'Error', 'Dataset must have train/val subdirectories'); return
-        dst = ROOT / 'datasets'; copied = 0
+        """自动从 original/label 文件夹导入数据集"""
+        src = ROOT / 'original' / 'label'
+        if not src.exists():
+            QMessageBox.warning(self, 'Error', f'Label directory not found: {src}')
+            return
+        
+        # 检查是否有 images 和 labels 子目录
+        img_src = src / 'images'
+        lbl_src = src / 'labels'
+        if not img_src.exists() or not lbl_src.exists():
+            QMessageBox.warning(self, 'Error', 
+                f'Invalid dataset structure. Expected:\n{src}/images/train, images/val\n{src}/labels/train, labels/val')
+            return
+        
+        # 统计将要导入的文件数量
+        total_images = 0
         for split in ['train', 'val']:
-            si = src / split / 'images'; sl = src / split / 'labels'
-            di = dst / 'images' / split; dl = dst / 'labels' / split
-            if not si.exists(): continue
-            di.mkdir(parents=True, exist_ok=True); dl.mkdir(parents=True, exist_ok=True)
+            si = img_src / split
+            if si.exists():
+                total_images += len([f for f in si.iterdir() if f.suffix.lower() in ('.jpg', '.png', '.jpeg', '.webp')])
+        
+        if total_images == 0:
+            QMessageBox.warning(self, 'Warning', 'No images found in original/label')
+            return
+        
+        # 显示确认对话框
+        reply = QMessageBox.question(
+            self,
+            'Confirm Import',
+            f'Found {total_images} images in:\n{src}\n\n'
+            f'This will copy images and labels to datasets/ folder.\n'
+            f'Duplicate files will be skipped.\n\n'
+            f'Continue with import?',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        dst = ROOT / 'datasets'
+        copied = 0
+        
+        for split in ['train', 'val']:
+            si = img_src / split
+            sl = lbl_src / split
+            di = dst / 'images' / split
+            dl = dst / 'labels' / split
+            
+            if not si.exists():
+                continue
+            
+            di.mkdir(parents=True, exist_ok=True)
+            dl.mkdir(parents=True, exist_ok=True)
+            
             for f in si.iterdir():
                 if f.suffix.lower() in ('.jpg', '.png', '.jpeg', '.webp'):
                     if not (di / f.name).exists():
                         shutil.copy2(f, di / f.name)
                         lbl = sl / f'{f.stem}.txt'
-                        if lbl.exists(): shutil.copy2(lbl, dl / f'{lbl.name}')
+                        if lbl.exists():
+                            shutil.copy2(lbl, dl / f'{lbl.name}')
                         copied += 1
-        self.dp_status.setText(f'✅ Imported {copied} images'); self._dp_refresh()
+        
+        if copied > 0:
+            self.dp_status.setText(f'Imported {copied} images from original/label')
+            QMessageBox.information(self, 'Import Complete', 
+                f'Successfully imported {copied} images from:\n{src}')
+            self._dp_refresh()
+        else:
+            QMessageBox.warning(self, 'Warning', 'No new images to import (all files already exist)')

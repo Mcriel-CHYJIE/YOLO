@@ -58,7 +58,7 @@ _DEFAULTS = {
     },
     'distill': {
         'teacher': '',
-        'student': 'yolo11n.pt',
+        'student': 'models/yolo11n.pt',
         'epochs': 100,
         'batch': 16,
         'lr0': 0.001,

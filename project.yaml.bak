@@ -15,19 +15,19 @@ project:
     2: squatting                       # 蹲姿
     3: fallen                          # 摔倒/躺卧
   data_yaml: datasets/data.yaml         # Relative to project root
-  tip: "V8n-Long-clsPW0.75-IoU0.75-Rot10"  # Shown in Algorithm group box
+  tip: "🦶 Balanced → LS+SIoU+Rot15"    # Shown in Algorithm group box
 
 # ── Training Defaults ──
 training:
-  model: yolov8n.pt                    # yolov8n — 3.2M params, 6.2MB, 精度略高于 yolo11n
+  model: yolo11n.pt                    # Nano model - lightweight, suitable for RTX 5070 Ti
   model_options:                       # Available models in dropdown
     - yolo11n.pt
     - yolo11s.pt
     - yolo11m.pt
     - yolo11l.pt
     - yolo11x.pt
-  epochs: 1500                         # 长训练，配合高 patience 充分收敛
-  batch: 48                            # 16GB VRAM，yolov8n 仅 3.2M 参，batch 48 安全
+  epochs: 800                          # Extended training for maximum accuracy (time not a concern)
+  batch: 32                            # Optimized batch size for yolo11n on 16GB VRAM
   imgsz: 640                           # Fixed image size as requested
   imgsz_options: [416, 512, 640, 800]
   optimizer: AdamW                     # Best optimizer for long training with stable convergence
@@ -35,38 +35,37 @@ training:
   device: auto                         # auto = detect GPU; fallback to CPU
   scheduler: cosine                    # Cosine annealing with warmup for optimal learning
   scheduler_options: [Cosine, Linear]
-  patience: 200                        # 高 patience，长训练防止早停过早打断收敛
-  lr0: 0.001                           # 低 LR 稳定收敛，降低震荡带来的误报
-  lrf: 0.01                            # Final LR = 0.001 * 0.01 = 1e-5
-  warmup_epochs: 20                    # 长训练需更长 warmup 缓慢升温
-  workers: 12                          # RTX 5070 Ti + 16GB，12 workers 拉满数据吞吐
+  patience: 100                        # Extended patience for thorough best model search
+  lr0: 0.002                           # Slightly higher LR for better exploration
+  lrf: 0.01                            # Final LR = 0.002 * 0.01 = 0.00002
+  warmup_epochs: 15                    # Longer warmup for stable training start
+  workers: 8                           # Increased workers for faster data loading
   momentum: 0.937                      # Optimizer momentum
   weight_decay: 0.0005                 # L2 regularization
-  cls_pw: 0.75                          # 分类正样本权重 0.75（<1 降低误报，范围 [0,1]）
-  # Algorithm - Stricter augmentation for low false alarm
-  iou: 0.75                            # 提高 IoU 阈值减少重复框，降低 FP
-  close_mosaic: 50                     # 最后 50 轮关 Mosaic 做细粒度微调，减少合成增强误报
-  copy_paste: 0.15                     # 降低 CP 比例，减少人工伪影
-  degrees: 10.0                        # 减小旋转，摔倒方向敏感，过大旋转混淆站/躺
+  # Algorithm - Enhanced augmentation for maximum accuracy
+  iou: 0.7                             # Standard IoU threshold
+  close_mosaic: 30                     # Close mosaic last 30 epochs for fine-tuning
+  copy_paste: 0.3                      # Aggressive copy-paste augmentation
+  degrees: 15.0                        # Increased rotation augmentation
   multi_scale: false                   # DISABLED to maintain consistent 640 input size
   hsv_h: 0.015                         # Hue augmentation
   hsv_s: 0.7                           # Saturation augmentation
   hsv_v: 0.4                           # Brightness augmentation
   translate: 0.15                      # Increased translation
   scale: 0.6                           # Wider scale range 0.4-1.6x
-  flip_lr: 0.5                         # fliplr
+  flip_lr: 0.5                         # Horizontal flip
 
 # ── Validation Defaults ──
 validation:
   imgsz: 640
-  batch: 48
-  conf: 0.35                           # 推理置信度提至 0.35，直接过滤低分框，降低误报
-  iou: 0.5                             # 推理 IoU 稍高，减少密集框
+  batch: 32
+  conf: 0.25
+  iou: 0.45
 
 # ── Distillation Defaults ──
 distill:
-  teacher: ''                          # Empty = auto-find latest runs/*/weights/best*.pt
-  student: models/yolo11n.pt           # Student model (smaller than teacher)
+  teacher: ''                          # Empty = auto-find latest runs/*/weights/best5.20.pt
+  student: models/yolo11n.pt                   # Student model (smaller than teacher)
   epochs: 150                          # Extended epochs for better knowledge transfer
   batch: 24                            # Optimized batch size for distillation (teacher frozen, less memory)
   lr0: 0.002                           # Higher LR for faster convergence in distillation
@@ -79,8 +78,8 @@ distill:
 
 # ── Prediction / Inference Defaults ──
 predict:
-  conf: 0.35                           # 推理默认 conf 0.35，匹配验证集标准
-  iou: 0.5
+  conf: 0.25
+  iou: 0.45
   imgsz: 640
 
 # ── Export Defaults ──

@@ -35,7 +35,7 @@ class Distiller(QThread):
         try: self._train()
         except BaseException as e:
             import traceback; traceback.print_exc()
-            self.log.emit(f'❌ {e}'); self.done.emit(False, str(e))
+            self.log.emit(f' {e}'); self.done.emit(False, str(e))
     def _train(self):
         import torch.nn.functional as F, torch.optim as optim
         from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -50,7 +50,7 @@ class Distiller(QThread):
             try:
                 gi = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 al = torch.cuda.memory_allocated(0) / (1024**3)
-                self.log.emit(f'💻 GPU Memory: {gi:.1f}GB total, {gi-al:.1f}GB free')
+                self.log.emit(f' GPU Memory: {gi:.1f}GB total, {gi-al:.1f}GB free')
                 torch.cuda.empty_cache()
             except: pass
         self.log.emit(f'[Teacher] {cfg["teacher"]}')
@@ -84,7 +84,7 @@ class Distiller(QThread):
         sd = ROOT / 'runs' / 'distill' / cfg['name']; sd.mkdir(parents=True, exist_ok=True)
         bm50, be, pc, hist = 0.0, 0, 0, {'epoch':[],'loss':[],'map50':[],'map50_95':[]}
         total_batches = len(dl)
-        self.log.emit('\n🚀 Starting distillation training...')
+        self.log.emit('\n Starting distillation training...')
         for ep in range(1, cfg['epochs'] + 1):
             if self._stop: break
             if ep <= we:
@@ -124,7 +124,7 @@ class Distiller(QThread):
                 bm50, be, pc = vm50, ep, 0
                 torch.save({'model': student.model.state_dict(), 'names': student.names,
                     'args': student.model.args, 'version': '8.0.0'}, str(sd / 'best5.20.pt'))
-                self.log.emit(f'  🎉 New best mAP50: {vm50:.4f} (epoch {ep})')
+                self.log.emit(f'   New best mAP50: {vm50:.4f} (epoch {ep})')
             else: pc += 1
             if ep % 10 == 0:
                 torch.save({'model': student.model.state_dict(), 'names': student.names,

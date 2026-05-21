@@ -65,7 +65,7 @@ class DistillTab(QWidget):
         d = cfg.get('distill', {})
         teacher_path = (d.get('teacher') if d else '') or str((ROOT / 'runs/detect/runs').as_posix())
         self.de_teacher.setText(teacher_path)
-        student_def = (d.get('student', 'yolo11n.pt') if d else 'yolo11n.pt')
+        student_def = (d.get('student', 'models/yolo11n.pt') if d else 'models/yolo11n.pt')
         sp = str((ROOT / student_def).as_posix()) if not Path(student_def).is_absolute() else Path(student_def).as_posix()
         self.de_student.setText(sp)
         self.de_data.setText(Path(DATA_YAML).as_posix())
@@ -153,7 +153,7 @@ class DistillTab(QWidget):
         self.dpg.setValue(int(data['epoch'] / data['total'] * 100))
 
     def _dd(self, ok, msg):
-        self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'{"✅" if ok else "❌"} {msg}'))
+        self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), f'{"" if ok else ""} {msg}'))
         self.ds1.setEnabled(True); self.ds2.setEnabled(True); self.ds2.setText('Stop')
         self.dworker = None
         if ok: self.dpg.setValue(100)

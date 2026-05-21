@@ -49,12 +49,12 @@ def main():
 
     folder = Path(args.folder).resolve()
     if not folder.is_dir():
-        print(f'❌ 目录不存在: {folder}')
+        print(f' 目录不存在: {folder}')
         sys.exit(1)
 
     files = sorted(f for f in folder.iterdir() if f.is_file())
     if not files:
-        print(f'⚠️  目录为空: {folder}')
+        print(f'  目录为空: {folder}')
         sys.exit(0)
 
     renamed = 0
@@ -69,7 +69,7 @@ def main():
         new_path = f.parent / new_name
 
         if new_path.exists():
-            print(f'⚠️  跳过，目标已存在: {new_path.name}')
+            print(f'  跳过，目标已存在: {new_path.name}')
             continue
 
         if args.dry_run:
@@ -80,7 +80,7 @@ def main():
 
         renamed += 1
 
-    print(f'\n{"📋 预览: " if args.dry_run else "✅ 完成: "}'
+    print(f'\n{"📋 预览: " if args.dry_run else " 完成: "}'
           f'重命名 {renamed} 个, 跳过 {skipped} 个')
 
     if renamed == 0:

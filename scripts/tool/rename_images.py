@@ -63,15 +63,15 @@ def main():
 
     folder = Path(args.folder).resolve()
     if not folder.is_dir():
-        print(f'❌ 目录不存在: {folder}')
+        print(f' 目录不存在: {folder}')
         sys.exit(1)
 
     # ── 收集图片 ──
-    print(f'📂 扫描目录: {folder}')
+    print(f' 扫描目录: {folder}')
     images = collect_images(folder)
 
     if not images:
-        print('⚠️  未找到任何图片文件')
+        print('  未找到任何图片文件')
         sys.exit(0)
 
     print(f'🔍 找到 {len(images)} 张图片')
@@ -83,7 +83,7 @@ def main():
         if not ext_lower.startswith('.'):
             ext_lower = f'.{ext_lower}'
         if ext_lower not in IMAGE_EXTS:
-            print(f'❌ 不支持的格式: {ext_lower}')
+            print(f' 不支持的格式: {ext_lower}')
             sys.exit(1)
         output_ext = ext_lower
 
@@ -113,7 +113,7 @@ def main():
         print(f'  ... 还有 {len(images) - 20} 个')
 
     if args.dry_run:
-        print('\n✅ Dry-run 完成，未执行任何操作')
+        print('\n Dry-run 完成，未执行任何操作')
         return
 
     # ── 执行重命名 ─
@@ -129,7 +129,7 @@ def main():
         dest_path = src_path.parent / new_name
 
         if dest_path.exists():
-            print(f'⚠️  跳过，目标已存在: {new_name}')
+            print(f'  跳过，目标已存在: {new_name}')
             skipped += 1
             continue
 
@@ -138,12 +138,12 @@ def main():
             print(f'  {src_path.name}  →  {new_name}')
             renamed += 1
         except Exception as e:
-            print(f'❌ 失败: {src_path.name} → {e}')
+            print(f' 失败: {src_path.name} → {e}')
             errors += 1
 
-    print(f'\n✅ 完成: 重命名 {renamed} 个, 跳过 {skipped} 个')
+    print(f'\n 完成: 重命名 {renamed} 个, 跳过 {skipped} 个')
     if errors:
-        print(f'⚠️  失败: {errors} 个')
+        print(f'  失败: {errors} 个')
 
 
 if __name__ == '__main__':

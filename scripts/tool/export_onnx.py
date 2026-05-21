@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 # Model configuration
 MODELS = [
     {
-        "pt_path": PROJECT_ROOT.parent / "models" / "best5.20.pt",  # Use latest trained model
+        "pt_path": PROJECT_ROOT.parent / "models" / "best5.21.pt",  # Use latest trained model
         "onnx_path": PROJECT_ROOT.parent / "models" / "best.onnx",
     },
 

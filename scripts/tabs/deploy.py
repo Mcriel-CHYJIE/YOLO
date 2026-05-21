@@ -73,7 +73,7 @@ class DeployTab(QWidget):
     def _vd(self, r):
         self._val_btn.setEnabled(True); self._val_btn.setText('Run Validation'); self.validator = None
         if isinstance(r, Exception):
-            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'❌ Validation failed: {r}'))
+            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f' Validation failed: {r}'))
             return
         try:
             b = r.box
@@ -94,10 +94,10 @@ class DeployTab(QWidget):
                 if imgs:
                     self._cm.ax.clear(); self._cm.ax.axis('on')
                     self._cm.ax.imshow(plt.imread(str(imgs[0]))); self._cm.ax.axis('off'); self._cm.rf()
-            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), '✅ Validation complete'))
+            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), ' Validation complete'))
         except Exception as e:
             import traceback; traceback.print_exc()
-            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'❌ Display error: {e}'))
+            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f' Display error: {e}'))
 
     def _run_export(self):
         w = self._w.text().strip()
@@ -106,7 +106,7 @@ class DeployTab(QWidget):
             if w2: self._w.setText(w2); w = w2
             else: QMessageBox.warning(self, 'Error', 'No weights found'); return
         fmt = self._fmt.currentText()
-        self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'📦 Exporting to {fmt.upper()}...'))
+        self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f' Exporting to {fmt.upper()}...'))
         self._exp_btn.setEnabled(False)
         QApplication.processEvents()
         try:
@@ -117,11 +117,11 @@ class DeployTab(QWidget):
                 nms=self._nms.isChecked(), simplify=fmt == 'onnx',
                 device='0' if self.studio.gpu_ok else 'cpu')
             sz = Path(out).stat().st_size / 1e6
-            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'✅ {fmt.upper()} exported!'))
+            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f' {fmt.upper()} exported!'))
             self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'   Path: {out}'))
             self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'   Size: {sz:.2f} MB'))
         except Exception as e:
             import traceback; traceback.print_exc()
-            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f'❌ Failed: {e}'))
+            self._log.append(format_log(datetime.now().strftime('%H:%M:%S'), f' Failed: {e}'))
         finally:
             self._exp_btn.setEnabled(True)

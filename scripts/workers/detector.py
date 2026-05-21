@@ -23,18 +23,18 @@ class Detector(QThread):
         try:
             from ultralytics import YOLO
             model = YOLO(str(self.model_path))
-            self.log_signal.emit(f'✅ {self.model_path.name}')
+            self.log_signal.emit(f' {self.model_path.name}')
             cap = cv2.VideoCapture(str(self.video_path))
             if not cap.isOpened(): self.log_signal.emit('Failed to open video'); self.finished.emit(); return
             total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.log_signal.emit(f'🎬 {self.video_path.name}  {total}帧')
+            self.log_signal.emit(f' {self.video_path.name}  {total}帧')
             writer = None
             if self.export_path:
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 writer = cv2.VideoWriter(str(self.export_path), fourcc, fps, (w, h))
-                if writer.isOpened(): self.log_signal.emit(f'💾 Saving to: {Path(self.export_path).name}')
+                if writer.isOpened(): self.log_signal.emit(f' Saving to: {Path(self.export_path).name}')
                 else: writer = None
             idx, t_prev = 0, datetime.now()
             fi = 1.0 / self.target_fps
@@ -57,9 +57,9 @@ class Detector(QThread):
                 elapsed = (datetime.now() - t_prev).total_seconds()
                 sleep_time = max(0, fi - elapsed)
                 if sleep_time > 0: self.msleep(int(sleep_time * 1000))
-            if writer is not None: writer.release(); self.log_signal.emit(f'✅ Video saved: {Path(self.export_path).name}')
+            if writer is not None: writer.release(); self.log_signal.emit(f' Video saved: {Path(self.export_path).name}')
             cap.release()
         except Exception as e:
             import traceback; traceback.print_exc()
-            self.log_signal.emit(f'❌ {e}')
+            self.log_signal.emit(f' {e}')
         finally: self.finished.emit()

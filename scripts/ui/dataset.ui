@@ -37,7 +37,7 @@
       </property>
 
       <item><widget class="QLabel" name="titleLabel">
-       <property name="text"><string>📊 Dataset Preview</string></property>
+       <property name="text"><string> Dataset Preview</string></property>
        <property name="styleSheet"><string>font-size:14px;font-weight:600;color:#1c1917;</string></property>
       </widget></item>
 
@@ -182,22 +182,23 @@
        <number>0</number>
       </property>
           <property name="spacing">
-       <number>8</number>
+       <number>6</number>
       </property>
-          <item><widget class="QLabel" name="splitLabel">
-           <property name="text"><string>Split</string></property>
-           <property name="styleSheet"><string>font-size:11px;color:#78716c;font-weight:500;</string></property>
+          <item><widget class="QPushButton" name="btn_train">
+           <property name="text"><string>Train</string></property>
+           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
+           <property name="checkable"><bool>true</bool></property>
+           <property name="checked"><bool>true</bool></property>
           </widget></item>
-          <item><widget class="QComboBox" name="dp_split"/></item>
-          <item><spacer><property name="orientation">
-       <enum>Horizontal</enum>
-      </property>
-           <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
-          </spacer></item>
+          <item><widget class="QPushButton" name="btn_val">
+           <property name="text"><string>Val</string></property>
+           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
+           <property name="checkable"><bool>true</bool></property>
+          </widget></item>
          </layout>
         </widget></item>
         <item><widget class="QWidget" name="btnRowD" native="true">
-         <layout class="QHBoxLayout" name="btnLoD">
+         <layout class="QVBoxLayout" name="btnLoD">
           <property name="leftMargin">
        <number>0</number>
       </property><property name="topMargin">
@@ -212,13 +213,16 @@
        <number>6</number>
       </property>
           <item><widget class="QPushButton" name="dp_rf">
-           <property name="text"><string>🔄 Refresh</string></property>
+           <property name="text"><string>Refresh</string></property>
+           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
           </widget></item>
           <item><widget class="QPushButton" name="dp_import">
-           <property name="text"><string>📥 Import</string></property>
+           <property name="text"><string>Import</string></property>
+           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
           </widget></item>
           <item><widget class="QPushButton" name="dp_fix_yaml">
-           <property name="text"><string>🔧 Fix YAML</string></property>
+           <property name="text"><string>Fix YAML</string></property>
+           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
           </widget></item>
          </layout>
         </widget></item>
@@ -231,7 +235,7 @@
       </widget></item>
 
       <item><widget class="QLabel" name="csHeader">
-       <property name="text"><string>📊 Class Distribution</string></property>
+       <property name="text"><string> Class Distribution</string></property>
        <property name="styleSheet"><string>font-size:12px;font-weight:600;color:#1c1917;</string></property>
       </widget></item>
 
@@ -242,12 +246,6 @@
        <number>4</number>
       </property>
       </layout></item>
-
-      <item><spacer><property name="orientation">
-       <enum>Vertical</enum>
-      </property>
-       <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
-      </spacer></item>
 
       <item><widget class="QLabel" name="dp_status">
        <property name="text"><string>Ready - Click Refresh to load dataset preview</string></property>

@@ -48,7 +48,7 @@ class Trainer(QThread):
             hp = d / 'training_history.json'
             h = json.loads(hp.read_text('utf-8')) if hp.exists() else []
             h.append(entry); hp.write_text(json.dumps(h, ensure_ascii=False, indent=2), 'utf-8')
-            self.log.emit(f'📁 Log saved: {ts}.json')
+            self.log.emit(f' Log saved: {ts}.json')
         except: pass
 
     def run(self):
@@ -59,11 +59,11 @@ class Trainer(QThread):
             from ultralytics import YOLO
             cfg = self.cfg; m = YOLO(cfg['model'])
             exp = f'{ROOT.name}_{datetime.now().strftime("%m%d_%H%M")}'
-            self.log.emit(f'🚀 {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
-            if cfg.get('lr0', 0) <= 0: cfg['lr0'] = 0.001; self.log.emit(f'⚠️  LR0 was 0, reset to 0.001')
+            self.log.emit(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
+            if cfg.get('lr0', 0) <= 0: cfg['lr0'] = 0.001; self.log.emit(f'  LR0 was 0, reset to 0.001')
             if torch.cuda.is_available() and cfg['device'] != 'cpu':
                 gi = self._check_gpu_memory()
-                if gi: self.log.emit(f'💻 GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free')
+                if gi: self.log.emit(f' GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free')
                 torch.cuda.empty_cache()
             def cb(t):
                 if self._stop: t.stop = True; return
@@ -89,7 +89,9 @@ class Trainer(QThread):
             m.add_callback('on_train_epoch_end', cb)
             train_args = dict(data=DATA_YAML, epochs=cfg['epochs'], batch=cfg['batch'], imgsz=cfg['imgsz'],
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
-                device=cfg['device'], warmup_epochs=3, warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
+                device=cfg['device'], warmup_epochs=cfg.get('warmup_epochs', 3), warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
+                momentum=cfg.get('momentum', 0.937), weight_decay=cfg.get('weight_decay', 0.0005),
+                cls_pw=cfg.get('cls_pw', 0.75),
                 flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=0.2, workers=cfg.get('workers', 4),
                 iou=cfg['iou'], close_mosaic=cfg['close_mosaic'],
                 copy_paste=cfg['copy_paste'] if cfg['copy_paste'] > 0 else 0,
@@ -101,15 +103,15 @@ class Trainer(QThread):
             try: m.train(**train_args)
             except RuntimeError as e:
                 if 'CUDA out of memory' in str(e):
-                    self.log.emit('💡 Reduce batch size or image size'); raise
+                    self.log.emit(' Reduce batch size or image size'); raise
                 raise
             stopped = self._stop
             self._save_log(ok=not stopped, error='Stopped by user' if stopped else '')
-            self.done.emit(not stopped, f'⏹ Stopped' if stopped else f'✅ Done | Best mAP@0.5 = {self.best_map:.4f}')
+            self.done.emit(not stopped, f' Stopped' if stopped else f' Done | Best mAP@0.5 = {self.best_map:.4f}')
         except BaseException as e:
             import traceback; traceback.print_exc()
             self._save_log(ok=False, error=str(e))
-            self.log.emit(f'❌ {e}')
+            self.log.emit(f' {e}')
             self.done.emit(False, f'Failed: {e}')
         finally:
             sys.stdout = original_stdout; sys.stderr = original_stderr

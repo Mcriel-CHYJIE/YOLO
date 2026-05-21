@@ -54,18 +54,18 @@ def main():
 
     root = Path(args.root).resolve()
     if not root.is_dir():
-        print(f'❌ 目录不存在: {root}')
+        print(f' 目录不存在: {root}')
         sys.exit(1)
 
     out_dir = Path(args.out) if args.out else (root / '_all_videos')
     out_dir = out_dir.resolve()
 
     # ── 收集视频 ──
-    print(f'📂 扫描目录: {root}')
+    print(f' 扫描目录: {root}')
     videos = collect_videos(root, EXCLUDE_DIRS)
 
     if not videos:
-        print('⚠️  未找到任何视频文件')
+        print('  未找到任何视频文件')
         sys.exit(0)
 
     print(f'🔍 找到 {len(videos)} 个视频文件')
@@ -78,7 +78,7 @@ def main():
 
     collisions = {k: v for k, v in dest_map.items() if len(v) > 1}
     if collisions:
-        print(f'⚠️  发现 {len(collisions)} 个冲突，即使加前缀仍同名：')
+        print(f'  发现 {len(collisions)} 个冲突，即使加前缀仍同名：')
         for name, sources in collisions.items():
             print(f'  "{name}" 来自:')
             for s in sources:
@@ -97,7 +97,7 @@ def main():
         print(f'  ... 还有 {len(videos) - 20} 个')
 
     if args.dry_run:
-        print('\n✅ Dry-run 完成，未执行任何操作')
+        print('\n Dry-run 完成，未执行任何操作')
         return
 
     # ── 执行 ──
@@ -116,13 +116,13 @@ def main():
                 shutil.copy2(str(src_path), str(dest_path))
             copied += 1
         except Exception as e:
-            print(f'❌ 失败: {src_path} → {e}')
+            print(f' 失败: {src_path} → {e}')
             errors += 1
 
     action = '移动' if args.move else '复制'
-    print(f'\n✅ 完成: {action}了 {copied} 个视频到 {out_dir}')
+    print(f'\n 完成: {action}了 {copied} 个视频到 {out_dir}')
     if errors:
-        print(f'⚠️  失败: {errors} 个')
+        print(f'  失败: {errors} 个')
 
 
 if __name__ == '__main__':
