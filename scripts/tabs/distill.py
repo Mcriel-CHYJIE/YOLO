@@ -16,6 +16,14 @@ class DistillTab(QWidget):
     def _build(self):
         ui_path = Path(__file__).resolve().parent.parent / 'ui' / 'distill.ui'
         uic.loadUi(str(ui_path), self)
+        # 按钮样式直接设置（规避全局 STYLE 传播时机问题）
+        self.ds1.setStyleSheet(
+            "QPushButton{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
+        )
+        self.ds2.setStyleSheet(
+            "QPushButton{background:#ef4444;color:#fff;border:none;padding:5px 18px;min-height:26px;border-radius:4px;}QPushButton:hover{background:#dc2626;}QPushButton:disabled{background:#fca5a5;}"
+        )
+        self.ds2.setEnabled(False)
         # 设置 columnStretch (PyQt5 不支持在 UI 文件中直接设置)
         if hasattr(self, 'paramsGridD'):
             self.paramsGridD.setColumnStretch(0, 0)

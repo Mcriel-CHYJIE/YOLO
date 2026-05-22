@@ -56,7 +56,7 @@ class AnnotationCanvas(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(CANVAS_SIZE, CANVAS_SIZE)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMouseTracking(True)
         self.setCursor(Qt.CrossCursor)
         self.setStyleSheet("background:#1a1a1a;border-radius:8px;")
@@ -123,12 +123,15 @@ class AnnotationCanvas(QWidget):
     def _calc_display(self):
         if self._image is None:
             return
-        scale = min(CANVAS_SIZE / self._img_w, CANVAS_SIZE / self._img_h)
+        cw, ch = self.width(), self.height()
+        if cw <= 0 or ch <= 0:
+            return
+        scale = min(cw / self._img_w, ch / self._img_h)
         self._scale = scale
         self._disp_w = int(self._img_w * scale)
         self._disp_h = int(self._img_h * scale)
-        self._ox = (CANVAS_SIZE - self._disp_w) // 2
-        self._oy = (CANVAS_SIZE - self._disp_h) // 2
+        self._ox = (cw - self._disp_w) // 2
+        self._oy = (ch - self._disp_h) // 2
 
     def _img2can(self, x, y):
         return (x * self._img_w * self._scale + self._ox,
@@ -338,12 +341,12 @@ class AnnotationCanvas(QWidget):
             
             nsx, nsy = self._can2img(sx, sy)
             nex, ney = self._can2img(ex, ey)
-            xc, yc = (nsx + nex) / 2, (nsy + ney) / 2
-            w, h = abs(nex - nsx), abs(ney - nsy)
-            xc = max(0, min(1, xc))
-            yc = max(0, min(1, yc))
-            w = max(0.01, min(1, w))
-            h = max(0.01, min(1, h))
+            x1 = max(0, min(nsx, nex))
+            y1 = max(0, min(nsy, ney))
+            x2 = min(1, max(nsx, nex))
+            y2 = min(1, max(nsy, ney))
+            w, h = x2 - x1, y2 - y1
+            xc, yc = (x1 + x2) / 2, (y1 + y2) / 2
             if w > 0.005 and h > 0.005:
                 self._annotations.append(Annotation(self._class_id, xc, yc, w, h))
                 self.annotation_changed.emit()
@@ -355,6 +358,7 @@ class AnnotationCanvas(QWidget):
         self._drag_idx = -1
 
     def resizeEvent(self, event):
+        self._calc_display()
         self.update()
 
     def delete_selected(self):
@@ -605,11 +609,9 @@ class LabelTab(QWidget):
     def _build_center(self):
         mid = QWidget()
         mid.setStyleSheet(f"background:#f0f0f0;border:1px solid {BORDER};border-radius:6px;")
-        mid.setMinimumSize(640 + 8, 640 + 8)
-        lo = QVBoxLayout(mid)
-        lo.setContentsMargins(4, 4, 4, 4)
-        lo.setSpacing(4)
-        lo.addWidget(self.canvas, alignment=Qt.AlignCenter)
+        lo = QGridLayout(mid)
+        lo.setContentsMargins(0, 0, 0, 0)
+        lo.addWidget(self.canvas, 0, 0)
 
         # 删除确认栏（位于画布下方）
         self._delete_confirm = QWidget()
@@ -640,7 +642,7 @@ class LabelTab(QWidget):
         no_btn.clicked.connect(lambda: self._delete_confirm.setVisible(False))
         confirm_lo.addWidget(no_btn)
 
-        lo.addWidget(self._delete_confirm)
+        lo.addWidget(self._delete_confirm, 0, 0, alignment=Qt.AlignBottom)
         return mid
 
     def _build_right_panel(self):
@@ -883,11 +885,11 @@ class LabelTab(QWidget):
         self._model_combo = QComboBox()
         self._model_combo.setMinimumHeight(24)
         ml2.addWidget(self._model_combo, 1)
-        ml2.addWidget(self._make_tool_btn("", self._browse_model))
-        self._auto_btn = QPushButton("▶")
+        ml2.addWidget(self._make_tool_btn("📁", self._browse_model))
+        self._auto_btn = QPushButton("▶ Auto")
         self._auto_btn.setObjectName("pri")
         self._auto_btn.setMinimumHeight(24)
-        self._auto_btn.setFixedWidth(32)
+        self._auto_btn.setMinimumWidth(72)
         self._auto_btn.clicked.connect(self._start_auto)
         ml2.addWidget(self._auto_btn)
         alo.addLayout(ml2)
@@ -1729,7 +1731,7 @@ class LabelTab(QWidget):
                 return
         self._auto_anns = {}
         self._auto_btn.setEnabled(False)
-        self._auto_btn.setText("")
+        self._auto_btn.setText("  Working…")
         self._export_bar.setValue(0)
         self._worker = AutoLabelWorker(
             model_path=model_path,
@@ -1748,7 +1750,7 @@ class LabelTab(QWidget):
 
     def _on_auto_done(self, ok, msg):
         self._auto_btn.setEnabled(True)
-        self._auto_btn.setText("▶")
+        self._auto_btn.setText("▶ Auto")
         if ok and self._auto_anns:
             for img_path, ann_dicts in self._auto_anns.items():
                 if ann_dicts:

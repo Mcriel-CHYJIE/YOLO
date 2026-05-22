@@ -24,6 +24,14 @@ class PredictTab(QWidget):
     def _build(self):
         ui_path = Path(__file__).resolve().parent.parent / 'ui' / 'predict.ui'
         uic.loadUi(str(ui_path), self)
+        # 按钮样式直接设置（规避全局 STYLE 传播时机问题）
+        self.btn_start.setStyleSheet(
+            "QPushButton{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
+        )
+        self.btn_stop.setStyleSheet(
+            "QPushButton{background:#ef4444;color:#fff;border:none;padding:5px 18px;min-height:26px;border-radius:4px;}QPushButton:hover{background:#dc2626;}QPushButton:disabled{background:#fca5a5;}"
+        )
+        self.btn_stop.setEnabled(False)
 
     def _init_widgets(self):
         # 替换 MetricCard 占位

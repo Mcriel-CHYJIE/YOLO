@@ -23,234 +23,105 @@
      <property name="maximumSize"><size><width>260</width><height>16777215</height></size></property>
      <layout class="QVBoxLayout" name="leftLo">
       <property name="leftMargin">
-       <number>12</number>
+       <number>0</number>
       </property><property name="topMargin">
-       <number>12</number>
+       <number>0</number>
       </property>
       <property name="rightMargin">
-       <number>12</number>
+       <number>0</number>
       </property><property name="bottomMargin">
-       <number>12</number>
+       <number>0</number>
       </property>
       <property name="spacing">
-       <number>8</number>
-      </property>
-
-      <item><widget class="QLabel" name="titleLabel">
-       <property name="text"><string> Dataset Preview</string></property>
-       <property name="styleSheet"><string>font-size:14px;font-weight:600;color:#1c1917;</string></property>
-      </widget></item>
-
-      <item><widget class="QWidget" name="statsWidget" native="true">
-       <layout class="QVBoxLayout" name="statsLo">
-        <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>8</number>
-      </property>
-        <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>8</number>
-      </property>
-        <property name="spacing">
        <number>6</number>
       </property>
-        <item><widget class="QWidget" name="totalStat" native="true">
-         <layout class="QHBoxLayout" name="totalStatLo">
-          <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>0</number>
-      </property>
-          <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>0</number>
-      </property>
-          <property name="spacing">
-       <number>6</number>
-      </property>
-          <item><widget class="QLabel" name="_st_total_v">
-           <property name="text"><string>—</string></property>
-           <property name="styleSheet"><string>font-size:18px;font-weight:700;color:#1c1917;</string></property>
-          </widget></item>
-          <item><widget class="QLabel" name="_st_total_lbl">
-           <property name="text"><string>Total</string></property>
-           <property name="styleSheet"><string>font-size:10px;color:#78716c;padding-top:3px;</string></property>
-          </widget></item>
-          <item><spacer><property name="orientation">
-       <enum>Horizontal</enum>
-      </property>
-           <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
-          </spacer></item>
-         </layout>
-        </widget></item>
-        <item><widget class="QWidget" name="labeledStat" native="true">
-         <layout class="QHBoxLayout" name="labeledStatLo">
-          <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>0</number>
-      </property>
-          <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>0</number>
-      </property>
-          <property name="spacing">
-       <number>6</number>
-      </property>
-          <item><widget class="QLabel" name="_st_lbl_v">
-           <property name="text"><string>—</string></property>
-           <property name="styleSheet"><string>font-size:18px;font-weight:700;color:#1c1917;</string></property>
-          </widget></item>
-          <item><widget class="QLabel" name="_st_lbl_text">
-           <property name="text"><string>Labeled</string></property>
-           <property name="styleSheet"><string>font-size:10px;color:#78716c;padding-top:3px;</string></property>
-          </widget></item>
-          <item><spacer><property name="orientation">
-       <enum>Horizontal</enum>
-      </property>
-           <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
-          </spacer></item>
-         </layout>
-        </widget></item>
-        <item><widget class="QWidget" name="clsStat" native="true">
-         <layout class="QHBoxLayout" name="clsStatLo">
-          <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>0</number>
-      </property>
-          <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>0</number>
-      </property>
-          <property name="spacing">
-       <number>6</number>
-      </property>
-          <item><widget class="QLabel" name="_st_cls_v">
-           <property name="text"><string>—</string></property>
-           <property name="styleSheet"><string>font-size:18px;font-weight:700;color:#1c1917;</string></property>
-          </widget></item>
-          <item><widget class="QLabel" name="_st_cls_text">
-           <property name="text"><string>Classes</string></property>
-           <property name="styleSheet"><string>font-size:10px;color:#78716c;padding-top:3px;</string></property>
-          </widget></item>
-          <item><spacer><property name="orientation">
-       <enum>Horizontal</enum>
-      </property>
-           <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
-          </spacer></item>
-         </layout>
-        </widget></item>
-       </layout>
-      </widget></item>
 
-      <item><widget class="QFrame" name="sep1">
-       <property name="frameShape"><enum>QFrame::HLine</enum></property>
-       <property name="styleSheet"><string>background:#e7e5e4;border:none;height:1px;</string></property>
-      </widget></item>
-
-      <item><widget class="QWidget" name="controlsWidget" native="true">
+      <!-- ════════ Data（按钮组）════════ -->
+      <item><widget class="QGroupBox" name="controlsGroup">
+       <property name="title"><string>Data</string></property>
+       <property name="maximumSize"><size><width>16777215</width><height>160</height></size></property>
        <layout class="QVBoxLayout" name="controlsLo">
-        <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>4</number>
-      </property>
-        <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>4</number>
-      </property>
-        <property name="spacing">
-       <number>6</number>
-      </property>
-        <item><widget class="QWidget" name="splitRow" native="true">
-         <layout class="QHBoxLayout" name="splitLo">
-          <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>0</number>
-      </property>
-          <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>0</number>
-      </property>
-          <property name="spacing">
-       <number>6</number>
-      </property>
-          <item><widget class="QPushButton" name="btn_train">
-           <property name="text"><string>Train</string></property>
-           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
-           <property name="checkable"><bool>true</bool></property>
-           <property name="checked"><bool>true</bool></property>
-          </widget></item>
-          <item><widget class="QPushButton" name="btn_val">
-           <property name="text"><string>Val</string></property>
-           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
-           <property name="checkable"><bool>true</bool></property>
-          </widget></item>
-         </layout>
+        <property name="leftMargin"><number>8</number></property>
+        <property name="topMargin"><number>6</number></property>
+        <property name="rightMargin"><number>8</number></property>
+        <property name="bottomMargin"><number>4</number></property>
+        <property name="spacing"><number>4</number></property>
+
+        <item><layout class="QHBoxLayout" name="splitLo">
+         <property name="spacing"><number>6</number></property>
+         <item><widget class="QPushButton" name="btn_train">
+          <property name="text"><string>Train</string></property>
+          <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+          <property name="checkable"><bool>true</bool></property>
+          <property name="checked"><bool>true</bool></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="btn_val">
+          <property name="text"><string>Val</string></property>
+          <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+          <property name="checkable"><bool>true</bool></property>
+         </widget></item>
+        </layout></item>
+
+        <item><widget class="QPushButton" name="dp_rf">
+         <property name="text"><string>Refresh</string></property>
+         <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
         </widget></item>
-        <item><widget class="QWidget" name="btnRowD" native="true">
-         <layout class="QVBoxLayout" name="btnLoD">
-          <property name="leftMargin">
-       <number>0</number>
-      </property><property name="topMargin">
-       <number>0</number>
-      </property>
-          <property name="rightMargin">
-       <number>0</number>
-      </property><property name="bottomMargin">
-       <number>0</number>
-      </property>
-          <property name="spacing">
-       <number>6</number>
-      </property>
-          <item><widget class="QPushButton" name="dp_rf">
-           <property name="text"><string>Refresh</string></property>
-           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
-          </widget></item>
-          <item><widget class="QPushButton" name="dp_import">
-           <property name="text"><string>Import</string></property>
-           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
-          </widget></item>
-          <item><widget class="QPushButton" name="dp_fix_yaml">
-           <property name="text"><string>Fix YAML</string></property>
-           <property name="minimumSize"><size><width>0</width><height>32</height></size></property>
-          </widget></item>
-         </layout>
+
+        <item><widget class="QPushButton" name="dp_import">
+         <property name="text"><string>Import</string></property>
+         <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+        </widget></item>
+
+        <item><widget class="QLabel" name="dp_status">
+         <property name="text"><string>Ready - Click Refresh to load dataset preview</string></property>
+         <property name="minimumSize"><size><width>0</width><height>12</height></size></property>
+         <property name="styleSheet"><string>font-size:9px;color:#78716c;padding:0;</string></property>
         </widget></item>
        </layout>
       </widget></item>
 
-      <item><widget class="QFrame" name="sep2">
-       <property name="frameShape"><enum>QFrame::HLine</enum></property>
-       <property name="styleSheet"><string>background:#e7e5e4;border:none;height:1px;</string></property>
+      <!-- ════════ Statistics（合并统计+类别分布）════════ -->
+      <item><widget class="QGroupBox" name="statsGroup">
+       <property name="title"><string>Statistics</string></property>
+       <layout class="QVBoxLayout" name="statsLo">
+        <property name="leftMargin"><number>8</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>8</number></property>
+        <property name="bottomMargin"><number>8</number></property>
+        <property name="spacing"><number>5</number></property>
+
+        <item><widget class="QLabel" name="_st_total">
+         <property name="text"><string>Total: -</string></property>
+         <property name="minimumSize"><size><width>0</width><height>16</height></size></property>
+         <property name="maximumSize"><size><width>16777215</width><height>16</height></size></property>
+         <property name="styleSheet"><string>font-size:11px;font-weight:600;color:#1c1917;</string></property>
+        </widget></item>
+
+        <item><widget class="QLabel" name="_st_instances">
+         <property name="text"><string>Instances: -</string></property>
+         <property name="minimumSize"><size><width>0</width><height>16</height></size></property>
+         <property name="maximumSize"><size><width>16777215</width><height>16</height></size></property>
+         <property name="styleSheet"><string>font-size:11px;font-weight:600;color:#1c1917;</string></property>
+        </widget></item>
+
+        <item><widget class="QLabel" name="_st_classes">
+         <property name="text"><string>Classes: -</string></property>
+         <property name="minimumSize"><size><width>0</width><height>16</height></size></property>
+         <property name="maximumSize"><size><width>16777215</width><height>16</height></size></property>
+         <property name="styleSheet"><string>font-size:11px;font-weight:600;color:#1c1917;</string></property>
+        </widget></item>
+
+        <!-- 类别分布合并在此 -->
+        <item><layout class="QGridLayout" name="_cs_grid">
+         <property name="horizontalSpacing"><number>4</number></property>
+         <property name="verticalSpacing"><number>4</number></property>
+        </layout></item>
+        <item><spacer><property name="orientation"><enum>Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+        </spacer></item>
+       </layout>
       </widget></item>
 
-      <item><widget class="QLabel" name="csHeader">
-       <property name="text"><string> Class Distribution</string></property>
-       <property name="styleSheet"><string>font-size:12px;font-weight:600;color:#1c1917;</string></property>
-      </widget></item>
-
-      <item><layout class="QGridLayout" name="_cs_grid">
-       <property name="horizontalSpacing">
-       <number>4</number>
-      </property><property name="verticalSpacing">
-       <number>4</number>
-      </property>
-      </layout></item>
-
-      <item><widget class="QLabel" name="dp_status">
-       <property name="text"><string>Ready - Click Refresh to load dataset preview</string></property>
-       <property name="styleSheet"><string>font-size:9px;color:#78716c;padding:4px 0;</string></property>
-      </widget></item>
      </layout>
     </widget>
    </item>
@@ -298,8 +169,8 @@
      </layout>
     </widget>
    </item>
-  </layout>
- </widget>
- <resources/>
- <connections/>
+ </layout>
+</widget>
+<resources/>
+<connections/>
 </ui>

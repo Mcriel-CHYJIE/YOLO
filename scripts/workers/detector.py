@@ -1,27 +1,46 @@
-"""视频推理工作线程"""
+"""视频推理工作线程 — 使用 threading.Thread 替代 QThread 避免原生栈溢出 (0xC0000409)"""
 import cv2, numpy as np
 from pathlib import Path
 from datetime import datetime
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
+from ultralytics import YOLO
+import threading
 
 
-class Detector(QThread):
+class Detector(QObject):
+    """视频推理管理器 — 非 QThread，用 threading.Thread 获得完整原生栈"""
     frame_ready = pyqtSignal(np.ndarray, int, int)
     fps_updated = pyqtSignal(float); stats_updated = pyqtSignal(dict)
     log_signal = pyqtSignal(str); finished = pyqtSignal()
 
-    def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=24):
+    def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
-        self.conf = conf; self.iou = iou; self._pause = False; self._stop = False
+        self.conf = conf; self.iou = iou
+        self._pause_event = threading.Event()
+        self._stop_event = threading.Event()
         self.export_path = None; self.target_fps = target_fps
+        self._thread = None
 
-    def stop(self): self._stop = True; self._pause = False
-    def toggle_pause(self): self._pause = not self._pause
+    def stop(self):
+        self._stop_event.set()
+        self._pause_event.set()
 
-    def run(self):
+    def toggle_pause(self):
+        if self._pause_event.is_set():
+            self._pause_event.clear()
+        else:
+            self._pause_event.set()
+
+    def isRunning(self):
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
         try:
-            from ultralytics import YOLO
             model = YOLO(str(self.model_path))
             self.log_signal.emit(f' {self.model_path.name}')
             cap = cv2.VideoCapture(str(self.video_path))
@@ -37,9 +56,10 @@ class Detector(QThread):
                 if writer.isOpened(): self.log_signal.emit(f' Saving to: {Path(self.export_path).name}')
                 else: writer = None
             idx, t_prev = 0, datetime.now()
-            fi = 1.0 / self.target_fps
-            while not self._stop and cap.isOpened():
-                if self._pause: self.msleep(50); continue
+            while not self._stop_event.is_set() and cap.isOpened():
+                if self._pause_event.is_set():
+                    self._pause_event.wait(0.05)
+                    continue
                 ret, frame = cap.read()
                 if not ret: break
                 idx += 1
@@ -54,12 +74,10 @@ class Detector(QThread):
                         stats[name] = stats.get(name, 0) + 1
                 self.frame_ready.emit(annotated, idx, total)
                 self.fps_updated.emit(fps_val); self.stats_updated.emit(stats)
-                elapsed = (datetime.now() - t_prev).total_seconds()
-                sleep_time = max(0, fi - elapsed)
-                if sleep_time > 0: self.msleep(int(sleep_time * 1000))
             if writer is not None: writer.release(); self.log_signal.emit(f' Video saved: {Path(self.export_path).name}')
             cap.release()
         except Exception as e:
             import traceback; traceback.print_exc()
             self.log_signal.emit(f' {e}')
-        finally: self.finished.emit()
+        finally:
+            self.finished.emit()

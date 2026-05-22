@@ -1,8 +1,9 @@
-"""蒸馏工作线程"""
+"""蒸馏工作线程 — 使用 threading.Thread 替代 QThread 避免原生栈溢出 (0xC0000409)"""
 from scripts.tabs.base import ROOT, DATA_YAML
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
-import json, torch
+import json, torch, threading
+from ultralytics import YOLO
 
 
 class DistillationLossWrapper:
@@ -26,25 +27,37 @@ class DistillationLossWrapper:
         return (1.0 - self.alpha) * det_loss.sum() + self.alpha * distill / max(n, 1), loss_items
 
 
-class Distiller(QThread):
-    log = pyqtSignal(str); progress = pyqtSignal(int, dict); done = pyqtSignal(bool, str)
+class Distiller(QObject):
+    """蒸馏训练管理器 — 非 QThread，用 threading.Thread 获得完整原生栈"""
+    log = pyqtSignal(str)
+    progress = pyqtSignal(int, dict)
+    done = pyqtSignal(bool, str)
+
     def __init__(self, cfg):
-        super().__init__(); self.cfg = cfg; self._stop = False
-    def stop(self): self._stop = True
-    def run(self):
-        try: self._train()
-        except BaseException as e:
-            import traceback; traceback.print_exc()
-            self.log.emit(f' {e}'); self.done.emit(False, str(e))
-    def _train(self):
+        super().__init__()
+        self.cfg = cfg
+        self._stop_event = threading.Event()
+        self._thread = None
+
+    def stop(self):
+        self._stop_event.set()
+
+    def isRunning(self):
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
         import torch.nn.functional as F, torch.optim as optim
         from torch.optim.lr_scheduler import CosineAnnealingLR
         import numpy as np, shutil, time
-        from ultralytics import YOLO
         from ultralytics.data import build_dataloader, build_yolo_dataset
         from ultralytics.data.utils import check_det_dataset
         from ultralytics.utils import colorstr
-        from types import SimpleNamespace; from copy import deepcopy
+        from types import SimpleNamespace
+        torch.set_num_threads(1)
         cfg = self.cfg; device = cfg['device']
         if torch.cuda.is_available() and 'cuda' in str(device):
             try:
@@ -86,7 +99,7 @@ class Distiller(QThread):
         total_batches = len(dl)
         self.log.emit('\n Starting distillation training...')
         for ep in range(1, cfg['epochs'] + 1):
-            if self._stop: break
+            if self._stop_event.is_set(): break
             if ep <= we:
                 for pg in opt.param_groups: pg['lr'] = cfg['lr0'] * (ep / we)
             student.model.train(); el, nb = 0.0, 0
@@ -94,7 +107,7 @@ class Distiller(QThread):
             self.log.emit(f'\n[Epoch {ep_progress}] LR: {opt.param_groups[0]["lr"]:.6f} | Batches: {total_batches}')
             bt = time.time()
             for bi, batch in enumerate(dl):
-                if self._stop: break
+                if self._stop_event.is_set(): break
                 try:
                     img = batch['img'].to(device, non_blocking=True)
                     img = img.float() / 255.0 if img.dtype == torch.uint8 else img; batch['img'] = img

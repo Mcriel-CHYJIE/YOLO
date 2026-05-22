@@ -19,7 +19,14 @@ class TrainTab(QWidget):
     def _build(self):
         ui_path = Path(__file__).resolve().parent.parent / 'ui' / 'train.ui'
         uic.loadUi(str(ui_path), self)
-        # 设置 columnStretch (PyQt5 不支持在 UI 文件中直接设置)
+        # 按钮样式直接设置（规避全局 STYLE 传播时机问题）
+        self.bs1.setStyleSheet(
+            "QPushButton{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
+        )
+        self.bs2.setStyleSheet(
+            "QPushButton{background:#ef4444;color:#fff;border:none;padding:5px 18px;min-height:26px;border-radius:4px;}QPushButton:hover{background:#dc2626;}QPushButton:disabled{background:#fca5a5;}"
+        )
+        self.bs2.setEnabled(False)
         if hasattr(self, 'configGrid'):
             self.configGrid.setColumnStretch(0, 0)
             self.configGrid.setColumnStretch(1, 1)
@@ -37,15 +44,22 @@ class TrainTab(QWidget):
         self.configGrid.setColumnStretch(1, 1)
         self.configGrid.setColumnStretch(2, 0)
         self.configGrid.setColumnStretch(3, 1)
+
+        # 模型下拉框：.pt 文件 + .yaml 架构（从零训练）
         models_dir = ROOT / 'models'
+        self.m.clear()
+        yaml_archs = ['yolov8n.yaml', 'yolov8s.yaml', 'yolo11n.yaml']
+        for ya in yaml_archs:
+            self.m.addItem(ya)
         if models_dir.exists():
-            model_files = sorted([p.name for p in models_dir.glob('*.pt')])
-            self.m.addItems(model_files)
-            if t['model'] in model_files:
-                self.m.setCurrentText(t['model'])
+            for f in sorted(models_dir.glob('*.pt')):
+                self.m.addItem(f.name)
         else:
-            self.m.addItems(t['model_options'])
+            for mo in t['model_options']:
+                self.m.addItem(mo)
+        if t['model'] in [self.m.itemText(i) for i in range(self.m.count())]:
             self.m.setCurrentText(t['model'])
+
         self.sz.addItems([str(v) for v in t['imgsz_options']])
         self.sz.setCurrentText(str(t['imgsz']))
         self.opt.addItems(t['optimizer_options'])
@@ -58,7 +72,7 @@ class TrainTab(QWidget):
         else:
             self.dev.setCurrentText('GPU' if t['device'] in ('auto', '0', 'GPU') else 'CPU')
 
-        # 替换 MetricCard 占位
+        # MetricCard 占位替换
         for placeholder, label, color, default, attr_val, attr_card in [
             (self.epochCard, 'Epoch', TEXT, '0', '_me', '_me_card'),
             (self.mapCard, 'mAP@0.5', GREEN, '—', '_mm', '_mm_card'),
@@ -72,44 +86,19 @@ class TrainTab(QWidget):
             setattr(self, attr_val, card.value_label)
             setattr(self, attr_card, card)
 
-        # 图表容器样式
-        for w in [self.lcContainer, self.mcContainer]:
-            w.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
-
-        # 系统监控面板
-        mvl = QVBoxLayout(self.sysMonitorPanel)
-        mvl.setContentsMargins(8, 8, 8, 8); mvl.setSpacing(4)
-        mvl.addWidget(QLabel('● System', styleSheet=f'font-size:10px;font-weight:600;color:{TEXT3};'))
-        monitors = [('CPU', 'CPU'), ('MEM', 'Memory'), ('DSK', 'Disk')]
-        if self.studio.gpu_ok:
-            monitors += [('VRM', 'VRAM'), ('GPU', 'GPU')]
-        for key, label in monitors:
-            item = QWidget(); item.setStyleSheet('background:transparent;border:none;')
-            il = QHBoxLayout(item); il.setContentsMargins(0, 0, 0, 0); il.setSpacing(0)
-            lbl = QLabel(label)
-            lbl.setStyleSheet(f'font-size:10px;font-weight:500;color:{TEXT2};')
-            lbl.setFixedWidth(35)
-            il.addWidget(lbl)
-            val = QLabel('0%')
-            val.setStyleSheet(f'font-size:10px;font-weight:600;color:{TEXT};')
-            val.setAlignment(Qt.AlignRight)
-            il.addWidget(val, 1)
-            mvl.addWidget(item)
-            self.studio._sys_data[key] = [val]
-
-        # 新 UI 控件初始值（从 project.yaml 读取）
+        # 各控件从 project.yaml 读取默认值
         self.ep.setValue(t['epochs'])
         self.bs.setValue(t['batch'])
         self.pt.setValue(t['patience'])
         self.lr0.setValue(t['lr0'])
         self.lrf.setValue(t['lrf'])
         self.wu.setValue(t['warmup_epochs'])
-        self.wk.setValue(min(t['workers'], self.studio.cpu_count))
+        self.wk.setValue(min(t.get('workers', 8), self.studio.cpu_count))
         self.iou_thresh.setValue(t['iou'])
         self.cm.setValue(t['close_mosaic'])
-        self.cp.setValue(t['copy_paste'])
-        self.dg.setValue(t['degrees'])
-        self.ms.setChecked(t['multi_scale'])
+        self.cp.setValue(t.get('copy_paste', 0))
+        self.dg.setValue(t.get('degrees', 0))
+        self.ms.setChecked(t.get('multi_scale', False))
         self.momentum.setValue(t.get('momentum', 0.937))
         self.wd.setValue(t.get('weight_decay', 0.0005))
         self.hsv_h.setValue(t.get('hsv_h', 0.015))
@@ -134,13 +123,17 @@ class TrainTab(QWidget):
 
     def _config(self):
         s = lambda w: w.currentText()
+        model_name = s(self.m)
+        model_path = model_name if model_name.endswith('.yaml') else f'models/{model_name}'
         lr0_val = self.lr0.value()
         if lr0_val <= 0: lr0_val = 0.001
-        return dict(model=f'models/{s(self.m)}', epochs=self.ep.value(), batch=self.bs.value(), imgsz=int(s(self.sz)),
+        g = cfg['training']
+        return dict(model=model_path, epochs=self.ep.value(), batch=self.bs.value(), imgsz=int(s(self.sz)),
             lr0=lr0_val, lrf=self.lrf.value(), optimizer=s(self.opt), patience=self.pt.value(),
             device='0' if self.studio.gpu_ok and self.dev.currentIndex() == 0 else 'cpu',
             cos_lr=self.sch.currentIndex() == 0, warmup_epochs=self.wu.value(), workers=self.wk.value(),
             momentum=self.momentum.value(), weight_decay=self.wd.value(),
+            mixup=g.get('mixup', 0.2),
             cls_pw=self.cls_pw.value(),
             iou=self.iou_thresh.value(),
             close_mosaic=self.cm.value(), copy_paste=self.cp.value(), degrees=self.dg.value(),
@@ -161,11 +154,11 @@ class TrainTab(QWidget):
         self._log(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
         self.trainer = Trainer(cfg)
         self.trainer.log.connect(self._log)
-        self.trainer.status.connect(lambda t, p, b, c: (
+        self.trainer.status.connect(lambda t, p, b, c, loss: (
             self._me.setText(t.split('/')[0].replace('Epoch ', '')),
             self._mm.setText(f'{c:.4f}' if c > 0 else '—'),
             self._mb.setText(f'{b:.4f}' if b > 0 else '—'),
-            self.pg.setValue(int(p * 100))))
+            self.pg.setValue(int(p * 100)))),
         self.trainer.chart.connect(
             lambda: (self.trainer and (self._lc.upd(self.trainer.history), self._mc.upd(self.trainer.history))))
         self.trainer.done.connect(self._dn)

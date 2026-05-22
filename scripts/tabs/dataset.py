@@ -23,14 +23,25 @@ class DatasetTab(QWidget):
         uic.loadUi(str(ui_path), self)
 
     def _init_widgets(self):
-        self.leftPanel.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
+        self.leftPanel.setStyleSheet(f'background:transparent;')
         self.rightPanel.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:6px;')
         self.sa.setStyleSheet('QScrollArea{background:transparent;border:none;}')
         self.dp_grid.setStyleSheet('background:transparent;')
+        
+        # 移除统计标签的边框样式，确保透明背景
+        for label_name in ['_st_total', '_st_instances', '_st_classes']:
+            label = self.findChild(QLabel, label_name)
+            if label:
+                # 查找并移除可能包裹的容器边框
+                parent = label.parentWidget()
+                if parent and parent != self.statsGroup:
+                    parent.setStyleSheet('background:transparent;border:none;')
+                label.setStyleSheet('font-size:11px;font-weight:600;color:#1c1917;background:transparent;border:none;')
+        
         self._cols = 3
         self.dp_status.setText('Ready - Click Refresh to load dataset preview')
         # 设置按钮最小高度
-        for btn in [self.btn_train, self.btn_val, self.dp_rf, self.dp_import, self.dp_fix_yaml]:
+        for btn in [self.btn_train, self.btn_val, self.dp_rf, self.dp_import]:
             btn.setMinimumHeight(32)
         # 设置 split 按钮样式
         for btn in [self.btn_train, self.btn_val]:
@@ -53,9 +64,11 @@ class DatasetTab(QWidget):
                     background: {CARD};
                 }}
             ''')
-        # 设置按钮互斥逻辑
+        # 互斥逻辑
         self.btn_train.clicked.connect(self._on_split_click)
         self.btn_val.clicked.connect(self._on_split_click)
+        # 初始占位行
+        self._show_placeholder_stats()
 
     def _on_split_click(self):
         """处理 split 按钮点击，实现互斥选中"""
@@ -70,13 +83,14 @@ class DatasetTab(QWidget):
         self._dp_refresh()
 
     def _connect_signals(self):
-        self.dp_rf.setObjectName('pri')
+        self.dp_rf.setStyleSheet(
+            "QPushButton{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
+        )
         self.dp_rf.clicked.connect(self._dp_refresh)
-        self.dp_import.setObjectName('sec')
+        self.dp_import.setStyleSheet(
+            "QPushButton{background:#ffffff;color:#07C160;border:1px solid #07C160;min-height:24px;font-size:11px;border-radius:4px;}QPushButton:hover{background:#e8f5e9;}"
+        )
         self.dp_import.clicked.connect(self._import_dataset)
-        self.dp_fix_yaml.setObjectName('warn')
-        self.dp_fix_yaml.clicked.connect(self._fix_yaml_config)
-
     def _dp_refresh(self):
         self.dp_status.setText('Loading...'); QApplication.processEvents()
         # 根据按钮选中状态确定 split
@@ -97,14 +111,11 @@ class DatasetTab(QWidget):
             if has_lbl:
                 for line in lbl_path.read_text().strip().split('\n'):
                     if line.strip(): cls_counter[int(line.strip().split()[0])] += 1
-        self._st_total_v.setText(f'{len(imgs)}')
-        self._st_lbl_v.setText(f'{labeled}')
-        unlabeled = len(imgs) - labeled
+        self._st_total.setText(f'Total: {len(imgs)}')
         total_instances = sum(cls_counter.values())
-        self._st_cls_v.setText(f'{total_instances}')
-        self._st_cls_text.setText('Instances')
-        self._st_total_lbl.setText('Total')
-        self._st_lbl_text.setText('Labeled')
+        self._st_instances.setText(f'Instances: {total_instances}')
+        self._st_classes.setText(f'Classes: {len(cls_counter)}')
+        unlabeled = len(imgs) - labeled
         self._update_class_stats(cls_counter, labeled)
         self._clear_grid()
         # 随机选9张预览，少于9张则全显示
@@ -136,6 +147,27 @@ class DatasetTab(QWidget):
             pb.setTextVisible(False); pb.setFixedHeight(4)
             pb.setStyleSheet(f'QProgressBar{{border:none;background:{BORDER};height:4px;border-radius:2px;}}'
                              f'QProgressBar::chunk{{background:{color};border-radius:2px;}}')
+            self._cs_grid.addWidget(pb, i, 3)
+
+    def _show_placeholder_stats(self):
+        """预览前显示5个灰色占位类别行，计数器显示-"""
+        self._clear_layout(self._cs_grid)
+        self._st_total.setText('Total: -')
+        self._st_instances.setText('Instances: -')
+        self._st_classes.setText('Classes: -')
+        gray = '#d0d0d0'
+        for i in range(10):
+            name = 'abcdefghijklmnopqrstuvwxyz'[i]
+            dot = QLabel('●'); dot.setStyleSheet(f'color:{gray};font-size:10px;')
+            self._cs_grid.addWidget(dot, i, 0)
+            nm = QLabel(name); nm.setStyleSheet(f'font-size:10px;color:{gray};font-weight:500;')
+            self._cs_grid.addWidget(nm, i, 1)
+            cv = QLabel('—'); cv.setStyleSheet(f'font-size:10px;color:{gray};')
+            cv.setAlignment(Qt.AlignRight); self._cs_grid.addWidget(cv, i, 2)
+            pb = QProgressBar(); pb.setRange(0, 100); pb.setValue(0)
+            pb.setTextVisible(False); pb.setFixedHeight(4)
+            pb.setStyleSheet(f'QProgressBar{{border:none;background:#eee;height:4px;border-radius:2px;}}'
+                             f'QProgressBar::chunk{{background:{gray};border-radius:2px;}}')
             self._cs_grid.addWidget(pb, i, 3)
 
     def _clear_layout(self, layout):
@@ -224,30 +256,6 @@ class DatasetTab(QWidget):
         rl.addStretch()
         hl.addWidget(right, 1)
         return card
-
-    def _fix_yaml_config(self):
-        try:
-            data_dir = ROOT / 'datasets'; yaml_path = data_dir / 'data.yaml'
-            img_dir = data_dir / 'images'
-            if not img_dir.exists(): QMessageBox.warning(self, 'Error', f'images dir not found: {img_dir}'); return
-            splits = [d.name for d in img_dir.iterdir() if d.is_dir()]
-            if not splits: QMessageBox.warning(self, 'Error', 'No split directories found'); return
-            lbl_dir = data_dir / 'labels'; all_cls = set()
-            for split in splits:
-                ls = lbl_dir / split
-                if ls.exists():
-                    for f in ls.glob('*.txt'):
-                        if f.stat().st_size > 0:
-                            for line in f.read_text().strip().split('\n'):
-                                if line.strip(): all_cls.add(int(line.strip().split()[0]))
-            if not all_cls: all_cls = set(range(len(CLASSES)))
-            nc = max(all_cls) + 1
-            data = {'path': str(data_dir).replace('\\', '/'), 'train': 'images/train', 'val': 'images/val',
-                    'nc': nc, 'names': {i: CLASSES[i] if i < len(CLASSES) else f'class_{i}' for i in range(nc)}}
-            with open(yaml_path, 'w') as f: yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-            self.dp_status.setText(f'data.yaml generated: {nc} classes')
-            QMessageBox.information(self, 'YAML Fixed', f'{yaml_path}\n{nc} classes, {len(splits)} splits')
-        except Exception as e: QMessageBox.critical(self, 'Error', f'Failed: {e}')
 
     def _import_dataset(self):
         """自动从 original/label 文件夹导入数据集"""

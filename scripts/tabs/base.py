@@ -1,4 +1,4 @@
-"""共享基础模块 — 常量、UI 组件、工具函数"""
+"""共享基础模块 — 常量、UI 组件、工具函数（WeChat 风格配色）"""
 import sys, os, json, time, re
 from pathlib import Path
 from datetime import datetime
@@ -14,49 +14,61 @@ CLASS_NAMES = cfg['project'].get('names', {i: name for i, name in enumerate(CLAS
 
 import cv2, numpy as np
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QEvent
+from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer, QEvent
 from PyQt5.QtGui import QFont, QPixmap, QPainter, QPen, QTextCursor, QIcon, QColor, QIntValidator, QDoubleValidator, QImage
+from PyQt5.QtWidgets import QGraphicsOpacityEffect
 
-# ── 配色 ──
-BG, CARD, BORDER = '#f5f5f4', '#ffffff', '#e7e5e4'
-TEXT, TEXT2, TEXT3 = '#1c1917', '#78716c', '#a8a29e'
-PRI, PRI_H = '#6366f1', '#4f46e5'
-GREEN, RED, AMBER = '#10b981', '#ef4444', '#f59e0b'
-CON, CON_T = '#0c0a09', '#e7e5e4'
+# ── 配色（WeChat 风格）──
+BG, CARD, BORDER = '#f7f7f7', '#ffffff', '#e5e5e5'
+TEXT, TEXT2, TEXT3 = '#1a1a1a', '#7a7a7a', '#b0b0b0'
+PRI, PRI_H = '#07C160', '#06ad56'
+GREEN, RED, AMBER = '#07C160', '#ef4444', '#f59e0b'
+CON, CON_T = '#1e1e1e', '#d4d4d4'
+SIDE_BG, SIDE_HOVER, SIDE_ACTIVE = '#f0f0f0', '#e5e5e5', '#ffffff'
+TOP_BG, BOT_BG = '#ffffff', '#2b2b2b'
 
 STYLE = f"""
 QMainWindow,QWidget{{background:{BG};}}
+QStackedWidget{{background:{CARD};}}
 QGroupBox{{font-weight:600;font-size:10px;color:{TEXT};border:1px solid {BORDER};
-    border-radius:7px;margin-top:9px;padding:10px 8px 8px;background:{CARD};}}
+    border-radius:6px;margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
 QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
-    background:{CARD};color:{TEXT3};letter-spacing:.4px;}}
+    background:{CARD};color:{TEXT3};}}
 QPushButton{{border-radius:4px;padding:4px 14px;border:1px solid {BORDER};
     background:{CARD};color:{TEXT};min-height:22px;font-size:11px;}}
 QPushButton:hover{{background:#f0efed;}}
-QPushButton#pri{{background:{PRI};color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;}}
+QPushButton#pri{{background:{PRI};color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}}
 QPushButton#pri:hover{{background:{PRI_H};}}
-QPushButton#pri:disabled{{background:#a5b4fc;}}
-QPushButton#danger{{background:{RED};color:#fff;border:none;padding:5px 18px;min-height:26px;}}
+QPushButton#pri:disabled{{background:#a5d6a5;}}
+QPushButton#danger{{background:{RED};color:#fff;border:none;padding:5px 18px;min-height:26px;border-radius:4px;}}
 QPushButton#danger:hover{{background:#dc2626;}}
 QPushButton#danger:disabled{{background:#fca5a5;}}
-QComboBox{{border:1px solid {BORDER};border-radius:4px;padding:2px 5px;
+QPushButton#sec{{background:{CARD};color:{PRI};border:1px solid {PRI};min-height:22px;font-size:11px;}}
+QPushButton#sec:hover{{background:#e8f5e9;}}
+QPushButton#warn{{background:{CARD};color:{AMBER};border:1px solid {AMBER};min-height:22px;font-size:11px;}}
+QPushButton#warn:hover{{background:#fff3e0;}}
+QComboBox{{border:1px solid {BORDER};border-radius:4px;padding:2px 6px;
     background:{CARD};min-height:22px;color:{TEXT};font-size:11px;}}
 QComboBox:focus{{border-color:{PRI};}}
 QComboBox::drop-down{{border:none;width:16px;}}
-QSpinBox,QDoubleSpinBox{{border:1px solid {BORDER};border-radius:4px;padding:2px 5px;
+QSpinBox,QDoubleSpinBox{{border:1px solid {BORDER};border-radius:4px;padding:2px 6px;
     background:{CARD};min-height:22px;color:{TEXT};font-size:11px;}}
 QSpinBox:focus,QDoubleSpinBox:focus{{border-color:{PRI};}}
 QSpinBox::up-button,QDoubleSpinBox::up-button{{width:0;padding:0;border:none;}}
 QSpinBox::down-button,QDoubleSpinBox::down-button{{width:0;padding:0;border:none;}}
 QProgressBar{{border:none;border-radius:1px;height:3px;background:{BORDER};text-align:center;}}
-QProgressBar::chunk{{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0{PRI},stop:1 '#8b5cf6');border-radius:1px;}}
-QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:6px;
+QProgressBar::chunk{{background:{PRI};border-radius:1px;}}
+QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:5px;
     padding:8px;font-family:Consolas,Courier New;font-size:11px;}}
-QTabBar::tab{{padding:4px 16px;font-size:11px;font-weight:500;}}
-QTabBar::tab:selected{{background:{CARD};border:1px solid {BORDER};border-bottom:none;font-weight:600;}}
-QTabBar::tab:!selected{{background:#e7e5e4;color:{TEXT2};}}
-QTabWidget::pane{{border:1px solid {BORDER};border-radius:6px;background:{CARD};}}
 QCheckBox{{spacing:5px;font-size:11px;color:{TEXT};}}
+QScrollBar:vertical{{width:6px;background:transparent;}}
+QScrollBar::handle:vertical{{background:#c0c0c0;border-radius:3px;min-height:30px;}}
+QScrollBar::handle:vertical:hover{{background:#a0a0a0;}}
+QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{{height:0;}}
+QScrollBar:horizontal{{height:6px;background:transparent;}}
+QScrollBar::handle:horizontal{{background:#c0c0c0;border-radius:3px;min-width:30px;}}
+QScrollBar::handle:horizontal:hover{{background:#a0a0a0;}}
+QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal{{width:0;}}
 """
 
 # ── 共享常量 ──
@@ -94,9 +106,13 @@ class MetricCard(QWidget):
         lo = QVBoxLayout(self); lo.setContentsMargins(8, 6, 8, 6); lo.setSpacing(2)
         self.value_label = QLabel(default)
         self.value_label.setStyleSheet(
-            f'font-size:18px;font-weight:600;color:{color};qproperty-alignment:AlignCenter;')
+            f'font-size:18px;font-weight:600;color:{color};text-align:center;')
+        self.value_label.setAlignment(Qt.AlignCenter)
         lo.addWidget(self.value_label)
-        lo.addWidget(QLabel(label, styleSheet=f'font-size:9px;color:{TEXT3};font-weight:500;qproperty-alignment:AlignCenter;'))
+        title_label = QLabel(label)
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet(f'font-size:9px;color:{TEXT3};font-weight:500;')
+        lo.addWidget(title_label)
 
 
 class LogPanel(QWidget):
@@ -104,26 +120,23 @@ class LogPanel(QWidget):
         super().__init__(parent)
         self._max_lines = max_lines; self._log_lines = []
         self.setStyleSheet(f'background:{CARD};border:1px solid {BORDER};border-radius:7px;')
-        lo = QVBoxLayout(self); lo.setContentsMargins(6, 4, 6, 6); lo.setSpacing(4)
-        h = QWidget(); h.setStyleSheet('background:transparent;border:none;')
-        hl = QHBoxLayout(h); hl.setContentsMargins(2, 0, 2, 0); hl.setSpacing(6)
-        hl.addWidget(QLabel(title, styleSheet=f'font-size:10px;font-weight:600;color:{TEXT3};'))
-        hl.addStretch()
-        self.line_count = QLabel('0 lines')
-        self.line_count.setStyleSheet(f'font-size:9px;color:{TEXT3};')
-        hl.addWidget(self.line_count)
-        clear_btn = QPushButton('Clear')
-        clear_btn.setObjectName('danger')
-        clear_btn.setStyleSheet('padding:2px 8px;min-height:18px;font-size:10px;')
-        clear_btn.clicked.connect(self.clear)
-        hl.addWidget(clear_btn)
-        lo.addWidget(h)
+        lo = QVBoxLayout(self); lo.setContentsMargins(4, 4, 4, 4); lo.setSpacing(0)
+
         self.editor = QTextEdit()
         self.editor.setReadOnly(True)
-        self.editor.setStyleSheet(
-            f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:5px;'
-            'padding:8px 10px;font-family:"Consolas","Courier New",monospace;font-size:13px;line-height:1.4;}}')
-        lo.addWidget(self.editor)
+        self.editor.setStyleSheet(f"""
+            QTextEdit {{
+                background: {CON};
+                color: {CON_T};
+                border: none;
+                border-radius: 5px;
+                padding: 8px 10px;
+                font-family: "Consolas", "Courier New", monospace;
+                font-size: 13px;
+                line-height: 1.4;
+            }}
+        """)
+        lo.addWidget(self.editor, 1)
 
     def append(self, html_line):
         self._log_lines.append(html_line)
@@ -133,7 +146,6 @@ class LogPanel(QWidget):
         else:
             self.editor.append(html_line)
         self.editor.verticalScrollBar().setValue(self.editor.verticalScrollBar().maximum())
-        self.line_count.setText(f'{len(self._log_lines)} lines')
 
     def replace_last(self, html_line):
         if self._log_lines:
@@ -142,7 +154,7 @@ class LogPanel(QWidget):
             self.editor.verticalScrollBar().setValue(self.editor.verticalScrollBar().maximum())
 
     def clear(self):
-        self.editor.clear(); self._log_lines = []; self.line_count.setText('0 lines')
+        self.editor.clear(); self._log_lines = []
 
 
 # ── 共享日志格式化 ──
@@ -212,7 +224,18 @@ class LossChart(Chart):
         if h.get('epoch') and len(h['epoch']):
             self.ax.plot(h['epoch'], h['train_loss'], color=RED, lw=1.5)
             self.ax.fill_between(h['epoch'], h['train_loss'], alpha=0.04, color=RED)
+            self.ax.set_title('Training Loss', fontsize=9, color=TEXT, fontweight='bold')
+            self.ax.set_xlabel('Epoch', fontsize=7, color=TEXT2)
+            self.ax.set_ylabel('Loss', fontsize=7, color=TEXT2)
         self.rf()
+
+    def save(self, path):
+        try:
+            self.fig.savefig(str(path), dpi=150, bbox_inches='tight', facecolor='white')
+            return True
+        except Exception as e:
+            print(f'Failed to save loss chart: {e}')
+            return False
 
 class MapChart(Chart):
     def upd(self, h):
@@ -222,7 +245,22 @@ class MapChart(Chart):
             self.ax.fill_between(h['epoch'], h['mAP50'], alpha=0.04, color=GREEN)
             if h.get('mAP50_95') and any(v>0 for v in h['mAP50_95']):
                 self.ax.plot(h['epoch'], h['mAP50_95'], color=AMBER, lw=1, ls='--')
+            self.ax.set_title('mAP Metrics', fontsize=9, color=TEXT, fontweight='bold')
+            self.ax.set_xlabel('Epoch', fontsize=7, color=TEXT2)
+            self.ax.set_ylabel('mAP', fontsize=7, color=TEXT2)
+            legend_labels = ['mAP@0.5']
+            if h.get('mAP50_95') and any(v>0 for v in h['mAP50_95']):
+                legend_labels.append('mAP@0.5:0.95')
+            self.ax.legend(legend_labels, loc='lower right', fontsize=6, framealpha=0.8)
         self.rf()
+
+    def save(self, path):
+        try:
+            self.fig.savefig(str(path), dpi=150, bbox_inches='tight', facecolor='white')
+            return True
+        except Exception as e:
+            print(f'Failed to save mAP chart: {e}')
+            return False
 
 
 def find_latest_best():
@@ -230,3 +268,50 @@ def find_latest_best():
     if not d.exists(): return None
     m = sorted(d.rglob('weights/best5.20.pt'), key=lambda p: p.stat().st_mtime)
     return str(m[-1]) if m else None
+
+
+# ── YOLO.png 水印 ──
+_YOLO_PIXMAP = None
+
+def _load_yolo_pixmap(size=200):
+    global _YOLO_PIXMAP
+    if _YOLO_PIXMAP is None:
+        p = ROOT / 'YOLO.png'
+        if p.exists():
+            pm = QPixmap(str(p))
+            if not pm.isNull():
+                _YOLO_PIXMAP = pm.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    return _YOLO_PIXMAP
+
+
+class _WatermarkFilter(QObject):
+    def __init__(self, parent, label, pixmap):
+        super().__init__(parent)
+        self._label = label
+        self._pm = pixmap
+        parent.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            pw, ph = obj.width(), obj.height()
+            lw, lh = self._pm.width(), self._pm.height()
+            self._label.setGeometry((pw - lw) // 2, (ph - lh) // 2, lw, lh)
+        return super().eventFilter(obj, event)
+
+
+def set_watermark(container, size=200, opacity=0.25):
+    pm = _load_yolo_pixmap(size)
+    if pm is None:
+        return
+    label = QLabel(container)
+    label.setPixmap(pm)
+    label.setAttribute(Qt.WA_TransparentForMouseEvents)
+    label.setStyleSheet('background:transparent;')
+    effect = QGraphicsOpacityEffect(label)
+    effect.setOpacity(opacity)
+    label.setGraphicsEffect(effect)
+    label.lower()
+    _WatermarkFilter(container, label, pm)
+    pw, ph = container.width(), container.height()
+    lw, lh = pm.width(), pm.height()
+    label.setGeometry((pw - lw) // 2, (ph - lh) // 2, lw, lh)

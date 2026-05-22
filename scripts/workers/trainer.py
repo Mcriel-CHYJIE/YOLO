@@ -1,24 +1,36 @@
-"""训练工作线程"""
+"""训练工作线程 — 使用 threading.Thread 替代 QThread 避免原生栈溢出 (0xC0000409)"""
 from scripts.tabs.base import ROOT, DATA_YAML, IS_FALL, StreamEmitter
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
-import json
+import json, torch, threading
+from ultralytics import YOLO
 
 
-class Trainer(QThread):
-    log = pyqtSignal(str); status = pyqtSignal(str,float,float,float); chart = pyqtSignal(); done = pyqtSignal(bool,str)
+class Trainer(QObject):
+    """线程内训练管理器 — 非 QThread，用 threading.Thread 获得完整原生栈"""
+    log = pyqtSignal(str); status = pyqtSignal(str,float,float,float,float); chart = pyqtSignal(); done = pyqtSignal(bool,str)
 
     def __init__(self, cfg):
-        super().__init__(); self.cfg = cfg; self._stop = False
+        super().__init__()
+        self.cfg = cfg
+        self._stop_event = threading.Event()
+        self._thread = None
         self.history = {'epoch':[],'train_loss':[],'mAP50':[],'mAP50_95':[],'precision':[],'recall':[]}
         self.best_map = 0.0
         self.stdout_emitter = StreamEmitter(self.log)
         self.stderr_emitter = StreamEmitter(self.log)
 
-    def stop(self): self._stop = True
+    def stop(self):
+        self._stop_event.set()
+
+    def isRunning(self):
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
     def _check_gpu_memory(self):
-        import torch
         if not torch.cuda.is_available(): return None
         try:
             total_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
@@ -51,22 +63,30 @@ class Trainer(QThread):
             self.log.emit(f' Log saved: {ts}.json')
         except: pass
 
-    def run(self):
-        import sys, torch
+    def _run(self):
+        import sys
+        torch.set_num_threads(1)  # 限制 PyTorch 内部线程，避免栈竞争
         original_stdout = sys.stdout; original_stderr = sys.stderr
         try:
             sys.stdout = self.stdout_emitter; sys.stderr = self.stderr_emitter
-            from ultralytics import YOLO
-            cfg = self.cfg; m = YOLO(cfg['model'])
+            cfg = self.cfg
+            
+            # 检查是否从头开始训练
+            if not cfg['model'] or cfg['model'].strip() == '':
+                self.log.emit(' [Scratch] Training from scratch (no pretrained weights)')
+                m = YOLO('yolo11n.yaml')  # 使用默认配置创建新模型
+            else:
+                m = YOLO(cfg['model'])
+            
             exp = f'{ROOT.name}_{datetime.now().strftime("%m%d_%H%M")}'
-            self.log.emit(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
+            model_name = cfg['model'] if cfg['model'] else 'Scratch'
+            self.log.emit(f' {model_name} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
             if cfg.get('lr0', 0) <= 0: cfg['lr0'] = 0.001; self.log.emit(f'  LR0 was 0, reset to 0.001')
             if torch.cuda.is_available() and cfg['device'] != 'cpu':
                 gi = self._check_gpu_memory()
                 if gi: self.log.emit(f' GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free')
-                torch.cuda.empty_cache()
             def cb(t):
-                if self._stop: t.stop = True; return
+                if self._stop_event.is_set(): t.stop = True; return
                 try:
                     ep = t.epoch; loss = 0.0
                     if hasattr(t,'loss') and t.loss is not None: loss = float(t.loss)
@@ -83,7 +103,7 @@ class Trainer(QThread):
                     self.history['mAP50'].append(m50); self.history['mAP50_95'].append(m95)
                     self.history['precision'].append(p); self.history['recall'].append(r)
                     if m50 > self.best_map: self.best_map = m50
-                    self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', min(ep/max(cfg['epochs'],1),1.0), self.best_map, m50)
+                    self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', min(ep/max(cfg['epochs'],1),1.0), self.best_map, m50, loss)
                     self.chart.emit()
                 except: pass
             m.add_callback('on_train_epoch_end', cb)
@@ -92,7 +112,7 @@ class Trainer(QThread):
                 device=cfg['device'], warmup_epochs=cfg.get('warmup_epochs', 3), warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
                 momentum=cfg.get('momentum', 0.937), weight_decay=cfg.get('weight_decay', 0.0005),
                 cls_pw=cfg.get('cls_pw', 0.75),
-                flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=0.2, workers=cfg.get('workers', 4),
+                flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=cfg.get('mixup', 0.2), workers=cfg.get('workers', 4),
                 iou=cfg['iou'], close_mosaic=cfg['close_mosaic'],
                 copy_paste=cfg['copy_paste'] if cfg['copy_paste'] > 0 else 0,
                 degrees=cfg['degrees'] if cfg['degrees'] > 0 else 0, multi_scale=cfg['multi_scale'],
@@ -105,7 +125,7 @@ class Trainer(QThread):
                 if 'CUDA out of memory' in str(e):
                     self.log.emit(' Reduce batch size or image size'); raise
                 raise
-            stopped = self._stop
+            stopped = self._stop_event.is_set()
             self._save_log(ok=not stopped, error='Stopped by user' if stopped else '')
             self.done.emit(not stopped, f' Stopped' if stopped else f' Done | Best mAP@0.5 = {self.best_map:.4f}')
         except BaseException as e:
