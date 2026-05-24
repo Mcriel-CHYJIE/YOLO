@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsPage</class>
+ <widget class="QWidget" name="SettingsPage">
+  <layout class="QVBoxLayout" name="mainLo">
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>12</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>12</number></property>
+   <property name="spacing"><number>8</number></property>
+
+   <!-- Title -->
+   <item><widget class="QLabel" name="titleLabel">
+    <property name="text"><string>⚙  Settings</string></property>
+    <property name="styleSheet"><string>font-size:18px;font-weight:700;</string></property>
+   </widget></item>
+
+   <!-- Three-column layout -->
+   <item><layout class="QHBoxLayout" name="colsLo">
+    <property name="spacing"><number>8</number></property>
+
+    <!-- ═══ Column 1: Class names ═══ -->
+    <item><widget class="QGroupBox" name="classGroup">
+     <property name="title"><string>Class names</string></property>
+     <layout class="QVBoxLayout" name="classGroupLo">
+      <property name="leftMargin"><number>8</number></property>
+      <property name="rightMargin"><number>8</number></property>
+      <property name="spacing"><number>8</number></property>
+      <item><widget class="QLabel" name="hintLabel">
+       <property name="text"><string>编辑 data.yaml 的类别名称。顺序决定索引（第1行=0，第2行=1…）</string></property>
+       <property name="styleSheet"><string>font-size:10px;color:#999;</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
+      </widget></item>
+      <item><widget class="QPlainTextEdit" name="classEditor">
+       <property name="placeholderText"><string>a
+b
+c
+d
+e
+f
+g</string></property>
+      </widget></item>
+
+      <item><widget class="QLabel" name="statusLabel">
+       <property name="text"><string></string></property>
+       <property name="styleSheet"><string>font-size:9px;</string></property>
+      </widget></item>
+
+      <item><widget class="QPushButton" name="saveBtn">
+       <property name="text"><string>Save</string></property>
+       <property name="styleSheet"><string>QPushButton{background:#07C160;color:#fff;border:none;padding:6px 28px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}</string></property>
+      </widget></item>
+     </layout>
+    </widget></item>
+
+    <!-- ═══ Column 2: Annotation Shortcuts ═══ -->
+    <item><widget class="QGroupBox" name="shortcutGroup">
+     <property name="title"><string>Annotation Shortcuts</string></property>
+     <layout class="QVBoxLayout" name="shortcutGroupLo">
+      <property name="leftMargin"><number>8</number></property>
+      <property name="rightMargin"><number>8</number></property>
+      <property name="spacing"><number>6</number></property>
+
+      <item><widget class="QLabel" name="navTitle">
+       <property name="text"><string>Navigation</string></property>
+       <property name="maximumHeight"><number>14</number></property>
+       <property name="styleSheet"><string>font-size:10px;color:#999;font-weight:600;padding:0;</string></property>
+      </widget></item>
+
+      <item><layout class="QGridLayout" name="navGrid">
+       <property name="horizontalSpacing"><number>8</number></property>
+       <property name="verticalSpacing"><number>4</number></property>
+       <item row="0" column="0">
+        <widget class="QLabel" name="navPrevLabel">
+         <property name="text"><string>Prev</string></property>
+        </widget></item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="shortcutPrev">
+         <property name="readOnly"><bool>true</bool></property>
+         <property name="maximumWidth"><number>50</number></property>
+         <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+        </widget></item>
+       <item row="0" column="2">
+        <widget class="QLabel" name="navNextLabel">
+         <property name="text"><string>Next</string></property>
+        </widget></item>
+       <item row="0" column="3">
+        <widget class="QLineEdit" name="shortcutNext">
+         <property name="readOnly"><bool>true</bool></property>
+         <property name="maximumWidth"><number>50</number></property>
+         <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+        </widget></item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="navDelBoxLabel">
+         <property name="text"><string>Del Box</string></property>
+        </widget></item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="shortcutDelBox">
+         <property name="readOnly"><bool>true</bool></property>
+         <property name="maximumWidth"><number>50</number></property>
+         <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+        </widget></item>
+       <item row="1" column="2">
+        <widget class="QLabel" name="navDelImgLabel">
+         <property name="text"><string>Del Img</string></property>
+        </widget></item>
+       <item row="1" column="3">
+        <widget class="QLineEdit" name="shortcutDelImg">
+         <property name="readOnly"><bool>true</bool></property>
+         <property name="maximumWidth"><number>50</number></property>
+         <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+        </widget></item>
+       <item row="0" column="4"><spacer/></item>
+      </layout></item>
+
+      <item><widget class="QLabel" name="clsTitle">
+       <property name="text"><string>Class Selection</string></property>
+       <property name="maximumHeight"><number>14</number></property>
+       <property name="styleSheet"><string>font-size:10px;color:#999;font-weight:600;padding:0;</string></property>
+      </widget></item>
+
+      <item><widget class="QLabel" name="shortcutStatus">
+       <property name="text"><string></string></property>
+       <property name="styleSheet"><string>font-size:9px;</string></property>
+      </widget></item>
+
+      <item><widget class="QPushButton" name="shortcutSaveBtn">
+       <property name="text"><string>Save Shortcuts</string></property>
+       <property name="styleSheet"><string>QPushButton{background:#07C160;color:#fff;border:none;padding:6px 28px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}</string></property>
+      </widget></item>
+     </layout>
+    </widget></item>
+
+    <!-- ═══ Column 3: Toggles + Init ═══ -->
+    <item><layout class="QVBoxLayout" name="col3Lo">
+     <property name="spacing"><number>8</number></property>
+
+     <item><widget class="QGroupBox" name="toggleGroup">
+      <property name="title"><string>Other</string></property>
+      <layout class="QVBoxLayout" name="toggleGroupLo">
+       <property name="leftMargin"><number>8</number></property>
+       <property name="rightMargin"><number>8</number></property>
+       <property name="spacing"><number>6</number></property>
+       <item><layout class="QHBoxLayout" name="ssRow">
+        <property name="spacing"><number>10</number></property>
+        <item><widget class="QLabel" name="ssLabel">
+         <property name="text"><string>Screen saver</string></property>
+        </widget></item>
+        <item><widget class="QWidget" name="ssToggleHost" native="true">
+         <property name="fixedSize"><size><width>44</width><height>22</height></size></property>
+        </widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+       </layout></item>
+       <item><layout class="QHBoxLayout" name="themeRow">
+        <property name="spacing"><number>10</number></property>
+        <item><widget class="QLabel" name="themeLabel">
+         <property name="text"><string>Dark theme</string></property>
+        </widget></item>
+        <item><widget class="QWidget" name="themeToggleHost" native="true">
+         <property name="fixedSize"><size><width>44</width><height>22</height></size></property>
+        </widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+       </layout></item>
+      </layout>
+     </widget></item>
+
+       <item><widget class="QGroupBox" name="initGroup">
+      <property name="title"><string>Init</string></property>
+      <layout class="QVBoxLayout" name="initGroupLo">
+       <property name="leftMargin"><number>8</number></property>
+       <property name="rightMargin"><number>8</number></property>
+       <property name="spacing"><number>6</number></property>
+       <item><widget class="QPushButton" name="initBtn">
+        <property name="text"><string>Init Project Structure</string></property>
+        <property name="styleSheet"><string>QPushButton{background:#07C160;color:#fff;border:none;padding:6px 16px;font-size:11px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}</string></property>
+       </widget></item>
+       <item><widget class="QLabel" name="initStatus">
+        <property name="text"><string></string></property>
+        <property name="maximumHeight"><number>14</number></property>
+        <property name="styleSheet"><string>font-size:10px;color:#999;padding:0;</string></property>
+       </widget></item>
+      </layout>
+     </widget></item>
+
+     <item><widget class="QGroupBox" name="dirGroup">
+      <property name="title"><string>Directories</string></property>
+      <layout class="QVBoxLayout" name="dirGroupLo">
+       <property name="leftMargin"><number>6</number></property>
+       <property name="rightMargin"><number>6</number></property>
+       <property name="spacing"><number>4</number></property>
+       <item><widget class="QWidget" name="pathsContainer" native="true">
+        <layout class="QVBoxLayout" name="pathsContainerLo">
+         <property name="leftMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="spacing"><number>4</number></property>
+        </layout>
+       </widget></item>
+       <item><widget class="QLabel" name="pathsStatus">
+        <property name="text"><string></string></property>
+        <property name="maximumHeight"><number>14</number></property>
+        <property name="styleSheet"><string>font-size:9px;color:#999;padding:0;</string></property>
+       </widget></item>
+       <item><widget class="QPushButton" name="pathsSaveBtn">
+        <property name="text"><string>Save Directories</string></property>
+        <property name="styleSheet"><string>QPushButton{background:#07C160;color:#fff;border:none;padding:6px 28px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}</string></property>
+       </widget></item>
+      </layout>
+     </widget></item>
+
+    </layout></item>
+
+   </layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

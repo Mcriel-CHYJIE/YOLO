@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ExportPage</class>
+ <widget class="QWidget" name="ExportPage">
+<layout class="QHBoxLayout" name="mainLo">
+   <property name="leftMargin"><number>6</number></property>
+   <property name="topMargin"><number>6</number></property>
+   <property name="rightMargin"><number>6</number></property>
+   <property name="bottomMargin"><number>6</number></property>
+   <property name="spacing"><number>6</number></property>
+
+   <item>
+    <widget class="QWidget" name="leftPanel" native="true">
+     <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
+     <property name="maximumSize"><size><width>380</width><height>16777215</height></size></property>
+     <layout class="QVBoxLayout" name="leftLo">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>5</number></property>
+
+      <item><widget class="QGroupBox" name="modelGroup">
+       <property name="title"><string>Model</string></property>
+       <layout class="QVBoxLayout" name="modelLo">
+        <property name="leftMargin"><number>8</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>8</number></property>
+        <property name="bottomMargin"><number>8</number></property>
+        <property name="spacing"><number>4</number></property>
+        <item><widget class="QLabel" name="modelLabel">
+         <property name="text"><string>Weights</string></property>
+         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+        </widget></item>
+        <item><layout class="QHBoxLayout" name="weightsRow">
+         <item><widget class="QLineEdit" name="_w"/></item>
+         <item><widget class="QPushButton" name="browseBtn">
+          <property name="text"><string>Browse</string></property>
+         </widget></item>
+        </layout></item>
+       </layout>
+      </widget></item>
+
+      <item><widget class="QGroupBox" name="exportGroup">
+       <property name="title"><string>Export</string></property>
+       <layout class="QVBoxLayout" name="exportLo">
+        <property name="leftMargin"><number>8</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>8</number></property>
+        <property name="bottomMargin"><number>8</number></property>
+        <property name="spacing"><number>3</number></property>
+        <item><widget class="QLabel" name="fmtLabel">
+         <property name="text"><string>Format:</string></property>
+         <property name="styleSheet"><string>font-size:9px;color:#78716c;</string></property>
+        </widget></item>
+        <item><widget class="QComboBox" name="_fmt"/></item>
+        <item><widget class="QLabel" name="szLabel">
+         <property name="text"><string>Image Size:</string></property>
+         <property name="styleSheet"><string>font-size:9px;color:#78716c;</string></property>
+        </widget></item>
+        <item><widget class="QComboBox" name="_sz"/></item>
+        <item><widget class="QCheckBox" name="_half">
+         <property name="text"><string>FP16 Half Precision</string></property>
+        </widget></item>
+        <item><widget class="QCheckBox" name="_int8">
+         <property name="text"><string>INT8 Quantization</string></property>
+        </widget></item>
+        <item><widget class="QCheckBox" name="_nms">
+         <property name="text"><string>Integrated NMS</string></property>
+        </widget></item>
+        <item><widget class="QPushButton" name="_exp_btn">
+         <property name="text"><string> Export</string></property>
+        </widget></item>
+       </layout>
+      </widget></item>
+
+      <item><spacer><property name="orientation"><enum>Vertical</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+      </spacer></item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QWidget" name="rightPanel" native="true">
+     <layout class="QVBoxLayout" name="rightLo">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>6</number></property>
+      <item stretch="1"><widget class="LogPanel" name="_log" native="true"/></item>
+     </layout>
+    </widget>
+   </item>
+ </layout>
+</widget>
+<resources/>
+<connections/>
+<customwidgets>
+ <customwidget><class>LogPanel</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
+</customwidgets>
+</ui>

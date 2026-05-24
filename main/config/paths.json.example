@@ -1,0 +1,9 @@
+{
+  "train_output": "",
+  "predict_output": "",
+  "dataset_dir": "",
+  "preproc_dir": "",
+  "label_dir": "",
+  "export_dir": "",
+  "models_dir": ""
+}

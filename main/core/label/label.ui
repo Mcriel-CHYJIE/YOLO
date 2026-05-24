@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>LabelPage</class>
+ <widget class="QWidget" name="LabelPage">
+  <layout class="QVBoxLayout" name="mainLo">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <property name="spacing"><number>0</number></property>
+
+   <item><layout class="QHBoxLayout" name="mainLoH">
+    <property name="spacing"><number>0</number></property>
+
+    <!-- ═══ LEFT PANEL ═══ -->
+    <item><widget class="QScrollArea" name="leftScroll">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="fixedWidth"><number>280</number></property>
+     <widget class="QWidget" name="leftPanel">
+      <layout class="QVBoxLayout" name="leftLo">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>4</number></property>
+       <property name="topMargin"><number>4</number></property>
+       <property name="rightMargin"><number>4</number></property>
+       <property name="bottomMargin"><number>4</number></property>
+
+       <!-- Source -->
+       <item><widget class="QGroupBox" name="sourceGroup">
+        <property name="title"><string>Source</string></property>
+        <layout class="QVBoxLayout" name="sourceLo">
+         <property name="spacing"><number>5</number></property>
+         <property name="leftMargin"><number>8</number></property>
+         <property name="topMargin"><number>8</number></property>
+         <property name="rightMargin"><number>8</number></property>
+         <property name="bottomMargin"><number>8</number></property>
+
+         <item><layout class="QHBoxLayout" name="sourceRow">
+          <property name="spacing"><number>4</number></property>
+          <item><widget class="QComboBox" name="srcCombo">
+           <property name="minimumHeight"><number>28</number></property>
+          </widget></item>
+          <item><widget class="QPushButton" name="srcRefreshBtn">
+           <property name="text"><string>↻</string></property>
+           <property name="minimumSize"><size><width>36</width><height>28</height></size></property>
+          </widget></item>
+         </layout></item>
+
+         <item><widget class="QLabel" name="srcPathLabel">
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget></item>
+
+         <item><layout class="QHBoxLayout" name="sourceStatsRow">
+          <property name="spacing"><number>6</number></property>
+          <item><widget class="QLabel" name="countLabel">
+           <property name="text"><string>0 images</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="annotatedLabel">
+           <property name="text"><string>0 annotated</string></property>
+          </widget></item>
+          <item><spacer name="sourceStatsSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         </layout></item>
+
+         <item><widget class="QFrame" name="sourceSep">
+          <property name="frameShape"><enum>QFrame::HLine</enum></property>
+          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
+         </widget></item>
+
+         <item><widget class="QLabel" name="filterStatsLabel">
+          <property name="text"><string>0 → 0 images</string></property>
+          <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+         </widget></item>
+
+         <item><widget class="QPushButton" name="filterBtn">
+          <property name="text"><string> Random Filter</string></property>
+          <property name="objectName"><string>pri</string></property>
+          <property name="minimumHeight"><number>26</number></property>
+         </widget></item>
+        </layout>
+       </widget></item>
+
+       <!-- Model & Export -->
+       <item><widget class="QGroupBox" name="modelGroup">
+        <property name="title"><string>Model &amp; Export</string></property>
+        <layout class="QVBoxLayout" name="modelLo">
+         <property name="spacing"><number>5</number></property>
+         <property name="leftMargin"><number>8</number></property>
+         <property name="topMargin"><number>8</number></property>
+         <property name="rightMargin"><number>8</number></property>
+         <property name="bottomMargin"><number>8</number></property>
+
+         <!-- Mode toggle -->
+         <item><layout class="QHBoxLayout" name="modeRow">
+          <property name="spacing"><number>0</number></property>
+          <item><widget class="QFrame" name="modeContainer">
+           <layout class="QHBoxLayout" name="modeLo">
+            <property name="spacing"><number>0</number></property>
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item><widget class="QPushButton" name="modeManual">
+             <property name="text"><string>Manual</string></property>
+             <property name="checkable"><bool>true</bool></property>
+             <property name="checked"><bool>true</bool></property>
+             <property name="minimumHeight"><number>26</number></property>
+            </widget></item>
+            <item><widget class="QPushButton" name="modeAuto">
+             <property name="text"><string>Auto</string></property>
+             <property name="checkable"><bool>true</bool></property>
+             <property name="minimumHeight"><number>26</number></property>
+            </widget></item>
+           </layout>
+          </widget></item>
+         </layout></item>
+
+         <!-- Auto panel -->
+         <item><widget class="QWidget" name="autoPanel">
+          <property name="enabled"><bool>false</bool></property>
+          <layout class="QVBoxLayout" name="autoLo">
+           <property name="spacing"><number>4</number></property>
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>4</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+
+           <item><layout class="QHBoxLayout" name="modelRow">
+            <property name="spacing"><number>4</number></property>
+            <item><widget class="QComboBox" name="modelCombo">
+             <property name="minimumHeight"><number>24</number></property>
+            </widget></item>
+            <item><widget class="QPushButton" name="browseModelBtn">
+             <property name="text"><string>📁</string></property>
+             <property name="minimumSize"><size><width>36</width><height>24</height></size></property>
+            </widget></item>
+            <item><widget class="QPushButton" name="autoBtn">
+             <property name="text"><string>▶ Auto</string></property>
+             <property name="objectName"><string>pri</string></property>
+             <property name="minimumSize"><size><width>72</width><height>24</height></size></property>
+            </widget></item>
+           </layout></item>
+
+           <item><layout class="QHBoxLayout" name="confRow">
+            <property name="spacing"><number>4</number></property>
+            <item><widget class="QLabel" name="confLabel">
+             <property name="text"><string>Conf</string></property>
+            </widget></item>
+            <item><widget class="QDoubleSpinBox" name="alConf">
+             <property name="minimum"><double>0.01</double></property>
+             <property name="maximum"><double>0.99</double></property>
+             <property name="value"><double>0.25</double></property>
+             <property name="singleStep"><double>0.05</double></property>
+             <property name="decimals"><number>2</number></property>
+             <property name="minimumHeight"><number>24</number></property>
+            </widget></item>
+            <item><widget class="QLabel" name="iouLabel">
+             <property name="text"><string>IoU</string></property>
+            </widget></item>
+            <item><widget class="QDoubleSpinBox" name="alIou">
+             <property name="minimum"><double>0.01</double></property>
+             <property name="maximum"><double>0.99</double></property>
+             <property name="value"><double>0.45</double></property>
+             <property name="singleStep"><double>0.05</double></property>
+             <property name="decimals"><number>2</number></property>
+             <property name="minimumHeight"><number>24</number></property>
+            </widget></item>
+           </layout></item>
+          </layout>
+         </widget></item>
+
+         <!-- Separator -->
+         <item><widget class="QFrame" name="exportSep">
+          <property name="frameShape"><enum>QFrame::HLine</enum></property>
+          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
+         </widget></item>
+
+         <!-- Export row -->
+         <item><layout class="QHBoxLayout" name="exportRow">
+          <property name="spacing"><number>6</number></property>
+          <item><layout class="QHBoxLayout" name="trainRatioRow">
+           <property name="spacing"><number>4</number></property>
+           <item><widget class="QLabel" name="trainLabel">
+            <property name="text"><string>Train</string></property>
+           </widget></item>
+           <item><widget class="QSpinBox" name="trainRatio">
+            <property name="minimum"><number>50</number></property>
+            <property name="maximum"><number>99</number></property>
+            <property name="value"><number>90</number></property>
+            <property name="suffix"><string> %</string></property>
+            <property name="minimumHeight"><number>24</number></property>
+           </widget></item>
+           <item><widget class="QLabel" name="valLabel2">
+            <property name="text"><string>Val</string></property>
+           </widget></item>
+           <item><widget class="QLabel" name="valLabel">
+            <property name="text"><string>10%</string></property>
+           </widget></item>
+          </layout></item>
+          <item><widget class="QPushButton" name="exportBtn">
+           <property name="text"><string> Export</string></property>
+           <property name="objectName"><string>pri</string></property>
+           <property name="minimumHeight"><number>24</number></property>
+          </widget></item>
+         </layout></item>
+
+         <!-- Progress & status -->
+         <item><layout class="QHBoxLayout" name="exportStatusRow">
+          <property name="spacing"><number>4</number></property>
+          <item><widget class="QProgressBar" name="exportBar">
+           <property name="minimumHeight"><number>4</number></property>
+           <property name="textVisible"><bool>false</bool></property>
+          </widget></item>
+          <item><widget class="QLabel" name="exportStatus">
+           <property name="text"><string>Ready</string></property>
+          </widget></item>
+         </layout></item>
+        </layout>
+       </widget></item>
+
+       <!-- Stats -->
+       <item><widget class="QGroupBox" name="statsGroup">
+        <property name="title"><string>Class Distribution</string></property>
+        <layout class="QVBoxLayout" name="statsLo">
+         <property name="spacing"><number>6</number></property>
+         <property name="leftMargin"><number>8</number></property>
+         <property name="topMargin"><number>8</number></property>
+         <property name="rightMargin"><number>8</number></property>
+         <property name="bottomMargin"><number>8</number></property>
+
+         <item><layout class="QHBoxLayout" name="statsHeader">
+          <property name="spacing"><number>4</number></property>
+          <item><widget class="QLabel" name="statsHeaderClass">
+           <property name="text"><string>Class</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="statsHeaderCount">
+           <property name="text"><string>Count</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="statsHeaderPct">
+           <property name="text"><string>%</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="statsHeaderDist">
+           <property name="text"><string>Distribution</string></property>
+          </widget></item>
+         </layout></item>
+
+         <item><widget class="QLabel" name="statsSummary">
+          <property name="text"><string>0 images · 0 instances</string></property>
+         </widget></item>
+
+         <item><widget class="QWidget" name="statsContainer" native="true">
+          <layout class="QVBoxLayout" name="statsContainerLo">
+           <property name="spacing"><number>4</number></property>
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget></item>
+        </layout>
+       </widget></item>
+
+       <item><spacer name="leftSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+      </layout>
+     </widget>
+    </widget></item>
+
+    <!-- ═══ CENTER: Canvas ═══ -->
+    <item><widget class="QWidget" name="centerPanel">
+     <layout class="QGridLayout" name="centerLo">
+      <property name="spacing"><number>0</number></property>
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+
+      <!-- Canvas at (0,0), will be replaced by AnnotationCanvas in Python -->
+      <item row="0" column="0"><widget class="QWidget" name="canvasPlaceholder" native="true"/></item>
+
+      <!-- Delete confirm bar (always bottom) -->
+      <item row="0" column="0">
+       <widget class="QWidget" name="deleteConfirm" native="true">
+        <property name="visible"><bool>false</bool></property>
+        <layout class="QHBoxLayout" name="deleteLo">
+         <property name="spacing"><number>8</number></property>
+         <property name="leftMargin"><number>12</number></property>
+         <property name="topMargin"><number>8</number></property>
+         <property name="rightMargin"><number>12</number></property>
+         <property name="bottomMargin"><number>8</number></property>
+         <item><widget class="QLabel" name="confirmMsg">
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="confirmYesBtn">
+          <property name="text"><string>Yes, Delete</string></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="confirmNoBtn">
+          <property name="text"><string>Cancel</string></property>
+         </widget></item>
+        </layout>
+         </widget>
+       </item>
+     </layout>
+    </widget></item>
+
+    <!-- ═══ RIGHT PANEL ═══ -->
+    <item><widget class="QScrollArea" name="rightScroll">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="fixedWidth"><number>280</number></property>
+     <widget class="QWidget" name="rightPanel">
+      <layout class="QVBoxLayout" name="rightLo">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>4</number></property>
+       <property name="topMargin"><number>4</number></property>
+       <property name="rightMargin"><number>4</number></property>
+       <property name="bottomMargin"><number>4</number></property>
+
+       <!-- Annotations list -->
+       <item><widget class="QGroupBox" name="annGroup">
+        <property name="title"><string>Annotations</string></property>
+        <layout class="QVBoxLayout" name="annLo">
+         <property name="spacing"><number>6</number></property>
+         <property name="leftMargin"><number>10</number></property>
+         <property name="topMargin"><number>10</number></property>
+         <property name="rightMargin"><number>10</number></property>
+         <property name="bottomMargin"><number>10</number></property>
+         <item><widget class="QListWidget" name="annList">
+          <property name="minimumHeight"><number>120</number></property>
+         </widget></item>
+        </layout>
+       </widget></item>
+
+       <!-- Classes & Shortcuts -->
+       <item><widget class="QGroupBox" name="classGroup">
+        <property name="title"><string>Classes &amp; Shortcuts</string></property>
+        <layout class="QVBoxLayout" name="classLo">
+         <property name="spacing"><number>6</number></property>
+         <property name="leftMargin"><number>10</number></property>
+         <property name="topMargin"><number>10</number></property>
+         <property name="rightMargin"><number>10</number></property>
+         <property name="bottomMargin"><number>10</number></property>
+
+         <!-- Class buttons container (populated dynamically) -->
+         <item><widget class="QWidget" name="classButtonsContainer" native="true">
+          <layout class="QGridLayout" name="classBtnsGrid">
+           <property name="spacing"><number>6</number></property>
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget></item>
+
+         <!-- Separator -->
+         <item><widget class="QFrame" name="classSep1">
+          <property name="frameShape"><enum>QFrame::HLine</enum></property>
+          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
+         </widget></item>
+
+         <!-- Shortcut inputs grid (4 columns) -->
+         <item><layout class="QGridLayout" name="shortcutGrid">
+          <property name="spacing"><number>4</number></property>
+          <!-- Row 0: Labels (filled by Python) -->
+          <!-- Row 1: Inputs (filled by Python) -->
+         </layout></item>
+
+         <!-- Separator -->
+         <item><widget class="QFrame" name="classSep2">
+          <property name="frameShape"><enum>QFrame::HLine</enum></property>
+          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
+         </widget></item>
+
+         <!-- Delete / Clear buttons -->
+         <item><layout class="QHBoxLayout" name="actionBtnRow">
+          <property name="spacing"><number>5</number></property>
+          <item><widget class="QPushButton" name="delBtn">
+           <property name="text"><string>Delete</string></property>
+          </widget></item>
+          <item><widget class="QPushButton" name="clearBtn">
+           <property name="text"><string>Clear</string></property>
+          </widget></item>
+         </layout></item>
+
+         <!-- Hint -->
+         <item><widget class="QLabel" name="shortcutHint">
+          <property name="text"><string>Click input to set key | Click buttons to select class</string></property>
+          <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+         </widget></item>
+
+         <!-- Separator -->
+         <item><widget class="QFrame" name="classSep3">
+          <property name="frameShape"><enum>QFrame::HLine</enum></property>
+          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
+         </widget></item>
+
+         <!-- Navigation row -->
+         <item><layout class="QHBoxLayout" name="navRow">
+          <property name="spacing"><number>4</number></property>
+          <item><widget class="QPushButton" name="prevBtn">
+           <property name="text"><string>◀</string></property>
+          </widget></item>
+          <item><widget class="QPushButton" name="nextBtn">
+           <property name="text"><string>▶</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="idxInput">
+           <property name="minimum"><number>1</number></property>
+           <property name="maximum"><number>99999</number></property>
+           <property name="minimumHeight"><number>24</number></property>
+          </widget></item>
+          <item><widget class="QLabel" name="totalLabel">
+           <property name="text"><string>/ 0</string></property>
+          </widget></item>
+         </layout></item>
+
+         <!-- Info row -->
+         <item><layout class="QHBoxLayout" name="infoRow">
+          <property name="spacing"><number>6</number></property>
+          <item><widget class="QLabel" name="imgNameLabel">
+           <property name="text"><string>—</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="annCountLabel">
+           <property name="text"><string>0 boxes</string></property>
+          </widget></item>
+          <item><widget class="QLabel" name="saveIndicator">
+           <property name="text"><string></string></property>
+          </widget></item>
+         </layout></item>
+        </layout>
+       </widget></item>
+
+       <item><spacer name="rightSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+      </layout>
+     </widget>
+    </widget></item>
+
+   </layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

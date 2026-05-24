@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PreprocessPage</class>
+ <widget class="QWidget" name="PreprocessPage">
+<layout class="QHBoxLayout" name="mainLo">
+   <property name="leftMargin">
+       <number>8</number>
+      </property><property name="topMargin">
+       <number>8</number>
+      </property>
+   <property name="rightMargin">
+       <number>8</number>
+      </property><property name="bottomMargin">
+       <number>8</number>
+      </property>
+   <property name="spacing">
+       <number>8</number>
+      </property>
+
+   <item>
+    <widget class="QWidget" name="leftPanel" native="true">
+     <property name="minimumSize"><size><width>300</width><height>0</height></size></property>
+     <property name="maximumSize"><size><width>300</width><height>16777215</height></size></property>
+     <layout class="QVBoxLayout" name="leftLo">
+      <property name="leftMargin">
+       <number>0</number>
+      </property><property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property><property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>6</number>
+      </property>
+
+      <item><widget class="QGroupBox" name="dirGroup">
+       <property name="title"><string>Directories</string></property>
+       <layout class="QVBoxLayout" name="dirLo">
+        <property name="leftMargin">
+       <number>10</number>
+      </property><property name="topMargin">
+       <number>14</number>
+      </property>
+        <property name="rightMargin">
+       <number>10</number>
+      </property><property name="bottomMargin">
+       <number>10</number>
+      </property>
+        <property name="spacing">
+       <number>8</number>
+      </property>
+        <item><layout class="QHBoxLayout" name="inputRow">
+         <item><widget class="QLabel" name="inputLabel">
+          <property name="text"><string>Input</string></property>
+          <property name="styleSheet"><string>font-size:10px;color:#78716c;font-weight:500;min-width:40px;</string></property>
+         </widget></item>
+         <item><widget class="QLineEdit" name="src_input">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="srcBrowseBtn">
+          <property name="text"><string>...</string></property>
+          <property name="fixedSize"><size><width>30</width><height>26</height></size></property>
+          <property name="toolTip"><string>Browse input directory</string></property>
+         </widget></item>
+        </layout></item>
+        <item><layout class="QHBoxLayout" name="outputRow">
+         <item><widget class="QLabel" name="outputLabel">
+          <property name="text"><string>Output</string></property>
+          <property name="styleSheet"><string>font-size:10px;color:#78716c;font-weight:500;min-width:40px;</string></property>
+         </widget></item>
+         <item><widget class="QLineEdit" name="out_input">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="outBrowseBtn">
+          <property name="text"><string>...</string></property>
+          <property name="fixedSize"><size><width>30</width><height>26</height></size></property>
+          <property name="toolTip"><string>Browse output directory</string></property>
+         </widget></item>
+        </layout></item>
+        <item><widget class="QPushButton" name="resetBtn">
+         <property name="text"><string> Reset to Default</string></property>
+         <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+         <property name="toolTip"><string>Reset to default directories</string></property>
+        </widget></item>
+       </layout>
+      </widget></item>
+
+      <item><widget class="QGroupBox" name="videoGroup">
+       <property name="title"><string>Videos</string></property>
+       <layout class="QVBoxLayout" name="videoLo">
+        <property name="leftMargin">
+       <number>10</number>
+      </property><property name="topMargin">
+       <number>14</number>
+      </property>
+        <property name="rightMargin">
+       <number>10</number>
+      </property><property name="bottomMargin">
+       <number>10</number>
+      </property>
+        <property name="spacing">
+       <number>6</number>
+      </property>
+        <item><widget class="QListWidget" name="video_list">
+         <property name="minimumSize"><size><width>0</width><height>140</height></size></property>
+        </widget></item>
+        <item><widget class="QLabel" name="video_count">
+         <property name="text"><string>0 videos</string></property>
+         <property name="styleSheet"><string>font-size:10px;color:#a8a29e;padding:2px 0;</string></property>
+        </widget></item>
+       </layout>
+      </widget></item>
+
+      <item><widget class="QGroupBox" name="controlGroupPP">
+       <property name="title"><string>Control</string></property>
+       <layout class="QVBoxLayout" name="controlLoPP">
+        <property name="leftMargin">
+       <number>10</number>
+      </property><property name="topMargin">
+       <number>14</number>
+      </property>
+        <property name="rightMargin">
+       <number>10</number>
+      </property><property name="bottomMargin">
+       <number>10</number>
+      </property>
+        <property name="spacing">
+       <number>6</number>
+      </property>
+        <item><layout class="QHBoxLayout" name="ctrlBtnRow">
+         <item><widget class="QPushButton" name="start_btn">
+          <property name="text"><string>▶ Start</string></property>
+          <property name="minimumSize"><size><width>0</width><height>28</height></size></property>
+         </widget></item>
+         <item><widget class="QPushButton" name="stop_btn">
+          <property name="text"><string> Stop</string></property>
+          <property name="minimumSize"><size><width>0</width><height>28</height></size></property>
+          <property name="enabled"><bool>false</bool></property>
+         </widget></item>
+        </layout></item>
+        <item><widget class="QProgressBar" name="progress_bar">
+         <property name="minimumSize"><size><width>0</width><height>6</height></size></property>
+         <property name="textVisible"><bool>false</bool></property>
+        </widget></item>
+        <item><layout class="QHBoxLayout" name="metricRowPP">
+         <item><widget class="QWidget" name="videoMetricCard" native="true"/></item>
+         <item><widget class="QWidget" name="frameMetricCard" native="true"/></item>
+        </layout></item>
+        <item><widget class="QLabel" name="status_label">
+         <property name="text"><string>Ready</string></property>
+         <property name="styleSheet"><string>font-size:10px;color:#78716c;padding:3px 0;</string></property>
+        </widget></item>
+       </layout>
+      </widget></item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QWidget" name="rightPanel" native="true">
+     <layout class="QVBoxLayout" name="rightLo">
+      <property name="leftMargin">
+       <number>0</number>
+      </property><property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property><property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>6</number>
+      </property>
+      <item stretch="1">
+       <widget class="QGroupBox" name="previewGroup">
+        <property name="title"><string>Image Preview</string></property>
+        <layout class="QVBoxLayout" name="previewLo">
+         <property name="leftMargin">
+       <number>8</number>
+      </property><property name="topMargin">
+       <number>12</number>
+      </property>
+         <property name="rightMargin">
+       <number>8</number>
+      </property><property name="bottomMargin">
+       <number>8</number>
+      </property>
+         <property name="spacing">
+       <number>6</number>
+      </property>
+         <item stretch="1"><widget class="QLabel" name="preview_label">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>0</width><height>0</height></size></property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet"><string>QLabel {background:#f5f5f4;border:1px solid #e7e5e4;border-radius:4px;color:#a8a29e;font-size:12px;}</string></property>
+         </widget></item>
+         <item><widget class="QLabel" name="preview_stats">
+          <property name="text"><string>0 images processed</string></property>
+          <property name="styleSheet"><string>font-size:9px;color:#a8a29e;padding:2px 0;</string></property>
+         </widget></item>
+        </layout>
+       </widget>
+      </item>
+      <item><widget class="LogPanel" name="log_panel" native="true">
+        <property name="minimumSize"><size><width>0</width><height>150</height></size></property>
+        <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
+       </widget></item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+ <customwidgets>
+  <customwidget><class>LogPanel</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
+ </customwidgets>
+</ui>

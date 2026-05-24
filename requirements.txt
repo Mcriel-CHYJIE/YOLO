@@ -1,7 +1,42 @@
-ultralytics>=8.0.0
-torch>=1.8.0
-opencv-python>=4.5.0
-matplotlib>=3.0.0
-numpy>=1.20.0
-pyyaml>=5.0
-pillow>=9.0.0
+# =============================================================================
+# YOLO Training Studio — Python 依赖清单
+# 学习交流许可 | Copyright (c) 2025 Mcriel-CHYJIE | 禁止商用倒卖
+# =============================================================================
+#
+# 安装方式（在项目根目录运行）：
+#
+#   1) 有 GPU（推荐）：
+#       先装 PyTorch（按 CUDA 版本选）：https://pytorch.org/get-started/locally/
+#       然后：pip install -r requirements.txt
+#
+#   2) 仅 CPU：
+#       pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#       pip install -r requirements.txt
+#
+#   3) Conda 用户：
+#       conda install -c pytorch pytorch torchvision pytorch-cuda=12.1
+#       conda install pyqt opencv matplotlib pyyaml psutil
+#       pip install ultralytics Pillow
+#       pip install -r requirements.txt
+#
+
+# ── GUI ──
+PyQt5>=5.15
+
+# ── 深度学习框架（核心） ──
+# torch 和 torchvision 建议自行安装（匹配 CUDA 版本），不在本文件自动安装
+# ultralytics 依赖 torch，需先装好 torch 再装它
+ultralytics>=8.0
+
+# ── 计算机视觉 ──
+opencv-python>=4.8
+Pillow>=10.0
+
+# ── 数值计算 / 可视化 ──
+numpy>=1.24
+matplotlib>=3.7
+
+# ── 工具 ──
+PyYAML>=6.0
+psutil>=5.9
+pywin32>=306 ; platform_system == 'Windows'

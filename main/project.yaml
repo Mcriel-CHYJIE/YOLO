@@ -1,0 +1,84 @@
+# =============================================================================
+# Project Configuration — defines project identity & UI defaults
+# All tabs (Training, Validate, Distill, Predict, Export, Dataset) read from here.
+# Make a copy for a new project (e.g. fire detection) and just swap the file.
+# =============================================================================
+
+# ── Project Identity ──
+project:
+  name: YOLO Training Studio         # Window title
+  task: detect                         # YOLO task (detect / segment / classify)
+  data_yaml: datasets/config.yaml         # Relative to project root
+  tip: "V8n-Long-clsPW0.75-IoU0.75-Rot10"  # Shown in Algorithm group box
+
+# ── Training Defaults ──
+training:
+  model: yolov8n.pt                    # 预训练权重（ultralytics 自动下载）
+  model_options:
+    - yolov8n.pt
+    - yolov11n.pt
+  epochs: 300                          # 微调 300 轮足够收敛
+  batch: 32                            # RTX 5070 Ti 16GB 安全值
+  imgsz: 640
+  imgsz_options: [416, 512, 640, 800]
+  optimizer: AdamW
+  optimizer_options: [AdamW, Adam, SGD]
+  device: auto
+  scheduler: Cosine
+  scheduler_options: [Cosine, Linear]
+  patience: 50
+  lr0: 0.001                           # AdamW 微调学习率
+  lrf: 0.01                            # 1e-3 → 1e-5
+  warmup_epochs: 3
+  workers: 12
+  momentum: 0.937
+  weight_decay: 0.0005
+  cls_pw: 0.75
+  iou: 0.7
+  close_mosaic: 15
+  copy_paste: 0.1
+  degrees: 15.0
+  multi_scale: false
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  translate: 0.1
+  scale: 0.5
+  flip_lr: 0.5
+
+# ── Validation Defaults ──
+validation:
+  imgsz: 640
+  batch: 48
+  conf: 0.35                           # 推理置信度提至 0.35，直接过滤低分框，降低误报
+  iou: 0.5                             # 推理 IoU 稍高，减少密集框
+
+# ── Distillation Defaults ──
+distill:
+  teacher: ''                          # Empty = auto-find latest runs/*/weights/best*.pt
+  student: models/yolo11n.pt           # Student model (smaller than teacher)
+  epochs: 150                          # Extended epochs for better knowledge transfer
+  batch: 24                            # Optimized batch size for distillation (teacher frozen, less memory)
+  lr0: 0.002                           # Higher LR for faster convergence in distillation
+  alpha: 0.5                           # Balanced weight: 50% detection loss + 50% distillation loss
+  patience: 40                         # Extended patience for thorough search
+  imgsz: 640                           # Same as training for consistency
+  warmup_epochs: 5                     # Shorter warmup for distillation
+  weight_decay: 0.0005                 # L2 regularization
+  momentum: 0.937                      # Optimizer momentum
+
+# ── Prediction / Inference Defaults ──
+predict:
+  conf: 0.35                           # 推理默认 conf 0.35，匹配验证集标准
+  iou: 0.5
+  imgsz: 640
+
+# ── Export Defaults ──
+export:
+  format: onnx
+  format_options: [onnx, torchscript, ncnn, openvino, tensorrt, tflite, edgetpu, coreml]
+  imgsz: 640
+  imgsz_options: [320, 416, 640, 800, 1280]
+  half: false
+  int8: false
+  nms: false

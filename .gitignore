@@ -69,3 +69,8 @@ desktop.ini
 *.tmp
 temp/
 tmp/
+# API Keys & secrets
+main/core/agent/agent_config.json
+
+# Machine-local paths
+main/config/paths.json
