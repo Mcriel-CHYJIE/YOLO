@@ -20,8 +20,8 @@ _ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Config / Data.yaml 操作
 # ══════════════════════════════════════════════════════════════
 
-def resolve_data_yaml(rel_path: str = 'datasets/config.yaml') -> Path:
-    """返回 config.yaml 的绝对路径"""
+def resolve_data_yaml(rel_path: str = 'data.yaml') -> Path:
+    """返回 data.yaml 的绝对路径"""
     return _ROOT / rel_path
 
 
@@ -37,9 +37,9 @@ def resolve_theme_file() -> Path:
 
 def load_classes_from_yaml(yaml_path: Path) -> list[str]:
     """
-    从 config.yaml 读取类别名称列表。
+    从 data.yaml 读取类别名称列表。
 
-    config.yaml 中的 names 为 {0: 'person', 1: 'car', ...} 格式，
+    data.yaml 中的 names 为 {0: 'person', 1: 'car', ...} 格式，
     按 key 升序返回 ['person', 'car', ...]。
     文件不存在或格式异常时返回空列表。
     """
@@ -59,7 +59,7 @@ def load_classes_from_yaml(yaml_path: Path) -> list[str]:
 
 def save_classes_to_yaml(yaml_path: Path, names: list[str]) -> None:
     """
-    将类别名称列表写入 config.yaml。
+    将类别名称列表写入 data.yaml。
 
     写入格式：
       names:
@@ -67,7 +67,7 @@ def save_classes_to_yaml(yaml_path: Path, names: list[str]) -> None:
         1: car
         ...
       nc: <数目>
-    保留 config.yaml 中其他已有字段。
+    保留 data.yaml 中其他已有字段。
     """
     data = {}
     if yaml_path.exists():
@@ -97,7 +97,7 @@ def reload_cfg(cfg_module_path: str = 'src.config') -> dict:
 
 def override_classes_in_cfg(cfg: dict, yaml_path: Path) -> dict:
     """
-    用 config.yaml 中的 names 覆盖 cfg['project']['classes']。
+    用 data.yaml 中的 names 覆盖 cfg['project']['classes']。
     返回被修改的 cfg（原地修改）。
     """
     if not yaml_path.exists():
@@ -218,11 +218,11 @@ def init_project_structure(base_path=None) -> list:
         if not p.exists():
             p.mkdir(parents=True, exist_ok=True)
             created.append(d)
-    dy = root / 'datasets' / 'config.yaml'
+    dy = root / 'data.yaml'
     if not dy.exists():
         try:
             dy.write_text('names:\n  0: object\nnc: 1\n', encoding='utf-8')
-            created.append('datasets/config.yaml')
+            created.append('data.yaml')
         except:
             pass
     return created

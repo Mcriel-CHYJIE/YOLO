@@ -16,6 +16,7 @@
     <item><widget class="QScrollArea" name="leftScroll">
      <property name="widgetResizable"><bool>true</bool></property>
      <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
      <property name="fixedWidth"><number>280</number></property>
      <widget class="QWidget" name="leftPanel">
       <layout class="QVBoxLayout" name="leftLo">
@@ -243,10 +244,6 @@
           </widget></item>
          </layout></item>
 
-         <item><widget class="QLabel" name="statsSummary">
-          <property name="text"><string>0 images · 0 instances</string></property>
-         </widget></item>
-
          <item><widget class="QWidget" name="statsContainer" native="true">
           <layout class="QVBoxLayout" name="statsContainerLo">
            <property name="spacing"><number>4</number></property>
@@ -256,10 +253,17 @@
            <property name="bottomMargin"><number>0</number></property>
           </layout>
          </widget></item>
+
+         <item><widget class="QLabel" name="statsSummary">
+          <property name="text"><string>0 images · 0 instances</string></property>
+         </widget></item>
         </layout>
        </widget></item>
 
-       <item><spacer name="leftSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+       <item><spacer name="leftSpacer">
+        <property name="orientation"><enum>Qt::Vertical</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+       </spacer></item>
       </layout>
      </widget>
     </widget></item>
@@ -305,6 +309,7 @@
     <item><widget class="QScrollArea" name="rightScroll">
      <property name="widgetResizable"><bool>true</bool></property>
      <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
      <property name="fixedWidth"><number>280</number></property>
      <widget class="QWidget" name="rightPanel">
       <layout class="QVBoxLayout" name="rightLo">
@@ -350,26 +355,7 @@
           </layout>
          </widget></item>
 
-         <!-- Separator -->
-         <item><widget class="QFrame" name="classSep1">
-          <property name="frameShape"><enum>QFrame::HLine</enum></property>
-          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
-         </widget></item>
-
-         <!-- Shortcut inputs grid (4 columns) -->
-         <item><layout class="QGridLayout" name="shortcutGrid">
-          <property name="spacing"><number>4</number></property>
-          <!-- Row 0: Labels (filled by Python) -->
-          <!-- Row 1: Inputs (filled by Python) -->
-         </layout></item>
-
-         <!-- Separator -->
-         <item><widget class="QFrame" name="classSep2">
-          <property name="frameShape"><enum>QFrame::HLine</enum></property>
-          <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
-         </widget></item>
-
-         <!-- Delete / Clear buttons -->
+        <!-- Delete / Clear buttons -->
          <item><layout class="QHBoxLayout" name="actionBtnRow">
           <property name="spacing"><number>5</number></property>
           <item><widget class="QPushButton" name="delBtn">
@@ -379,12 +365,6 @@
            <property name="text"><string>Clear</string></property>
           </widget></item>
          </layout></item>
-
-         <!-- Hint -->
-         <item><widget class="QLabel" name="shortcutHint">
-          <property name="text"><string>Click input to set key | Click buttons to select class</string></property>
-          <property name="alignment"><enum>Qt::AlignCenter</enum></property>
-         </widget></item>
 
          <!-- Separator -->
          <item><widget class="QFrame" name="classSep3">
@@ -427,7 +407,10 @@
         </layout>
        </widget></item>
 
-       <item><spacer name="rightSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+       <item><spacer name="rightSpacer">
+        <property name="orientation"><enum>Qt::Vertical</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+      </spacer></item>
       </layout>
      </widget>
     </widget></item>

@@ -36,7 +36,8 @@ _DEFAULT_PATHS = {
     'train_output': '',
     'predict_output': '',
     'dataset_dir': '',
-    'preproc_dir': '',
+    'preproc_before': '',
+    'preproc_after': '',
     'label_dir': '',
     'export_dir': '',
     'models_dir': '',
@@ -62,7 +63,8 @@ def check_paths() -> list:
         'train_output': 'Training output',
         'predict_output': 'Predict output',
         'dataset_dir': 'Dataset dir',
-        'preproc_dir': 'Preprocess dir',
+        'preproc_before': 'Preproc input',
+        'preproc_after': 'Preproc output',
         'label_dir': 'Label dir',
         'export_dir': 'Export dir',
         'models_dir': 'Models dir',
@@ -79,7 +81,7 @@ def _setup_models_dir():
 _setup_models_dir()
 _FALLBACK = {
     'project': {'name': 'YOLO Studio', 'task': 'detect', 'classes': ['object'],
-                'data_yaml': 'config.yaml'},
+                'data_yaml': 'data.yaml'},
     'training': {'model': 'yolov8n.pt'},
     'predict': {'conf': 0.25},
     'export': {'format': 'onnx'},
@@ -97,8 +99,8 @@ def _load_raw():
 # ── Singleton config ──
 cfg = _load_raw()
 
-# ── Override classes from datasets/config.yaml (single source of truth for class names) ──
-_DATAYAML_PATH = ROOT / cfg['project'].get('data_yaml', 'config.yaml')
+# ── Override classes from data.yaml (single source of truth for class names) ──
+_DATAYAML_PATH = ROOT / cfg['project'].get('data_yaml', 'data.yaml')
 if _DATAYAML_PATH.exists():
     try:
         with open(_DATAYAML_PATH, encoding='utf-8') as f:

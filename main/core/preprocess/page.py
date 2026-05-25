@@ -24,12 +24,12 @@ class PreprocessTab(QWidget):
 
     @property
     def _before_root(self):
-        p = load_paths().get('preproc_dir', '')
-        return Path(p) / 'before' if p else Path()
+        p = load_paths().get('preproc_before', '')
+        return Path(p) if p else Path()
     @property
     def _after_root(self):
-        p = load_paths().get('preproc_dir', '')
-        return Path(p) / 'after' if p else Path()
+        p = load_paths().get('preproc_after', '')
+        return Path(p) if p else Path()
 
     def _build_ui(self):
         ui_path = Path(__file__).resolve().parent / 'preprocess.ui'

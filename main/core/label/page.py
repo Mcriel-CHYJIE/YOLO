@@ -382,7 +382,6 @@ class LabelTab(QWidget):
         self._export_worker = None
         self._class_ids = []
         self._class_btns = []
-        self._shortcut_inputs = {}
         self._shortcut_keys = {}
 
     # ═══════════════ UI LOADING ═══════════════
@@ -402,6 +401,12 @@ class LabelTab(QWidget):
         self.canvasPlaceholder.deleteLater()
 
         # ── Delete confirm styles ──
+        self.centerLo.setAlignment(self.deleteConfirm, Qt.AlignBottom)
+        self.deleteConfirm.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.deleteConfirm.setMaximumHeight(48)
+        self.deleteLo.setStretch(0, 1)   # confirmMsg 填满
+        self.deleteLo.setStretch(1, 0)   # confirmYesBtn 紧凑
+        self.deleteLo.setStretch(2, 0)   # confirmNoBtn 紧凑
         self.deleteConfirm.setStyleSheet(
             "background:#fff3cd;border:1px solid #ffc107;border-radius:6px;")
         self.confirmMsg.setStyleSheet(
@@ -431,8 +436,8 @@ class LabelTab(QWidget):
         self.modeContainer.setStyleSheet(
             "QFrame{background:transparent;border:1px solid #d4d4d4;border-radius:5px;}")
 
-        # ── Build shortcut inputs in the right panel ──
-        self._build_shortcut_inputs()
+        # ── Build class buttons ──
+        self._build_class_buttons()
 
         # ── Load shortcut keys ──
         self._shortcut_keys = lbsvc.load_shortcut_keys()
@@ -445,6 +450,11 @@ class LabelTab(QWidget):
 
     def _apply_widget_styles(self):
         """应用需匹配当前主题的样式（从 base 模块读取常量）"""
+        # ── 左右面板 QGroupBox 固定自然高度，spacer 吸收剩余空间 ──
+        for g in (self.sourceGroup, self.modelGroup, self.statsGroup,
+                  self.annGroup, self.classGroup):
+            g.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+
         # Source section labels
         self.countLabel.setStyleSheet(f"font-size:10px;color:{TEXT3};font-weight:500;")
         self.annotatedLabel.setStyleSheet(f"font-size:10px;color:{GREEN};font-weight:600;")
@@ -455,8 +465,7 @@ class LabelTab(QWidget):
             f"font-size:9px;color:{TEXT2};font-weight:500;padding:3px 5px;"
             f"background:{BG};border-radius:3px;border:1px solid {BORDER};")
         # Separators
-        for sep in (self.sourceSep, self.exportSep, self.classSep1,
-                    self.classSep2, self.classSep3):
+        for sep in (self.sourceSep, self.exportSep, self.classSep3):
             sep.setStyleSheet(f"background:{BORDER};")
         # Stats header
         for hdr in (self.statsHeaderClass, self.statsHeaderCount,
@@ -468,8 +477,6 @@ class LabelTab(QWidget):
         self.statsSummary.setStyleSheet(
             f"font-size:9px;color:{TEXT3};padding:4px 6px;background:{BG};"
             f"border-radius:4px;border:1px solid {BORDER};")
-        # Shortcut hint
-        self.shortcutHint.setStyleSheet(f"font-size:8px;color:{TEXT3};font-style:italic;")
         # Delete/Clear buttons
         common_btn_style = (
             f"QPushButton{{background:{BG};border:1px solid {BORDER};border-radius:5px;"
@@ -511,8 +518,6 @@ class LabelTab(QWidget):
         self.trainLabel.setMinimumWidth(32)
         self.valLabel2.setMinimumWidth(24)
         self.valLabel.setStyleSheet(f"font-size:10px;color:{TEXT3};font-weight:600;")
-
-        # Info row
         self.imgNameLabel.setStyleSheet(f"font-size:10px;font-weight:500;color:{TEXT};")
         self.annCountLabel.setStyleSheet(f"font-size:9px;color:{TEXT2};")
 
@@ -532,40 +537,6 @@ class LabelTab(QWidget):
         """用 objectName 注册代码中引用的 widget 别名（兼容旧代码引用方式）"""
         # Source section already has objectName access via self.<name>
         pass
-
-    def _build_shortcut_inputs(self):
-        """在 shortcutGrid 中填入快捷键输入框"""
-        # Clear existing
-        lo = self.shortcutGrid
-        while lo.count():
-            item = lo.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        shortcuts = [
-            ("Prev", "prev", "A"),
-            ("Next", "next", "D"),
-            ("Del Box", "delete_box", "W"),
-            ("Del Img", "delete_img", "S"),
-        ]
-        for idx, (label, key, default) in enumerate(shortcuts):
-            lbl = QLabel(label)
-            lbl.setStyleSheet(f"font-size:9px;color:{TEXT2};font-weight:500;")
-            lo.addWidget(lbl, 0, idx * 2)
-
-            inp = QLineEdit()
-            inp.setMinimumHeight(24)
-            inp.setAlignment(Qt.AlignCenter)
-            inp.setStyleSheet(
-                f"QLineEdit{{background:{BG};border:1px solid {BORDER};border-radius:4px;"
-                f"color:{TEXT};font-size:10px;padding:2px;}}"
-                f"QLineEdit:focus{{border-color:{PRI};}}")
-            inp.installEventFilter(self)
-            inp.setProperty("shortcut_key", key)
-            inp.setReadOnly(True)
-            inp.setText(self._shortcut_keys.get(key, default))
-            lo.addWidget(inp, 0, idx * 2 + 1)
-            self._shortcut_inputs[key] = inp
 
     def _connect_signals(self):
         """连接信号"""
@@ -754,8 +725,6 @@ class LabelTab(QWidget):
     def keyPressEvent(self, event):
         if hasattr(self, 'deleteConfirm') and self.deleteConfirm.isVisible():
             return event.ignore()
-        if not hasattr(self, '_shortcut_inputs') or not self._shortcut_inputs:
-            return super().keyPressEvent(event)
 
         key = event.key()
         prev_key = self._shortcut_keys.get('prev', 'A')
@@ -845,10 +814,10 @@ class LabelTab(QWidget):
         boxes = len(self.canvas.annotations)
         self._pending_delete_path = current_path
         self.confirmMsg.setText(
-            f"Delete this image and{' its' if boxes else ''} config? "
-            f"<b>{current_path.name}</b> "
-            f"({boxes} box{'es' if boxes != 1 else ''}) — This cannot be undone.")
+            f"Delete <b>{current_path.name}</b>?"
+            f" ({boxes} box{'es' if boxes != 1 else ''})")
         self.deleteConfirm.setVisible(True)
+        self.deleteConfirm.raise_()
 
     def _confirm_delete_image(self):
         self.deleteConfirm.setVisible(False)
@@ -978,7 +947,7 @@ class LabelTab(QWidget):
                 class_counts[ann.class_id] = class_counts.get(ann.class_id, 0) + 1
                 total_boxes += 1
 
-        self.statsSummary.setText(f"{total_images} images · {total_boxes} instances")
+        self.statsSummary.setText(f"images {total_images} · boxes {total_boxes}")
 
         if class_counts:
             for class_id in sorted(class_counts.keys()):

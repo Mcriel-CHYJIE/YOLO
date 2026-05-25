@@ -12,8 +12,8 @@ from main.config import cfg, THEME_FILE, SHORTCUTS_FILE, load_paths
 from main.core.settings import service as svc
 
 # ── 路径常量 ──
-ROOT = Path(__file__).resolve().parent.parent.parent
-_DATA_YAML_REL = cfg['project'].get('data_yaml', 'datasets/config.yaml')
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_DATA_YAML_REL = cfg['project'].get('data_yaml', 'data.yaml')
 DATA_YAML = Path(str(_DATA_YAML_REL))
 if not DATA_YAML.is_absolute():
     DATA_YAML = ROOT / DATA_YAML
@@ -116,7 +116,8 @@ class SettingsTab(QWidget):
         ('train_output', 'Training output'),
         ('predict_output', 'Predict output'),
         ('dataset_dir', 'Dataset dir'),
-        ('preproc_dir', 'Preprocess dir'),
+        ('preproc_before', 'Preproc input'),
+        ('preproc_after', 'Preproc output'),
         ('label_dir', 'Label dir'),
         ('export_dir', 'Export dir'),
         ('models_dir', 'Models dir'),
@@ -230,7 +231,7 @@ class SettingsTab(QWidget):
         try:
             # ── 业务逻辑 ──
             svc.save_classes_to_yaml(DATA_YAML, names)
-            cfg_mod = svc.reload_cfg('src.config')
+            cfg_mod = svc.reload_cfg('main.config')
             svc.override_classes_in_cfg(cfg_mod, DATA_YAML)
 
             # ── UI 响应 ──
@@ -246,7 +247,7 @@ class SettingsTab(QWidget):
             self._load_shortcuts()
 
             self.statusLabel.setStyleSheet(f'font-size:10px;color:{GREEN};')
-            self.statusLabel.setText(f'Saved — {len(names)} categories (datasets/config.yaml)')
+            self.statusLabel.setText(f'Saved — {len(names)} categories (data.yaml)')
         except Exception as e:
             self.statusLabel.setStyleSheet(f'font-size:10px;color:{RED};')
             self.statusLabel.setText(f'Save failed: {e}')
@@ -334,17 +335,18 @@ class SettingsTab(QWidget):
     # ═══════════════════════════════════════════
 
     def _rebuild_cls_shortcuts(self, classes):
-        """重建类别快捷键行"""
+        """重建类别快捷键行（紧凑单列布局）"""
         container = self.classShortcutsContainer
-        lo = container.layout()
-        if lo is None:
-            lo = QVBoxLayout(container)
-            lo.setContentsMargins(0, 0, 0, 0)
-            lo.setSpacing(3)
-        else:
-            while lo.count():
-                w = lo.takeAt(0).widget()
-                if w: w.deleteLater()
+
+        old_lo = container.layout()
+        if old_lo:
+            temp = QWidget()
+            temp.setLayout(old_lo)
+            temp.deleteLater()
+
+        lo = QVBoxLayout(container)
+        lo.setContentsMargins(0, 0, 0, 0)
+        lo.setSpacing(1)
 
         remove_keys = [k for k in self._shortcut_widgets if k.startswith('cls_')]
         for k in remove_keys:
@@ -356,13 +358,13 @@ class SettingsTab(QWidget):
                     'X','C','V','B','N','M']
         for i, cls_name in enumerate(classes):
             row = QHBoxLayout()
-            row.setContentsMargins(4, 2, 4, 2)
+            row.setContentsMargins(4, 0, 4, 0)
             row.setSpacing(4)
-            row.setAlignment(Qt.AlignTop)
             lbl = QLabel(cls_name)
             lbl.setStyleSheet(f'font-size:9px;color:{TEXT};')
             inp = QLineEdit()
-            inp.setMinimumHeight(22)
+            inp.setMinimumHeight(18)
+            inp.setMaximumHeight(18)
             inp.setAlignment(Qt.AlignCenter)
             inp.setReadOnly(True)
             inp.setProperty('shortcut_key', f'cls_{i}')
@@ -376,6 +378,7 @@ class SettingsTab(QWidget):
             row.addWidget(inp)
             lo.addLayout(row)
             self._shortcut_widgets[f'cls_{i}'] = inp
+        lo.addStretch(1)  # 占满剩余空间，行都挤到顶部
 
     # ═══════════════════════════════════════════
     # 快捷键读取/写入（委托 service 层）
@@ -405,7 +408,8 @@ class SettingsTab(QWidget):
             'train_output': 'runs',
             'predict_output': 'output',
             'dataset_dir': 'datasets',
-            'preproc_dir': 'original',
+            'preproc_before': 'original/before',
+            'preproc_after': 'original/after',
             'label_dir': 'original',
             'export_dir': 'output',
             'models_dir': 'models',

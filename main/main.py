@@ -29,10 +29,11 @@ from main.core.guide import GuideTab
 from main.core.export import ExportTab
 from main.core.settings import SettingsTab
 from main.core.agent import AgentTab
+from main.core.tools import ToolsTab
 from main.core.base import *
 
 
-SIDE_W = 130  # 侧边栏宽度
+SIDE_W = 110  # 侧边栏宽度
 NAV_ITEMS = [
     ('🎯  Training',   'training'),
     ('👁️  Predict',   'predict'),
@@ -42,6 +43,7 @@ NAV_ITEMS = [
     ('🔬  Distill',    'distill'),
     ('📦  Export',     'export'),
     ('🤖  AI Agent',   'agent'),
+    ('🛠  Tools',      'tools'),
     ('⚙️  Settings',   'settings'),
     ('📖  Guide',      'guide'),
 ]
@@ -287,6 +289,7 @@ class Studio(QMainWindow):
             ('distill',    DistillTab(self)),
             ('export',     ExportTab(self)),
             ('agent',      AgentTab(self)),
+            ('tools',      ToolsTab(self)),
             ('settings',   SettingsTab(self)),
             ('guide',      GuideTab(self)),
         ]
