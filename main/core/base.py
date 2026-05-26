@@ -11,7 +11,7 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-from main.config import cfg, THEME_FILE
+from main.config import cfg, THEME_FILE, DATA_YAML
 
 # ── 主题加载（必须在颜色常量之前）──
 _IS_DARK = False
@@ -50,7 +50,6 @@ else:
     SCROLL_H = '#c0c0c0'
     SCROLL_HH = '#a0a0a0'
 IS_FALL = any(k.lower() in ('fallen', 'fall') for k in cfg['project']['classes'])
-DATA_YAML = str(ROOT / cfg['project']['data_yaml'])
 TITLE = cfg['project']['name']
 CLASSES = cfg['project']['classes']
 CLASS_NAMES = cfg['project'].get('names', {i: name for i, name in enumerate(CLASSES)})

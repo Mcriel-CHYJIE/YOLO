@@ -8,7 +8,7 @@
 
 from PyQt5 import uic
 from main.core.base import *
-from main.config import cfg, THEME_FILE, SHORTCUTS_FILE, load_paths
+from main.config import cfg, THEME_FILE, SHORTCUTS_FILE, load_paths, get_data_yaml
 from main.core.settings import service as svc
 
 # ── 路径常量 ──
@@ -17,6 +17,13 @@ _DATA_YAML_REL = cfg['project'].get('data_yaml', 'data.yaml')
 DATA_YAML = Path(str(_DATA_YAML_REL))
 if not DATA_YAML.is_absolute():
     DATA_YAML = ROOT / DATA_YAML
+# 运行时优先用 dataset_dir/data.yaml
+if not DATA_YAML.exists():
+    _ds = load_paths().get('dataset_dir', '')
+    if _ds and Path(_ds).exists():
+        _candidate = Path(_ds) / 'data.yaml'
+        if _candidate.exists():
+            DATA_YAML = _candidate
 
 DARK_QSS = """\
 QMainWindow,QWidget{background:#1e1e1e;}
@@ -132,8 +139,7 @@ class SettingsTab(QWidget):
         #   classShortcutsContainer, ssToggleHost, themeToggleHost,
         #   initBtn, initStatus
 
-    def _post_process_ui(self):
-        """替换占位 widget 为真实组件，安装事件过滤器"""
+        # ── 快捷键输入框安装事件过滤器 ──
         nav_keys = [('shortcutPrev', 'prev'), ('shortcutNext', 'next'),
                      ('shortcutDelBox', 'delete_box'), ('shortcutDelImg', 'delete_img')]
         for obj_name, key in nav_keys:
@@ -141,6 +147,26 @@ class SettingsTab(QWidget):
             inp.setProperty('shortcut_key', key)
             inp.installEventFilter(self)
             self._shortcut_widgets[key] = inp
+
+    def _post_process_ui(self):
+        """UI 初始化后处理"""
+        # ── hintLabel 自适应多行 ──
+        self.hintLabel.setWordWrap(True)
+        self.hintLabel.setMinimumHeight(0)
+        self.hintLabel.setMaximumHeight(16777215)
+
+        # ── 将 saveBtn 替换为行：saveBtn + refreshBtn ──
+        self.refreshBtn = QPushButton('↻ Refresh')
+        self.refreshBtn.setObjectName('sec')
+        self.refreshBtn.setFixedHeight(26)
+        self.saveBtn.setFixedHeight(26)
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        row.addWidget(self.saveBtn)
+        row.addWidget(self.refreshBtn)
+        idx = self.classGroupLo.indexOf(self.saveBtn)
+        self.classGroupLo.removeWidget(self.saveBtn)
+        self.classGroupLo.insertLayout(idx, row)
 
         # ── 替换屏保/主题占位 QWidget 为 _ToggleSwitch ──
         self._ss_toggle = self._replace_widget_with_toggle('ssToggleHost')
@@ -190,6 +216,7 @@ class SettingsTab(QWidget):
     def _connect_signals(self):
         """连接信号"""
         self.saveBtn.clicked.connect(self._save)
+        self.refreshBtn.clicked.connect(self._load)
         self.shortcutSaveBtn.clicked.connect(self._save_shortcuts)
         self._ss_toggle.toggled.connect(self._on_ss_toggle)
         self._theme_toggle.toggled.connect(self._on_theme_toggle)
@@ -203,7 +230,8 @@ class SettingsTab(QWidget):
     def _load(self):
         """从 service 层读取类别数据，填充 UI"""
         try:
-            classes = svc.load_classes_from_yaml(DATA_YAML)
+            dy = Path(get_data_yaml())
+            classes = svc.load_classes_from_yaml(dy) if dy.exists() else []
             if not classes:
                 classes = cfg['project'].get('classes', [])
         except Exception:
@@ -230,9 +258,10 @@ class SettingsTab(QWidget):
 
         try:
             # ── 业务逻辑 ──
-            svc.save_classes_to_yaml(DATA_YAML, names)
+            save_path = Path(get_data_yaml() or DATA_YAML)
+            svc.save_classes_to_yaml(save_path, names)
             cfg_mod = svc.reload_cfg('main.config')
-            svc.override_classes_in_cfg(cfg_mod, DATA_YAML)
+            svc.override_classes_in_cfg(cfg_mod, save_path)
 
             # ── UI 响应 ──
             import importlib
@@ -468,6 +497,9 @@ class SettingsTab(QWidget):
         for key, inp in self._path_widgets.items():
             paths[key] = inp.text()
         svc.save_paths(paths)
+        # 保存后重新加载 data.yaml 的类别名称
+        if paths.get('dataset_dir'):
+            self._load()
         self.pathsStatus.setStyleSheet(f'font-size:9px;color:{GREEN};')
         self.pathsStatus.setText('Directories saved')
         QTimer.singleShot(2000, lambda: self.pathsStatus.setText(''))

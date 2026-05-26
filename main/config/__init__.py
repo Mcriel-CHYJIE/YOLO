@@ -18,14 +18,18 @@ JSON config files (attention, shortcuts, theme) are stored in this directory.
 
 import yaml
 import json
+import os, sys
 from pathlib import Path
 from ultralytics import settings as _ultra_settings
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = Path(__file__).resolve().parent.parent / 'project.yaml'
 
-# ── JSON 配置文件路径（统一在 main/config/ 下） ──
-_CFG_DIR = Path(__file__).resolve().parent
+# ── JSON 配置文件路径（frozen 时存到 %APPDATA% 避免重装丢失） ──
+if getattr(sys, 'frozen', False):
+    _CFG_DIR = Path(os.environ.get('APPDATA', ROOT)) / 'YOLO Training Studio'
+else:
+    _CFG_DIR = Path(__file__).resolve().parent
 ATTENTION_FILE = _CFG_DIR / 'attention.json'
 THEME_FILE = _CFG_DIR / 'theme.json'
 SHORTCUTS_FILE = _CFG_DIR / 'shortcuts.json'
@@ -99,22 +103,49 @@ def _load_raw():
 # ── Singleton config ──
 cfg = _load_raw()
 
-# ── Override classes from data.yaml (single source of truth for class names) ──
-_DATAYAML_PATH = ROOT / cfg['project'].get('data_yaml', 'data.yaml')
-if _DATAYAML_PATH.exists():
-    try:
-        with open(_DATAYAML_PATH, encoding='utf-8') as f:
-            dy = yaml.safe_load(f) or {}
-        dy_names = dy.get('names', {})
-        if dy_names:
-            sorted_keys = sorted(dy_names, key=lambda k: int(k) if isinstance(k, str) else k)
-            cfg['project']['classes'] = [dy_names[k] for k in sorted_keys]
-            cfg['project']['names'] = {i: n for i, n in enumerate(cfg['project']['classes'])}
-    except Exception:
-        pass  # fall back to project.yaml values
+# ══════════════════════════════════════════════════════════════
+# DATA_YAML — 运行时按需解析（只用 dataset_dir/data.yaml）
+# ══════════════════════════════════════════════════════════════
 
-# ── Ensure classes always exists ──
-if 'classes' not in cfg['project']:
-    cfg['project']['classes'] = ['object']
-if 'names' not in cfg['project']:
-    cfg['project']['names'] = {0: 'object'}
+def get_data_yaml() -> str:
+    """返回 dataset_dir/data.yaml（用户通过 Settings 配置）"""
+    ds = load_paths().get('dataset_dir', '')
+    if ds:
+        return str(Path(ds) / 'data.yaml')
+    return ''
+
+class _DataYamlProxy(str):
+    """延迟计算 DATA_YAML，兼容 str 操作"""
+    def __new__(cls):
+        return str.__new__(cls, '')
+    def __str__(self):
+        return get_data_yaml()
+    def __repr__(self):
+        return get_data_yaml()
+    def __eq__(self, other):
+        return str(self) == str(other) if isinstance(other, (str, _DataYamlProxy)) else NotImplemented
+
+DATA_YAML = _DataYamlProxy()
+
+# ── 从 data.yaml 初始化 classes（如果 data.yaml 已存在） ──
+def _load_classes_from_data():
+    """加载 data.yaml 中的类别名称到 cfg"""
+    p = Path(get_data_yaml())
+    if p.exists():
+        try:
+            with open(p, encoding='utf-8') as f:
+                dy = yaml.safe_load(f) or {}
+            dy_names = dy.get('names', {})
+            if dy_names:
+                sk = sorted(dy_names, key=lambda k: int(k) if isinstance(k, str) else k)
+                cfg['project']['classes'] = [dy_names[k] for k in sk]
+                cfg['project']['names'] = {i: n for i, n in enumerate(cfg['project']['classes'])}
+                return
+        except Exception:
+            pass
+    cfg.setdefault('project', {})
+    cfg['project'].setdefault('classes', ['object'])
+    cfg['project'].setdefault('names', {0: 'object'})
+
+_load_classes_from_data()
+

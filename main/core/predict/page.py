@@ -119,7 +119,9 @@ class PredictTab(QWidget):
         if w: self.lbl_model.setText(f'[{Path(w).name}]'); self._model_path = Path(w)
 
     def _browse_model(self):
-        p, _ = QFileDialog.getOpenFileName(self, 'Select Model', 'runs', MODEL_FILTER)
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Model', 'runs', MODEL_FILTER, options=opts)
         if p: self._model_path = Path(p); self.lbl_model.setText(f'[{self._model_path.name}]')
 
     def _browse_src(self):

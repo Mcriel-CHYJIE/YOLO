@@ -20,16 +20,32 @@ def build_train_config(
     translate_val, scale_val, cls_pw_val,
 ) -> dict:
     """从 UI 控件值构建训练参数字典"""
+    print(f'[build_train_config] entered', flush=True)
     if lr0_val <= 0:
         lr0_val = 0.001
+    print(f'[build_train_config] cfg.get', flush=True)
     g = cfg.get('training', {})
+    print(f'[build_train_config] model_name={model_current_text}', flush=True)
     model_name = model_current_text
     if model_name.endswith('.yaml'):
         model_path = model_name
     else:
-        local = Path(load_paths().get('models_dir', str(ROOT / 'models'))) / model_name
-        model_path = str(local) if local.exists() else model_name
-    return dict(
+        print(f'[build_train_config] resolving model path...', flush=True)
+        _p = load_paths()
+        print(f'[build_train_config] paths={_p}', flush=True)
+        _md = _p.get('models_dir', str(ROOT / 'models'))
+        print(f'[build_train_config] models_dir={_md}', flush=True)
+        try:
+            local = Path(_md) / model_name
+            print(f'[build_train_config] local={local}', flush=True)
+            _exists = local.exists()
+            print(f'[build_train_config] exists={_exists}', flush=True)
+            model_path = str(local) if _exists else model_name
+        except Exception as _e:
+            print(f'[build_train_config] Path error: {_e}', flush=True)
+            model_path = model_name
+    print(f'[build_train_config] building dict...', flush=True)
+    result = dict(
         model=model_path, epochs=ep_val, batch=bs_val, imgsz=int(sz_text),
         lr0=lr0_val, lrf=lrf_val, optimizer=opt_text, patience=pt_val,
         device='0' if studio_gpu_ok and dev_idx == 0 else 'cpu',
@@ -43,6 +59,9 @@ def build_train_config(
         hsv_h=hsv_h_val, hsv_s=hsv_s_val, hsv_v=hsv_v_val,
         translate=translate_val, scale=scale_val,
     )
+    _mdl = result.get('model', '?')
+    print(f'[build_train_config] done, model={_mdl}', flush=True)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════
@@ -70,8 +89,12 @@ class Trainer(QObject):
         return self._thread is not None and self._thread.is_alive()
 
     def start(self):
+        print(f'[Trainer] start() called', flush=True)
+        threading.stack_size(4 * 1024 * 1024)
         self._thread = threading.Thread(target=self._run, daemon=True)
+        print(f'[Trainer] thread created, starting...', flush=True)
         self._thread.start()
+        print(f'[Trainer] thread started, id={self._thread.ident}', flush=True)
 
     def _check_gpu_memory(self):
         if not torch.cuda.is_available(): return None
@@ -108,7 +131,8 @@ class Trainer(QObject):
 
     def _run(self):
         import sys
-        torch.set_num_threads(1)  # 限制 PyTorch 内部线程，避免栈竞争
+        print(f'[Trainer] _run entered', flush=True)
+        torch.set_num_threads(1)
         original_stdout = sys.stdout; original_stderr = sys.stderr
         try:
             sys.stdout = self.stdout_emitter; sys.stderr = self.stderr_emitter
@@ -164,7 +188,7 @@ class Trainer(QObject):
                     self.chart.emit()
                 except: pass
             m.add_callback('on_train_epoch_end', cb)
-            train_args = dict(data=DATA_YAML, epochs=cfg['epochs'], batch=cfg['batch'], imgsz=cfg['imgsz'],
+            train_args = dict(data=str(DATA_YAML), epochs=cfg['epochs'], batch=cfg['batch'], imgsz=cfg['imgsz'],
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
                 device=cfg['device'], warmup_epochs=cfg.get('warmup_epochs', 3), warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
                 momentum=cfg.get('momentum', 0.937), weight_decay=cfg.get('weight_decay', 0.0005),

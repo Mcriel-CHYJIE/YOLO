@@ -20,6 +20,7 @@ TAB_GUIDES = [
             ('Learning Rate', 'LR=0.001-0.002, LRF=0.01, Warmup=15。续训时 LR 降 10 倍至 0.0001, Warmup=1'),
             ('Scheduler', 'Cosine（余弦退火，平滑衰减） / Linear（线性衰减）。续训推荐 Linear'),
             ('Augmentation', 'Rotation=15°, IoU=0.7, Close Mosaic=30, Copy-Paste=0.3, cls_pw=0.75'),
+            ('Attention Injection (Settings → 第三列下拉)', '在训练前向 YOLO 的 C2f 模块注入注意力机制——SE（Squeeze-and-Excitation，轻量通道注意力，~2C/r 参数）、CBAM（通道+空间双注意力，精度提升最稳）、CA（Coordinate Attention，位置编码，小目标友好）。零推理成本：训练后导出不含注意力模块，不影响部署速度。'),
             ('Start Training', '点击 Start Training 按钮。参数自动锁定，停止/中断后恢复'),
             ('Monitor', '训练中实时查看 Loss Chart（红色曲线）和 mAP Chart（绿色曲线）'),
             ('Auto-Save', '每轮自动保存 best.pt / last.pt，best.pt 保留 mAP 最高的 epoch'),

@@ -95,15 +95,21 @@ class DistillTab(QWidget):
         self.de_mom.setValue(d['momentum'])
 
     def _browse_teacher(self):
-        p, _ = QFileDialog.getOpenFileName(self, 'Select Teacher Model', str(ROOT / 'runs/detect/runs'), MODEL_FILTER)
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Teacher Model', str(ROOT / 'runs/detect/runs'), MODEL_FILTER, options=opts)
         if p: self.de_teacher.setText(p)
 
     def _browse_student(self):
-        p, _ = QFileDialog.getOpenFileName(self, 'Select Student Model', str(ROOT / 'runs/detect/runs'), MODEL_FILTER)
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Student Model', str(ROOT / 'runs/detect/runs'), MODEL_FILTER, options=opts)
         if p: self.de_student.setText(p)
 
     def _browse_data(self):
-        p, _ = QFileDialog.getOpenFileName(self, 'Select Data YAML', '', 'YAML Files (*.yaml *.yml)')
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Data YAML', '', 'YAML Files (*.yaml *.yml)', options=opts)
         if p: self.de_data.setText(p)
 
     def _ds(self):

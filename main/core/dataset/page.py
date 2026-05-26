@@ -137,6 +137,7 @@ class DatasetTab(QWidget):
         self.dp_status.setText(' | '.join(status_parts))
 
     def _update_class_stats(self, cls_counter, total_imgs):
+        from main.core.base import CLASSES
         self._clear_layout(self._cs_grid)
         for i, (cid, cnt) in enumerate(sorted(cls_counter.items())):
             color = self.COLORS[cid % len(self.COLORS)]
@@ -185,6 +186,7 @@ class DatasetTab(QWidget):
         self._clear_layout(self.dp_gl)
 
     def _make_card(self, img_path, lbl_path):
+        from main.core.base import CLASSES
         card = QWidget(); card.setStyleSheet(f'background:{BG};border-radius:6px;')
         hl = QHBoxLayout(card); hl.setContentsMargins(4,4,4,4); hl.setSpacing(6)
         has_lbl = lbl_path.exists() and lbl_path.stat().st_size > 0

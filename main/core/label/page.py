@@ -420,6 +420,14 @@ class LabelTab(QWidget):
             "border-radius:4px;padding:6px 16px;font-size:11px;font-weight:500;}"
             "QPushButton:hover{background:#f8f9fa;}")
 
+        # ── exportStatus 放到进度条下方 ──
+        self.exportStatus.setParent(None)
+        self.exportStatus.setWordWrap(True)
+        self.exportStatus.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # 从 exportStatusRow 中移除，插入到 modelLo 中 exportStatusRow 之后
+        idx = self.modelLo.indexOf(self.exportStatusRow)
+        self.modelLo.insertWidget(idx + 1, self.exportStatus)
+
         # ── Style the toggle buttons ──
         ss_on = "background:#07C160;color:#fff;"
         ss_off = "background:#f5f5f5;color:#78716c;"

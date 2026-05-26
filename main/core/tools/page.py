@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: MIT | See <ROOT>/LICENSE for full text
 # =============================================================================
 
-"""Tools 标签页 — 导入视频到预处理目录"""
+"""Tools 标签页 — 导入视频到预处理目录 + 标签导入导出"""
 
-import shutil
+import shutil, zipfile
 from pathlib import Path
 from PyQt5 import uic
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -103,7 +103,7 @@ class ToolsTab(QWidget):
         self.titleLabel.setFixedHeight(24)
 
         # ── 所有 QGroupBox 统一样式 ──
-        for g in (self.otherGroup, self.otherGroup2, self.otherGroup3):
+        for g in (self.otherGroup, self.otherGroup2, self.otherGroup3, self.otherPlaceholder):
             g.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
             g.setStyleSheet(f'''
                 QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
@@ -112,6 +112,8 @@ class ToolsTab(QWidget):
                 QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
                     background:{CARD};}}
             ''')
+        # Label group 自然高度，替代默认 Preferred
+        self.otherGroup.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         # dataGroup 自然高度
         self.dataGroup.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.dataGroup.setStyleSheet(f'''
@@ -144,6 +146,30 @@ class ToolsTab(QWidget):
             QPushButton:hover{{background:{PRI_H};}}
         ''')
 
+        # ── Label import/export widgets ──
+        self.labelPath.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
+        self.labelStatus.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
+        self.labelFolderCombo.setStyleSheet(f'''
+            QComboBox{{border:1px solid {BORDER};border-radius:4px;
+                padding:2px 6px;background:{CARD};font-size:10px;color:{TEXT};}}
+            QComboBox:focus{{border-color:{PRI};}}
+            QComboBox::drop-down{{border:none;width:16px;}}
+        ''')
+        self.labelExportBtn.setStyleSheet(f'''
+            QPushButton{{background:{PRI};color:#fff;border:none;
+                padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
+            QPushButton:hover{{background:{PRI_H};}}
+            QPushButton:disabled{{background:#a5d6a5;}}
+        ''')
+        self.labelImportBtn.setStyleSheet(f'''
+            QPushButton{{background:{AMBER};color:#fff;border:none;
+                padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
+            QPushButton:hover{{background:#d97706;}}
+            QPushButton:disabled{{background:#fcd34d;}}
+        ''')
+
         # ── Progress bar ──
         self.importProgress.setStyleSheet(f'''
             QProgressBar{{border:none;border-radius:1px;height:3px;
@@ -157,17 +183,34 @@ class ToolsTab(QWidget):
 
     def _connect_signals(self):
         self.importBtn.clicked.connect(self._start_import)
+        self.labelExportBtn.clicked.connect(self._export_label_zip)
+        self.labelImportBtn.clicked.connect(self._import_label_zip)
 
     # ═══════════════════════════════════════════
     # Data Loading
     # ═══════════════════════════════════════════
 
     def _load_paths(self):
-        """从 paths.json 读取 preproc_before 并显示"""
+        """从 paths.json 读取路径并显示"""
         paths = load_paths()
         preproc = paths.get('preproc_before', '')
         self.importPath.setText(preproc)
         self._preproc_dir = preproc
+
+        label_dir = paths.get('label_dir', '')
+        if label_dir:
+            after = Path(label_dir) / 'after'
+            self.labelPath.setText(str(after) if after.exists() else '—')
+            self._label_after = after
+            # 填充子文件夹下拉
+            self.labelFolderCombo.clear()
+            if after.exists():
+                dirs = sorted([d.name for d in after.iterdir() if d.is_dir()])
+                if dirs:
+                    self.labelFolderCombo.addItems(dirs)
+        else:
+            self.labelPath.setText('—')
+            self._label_after = None
 
     # ═══════════════════════════════════════════
     # Import Logic
@@ -219,6 +262,97 @@ class ToolsTab(QWidget):
 
     def _on_import_thread_done(self):
         self.importBtn.setEnabled(True)
+
+    # ═══════════════════════════════════════════
+    # Label Export / Import
+    # ═══════════════════════════════════════════
+
+    def _export_label_zip(self):
+        """将选中的子文件夹压缩为 ZIP"""
+        after = self._label_after
+        if not after or not after.exists():
+            self._set_label_status(RED, 'No after dir configured in Settings')
+            return
+
+        folder_name = self.labelFolderCombo.currentText()
+        if not folder_name:
+            self._set_label_status(RED, 'No folder selected')
+            return
+
+        src_folder = after / folder_name
+        if not src_folder.exists():
+            self._set_label_status(RED, f'Folder not found: {folder_name}')
+            return
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self, 'Export Label ZIP', str(after / f'{folder_name}.zip'),
+            'ZIP Files (*.zip)', options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not save_path:
+            return
+
+        self._set_label_status(AMBER, 'Compressing...')
+        self.labelExportBtn.setEnabled(False)
+        self.labelImportBtn.setEnabled(False)
+        QApplication.processEvents()
+
+        try:
+            with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for f in src_folder.rglob('*'):
+                    if f.is_file():
+                        arcname = str(f.relative_to(after))
+                        zf.write(str(f), arcname)
+            self._set_label_status(GREEN, f'Exported → {Path(save_path).name}')
+        except Exception as e:
+            self._set_label_status(RED, f'Export failed: {e}')
+        finally:
+            self.labelExportBtn.setEnabled(True)
+            self.labelImportBtn.setEnabled(True)
+
+    def _import_label_zip(self):
+        """导入 ZIP 压缩包并解压到 original/after"""
+        after = self._label_after
+        if not after:
+            self._set_label_status(RED, 'No after dir configured in Settings')
+            return
+
+        zip_path, _ = QFileDialog.getOpenFileName(
+            self, 'Import Label ZIP', '', 'ZIP Files (*.zip)',
+            options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not zip_path:
+            return
+
+        self._set_label_status(AMBER, 'Extracting...')
+        self.labelExportBtn.setEnabled(False)
+        self.labelImportBtn.setEnabled(False)
+        QApplication.processEvents()
+
+        try:
+            extracted = 0
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    # 安全解压：防止 zip slip
+                    name = info.filename
+                    if '..' in name or name.startswith('/') or name.startswith('\\'):
+                        continue
+                    dst = (after / name).resolve()
+                    if not str(dst).startswith(str(after.resolve())):
+                        continue
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    zf.extract(info, after)
+                    extracted += 1
+            self._set_label_status(GREEN, f'Extracted {extracted} file(s) to after/')
+        except Exception as e:
+            self._set_label_status(RED, f'Import failed: {e}')
+        finally:
+            self.labelExportBtn.setEnabled(True)
+            self.labelImportBtn.setEnabled(True)
+
+    def _set_label_status(self, color, msg):
+        self.labelStatus.setStyleSheet(f'font-size:9px;color:{color};padding:0;margin:0;')
+        self.labelStatus.setText(msg)
+        self.labelStatus.repaint()
 
     # ═══════════════════════════════════════════
     # 主题刷新

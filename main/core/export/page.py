@@ -1,7 +1,7 @@
 # =============================================================================
+# =============================================================================
 # YOLO Training Studio — 基于 Ultralytics YOLO 的通用目标检测训练平台
 # 学习交流许可 | Copyright (c) 2025 Mcriel-CHYJIE | 禁止商用倒卖
-# SPDX-License-Identifier: MIT | See <ROOT>/LICENSE for full text
 # =============================================================================
 
 """导出标签页"""
@@ -47,7 +47,9 @@ class ExportTab(QWidget):
             self._w.setText(w)
 
     def _browse(self):
-        p, _ = QFileDialog.getOpenFileName(self, 'Select Weights', load_paths().get('train_output', ''), MODEL_FILTER)
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Weights', str(ROOT / 'models'), MODEL_FILTER, options=opts)
         if p:
             self._w.setText(p)
 

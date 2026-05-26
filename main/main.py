@@ -16,8 +16,14 @@ os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
 if sys.platform == 'win32':
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+    elif hasattr(sys.stdout, 'buffer') and sys.stdout.buffer is not None:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+    elif hasattr(sys.stderr, 'buffer') and sys.stderr.buffer is not None:
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from main.core.train import TrainTab
 from main.core.distill import DistillTab
@@ -365,9 +371,12 @@ class Studio(QMainWindow):
         except: pass
         try:
             import subprocess
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             r = subprocess.run(
                 ['nvidia-smi','--query-gpu=utilization.gpu','--format=csv,noheader,nounits'],
-                capture_output=True, text=True, timeout=2)
+                capture_output=True, text=True, timeout=2,
+                startupinfo=si, creationflags=subprocess.CREATE_NO_WINDOW)
             if r.returncode == 0 and r.stdout.strip():
                 gpu = float(r.stdout.strip())
                 if 'GPU' in self._sys_data:

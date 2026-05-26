@@ -159,7 +159,9 @@ class TrainTab(QWidget):
         ATTENTION_FILE.write_text(json.dumps({'type': t}, ensure_ascii=False, indent=2), 'utf-8')
 
     def _config(self):
-        return build_train_config(
+        _ts = lambda: __import__('datetime').datetime.now().strftime('%H:%M:%S.%f')
+        print(f'[{_ts()}] _config: m={self.m.currentText()}', flush=True)
+        r = build_train_config(
             [self.m.itemText(i) for i in range(self.m.count())],
             self.m.currentText(), self.studio.gpu_ok, self.studio.cpu_count,
             self.ep.value(), self.bs.value(), self.sz.currentText(), self.opt.currentText(),
@@ -169,18 +171,33 @@ class TrainTab(QWidget):
             self.ms.isChecked(),
             self.momentum.value(), self.wd.value(), self.hsv_h.value(), self.hsv_s.value(),
             self.hsv_v.value(), self.translate.value(), self.scale.value(), self.cls_pw.value())
+        print(f'[{_ts()}] _config done', flush=True)
+        return r
 
     def _s(self):
+        _ts = lambda: __import__('datetime').datetime.now().strftime('%H:%M:%S.%f')
+        print(f'[{_ts()}] _s called', flush=True)
         if self.trainer and self.trainer.isRunning():
             QMessageBox.warning(self, 'Warning',
                 'Training is in progress, please stop the current training first!'); return
         self.trainer = None
+        print(f'[{_ts()}] disabling UI...', flush=True)
         self.bs1.setEnabled(False); self.bs2.setEnabled(True); self._enable_params(False)
         self.log_panel.clear(); self.pg.setValue(0)
         self._me.setText('0'); self._mm.setText('—'); self._mb.setText('—')
-        self._lc.upd({}); self._mc.upd({})
+        print(f'[{_ts()}] clearing charts...', flush=True)
+        try:
+            self._lc.upd({})
+        except Exception as _e:
+            print(f'[{_ts()}] _lc.upd error: {_e}', flush=True)
+        try:
+            self._mc.upd({})
+        except Exception as _e:
+            print(f'[{_ts()}] _mc.upd error: {_e}', flush=True)
+        print(f'[{_ts()}] building config...', flush=True)
         cfg = self._config()
         self._log(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
+        print(f'[{_ts()}] creating Trainer...', flush=True)
         self.trainer = Trainer(cfg)
         self.trainer.log.connect(self._log)
         self.trainer.status.connect(lambda t, p, b, c, loss: (

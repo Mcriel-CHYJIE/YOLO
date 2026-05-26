@@ -218,13 +218,6 @@ def init_project_structure(base_path=None) -> list:
         if not p.exists():
             p.mkdir(parents=True, exist_ok=True)
             created.append(d)
-    dy = root / 'data.yaml'
-    if not dy.exists():
-        try:
-            dy.write_text('names:\n  0: object\nnc: 1\n', encoding='utf-8')
-            created.append('data.yaml')
-        except:
-            pass
     return created
 
 
