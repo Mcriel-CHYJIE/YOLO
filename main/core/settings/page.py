@@ -155,18 +155,7 @@ class SettingsTab(QWidget):
         self.hintLabel.setMinimumHeight(0)
         self.hintLabel.setMaximumHeight(16777215)
 
-        # ── 将 saveBtn 替换为行：saveBtn + refreshBtn ──
-        self.refreshBtn = QPushButton('↻ Refresh')
-        self.refreshBtn.setObjectName('sec')
-        self.refreshBtn.setFixedHeight(26)
         self.saveBtn.setFixedHeight(26)
-        row = QHBoxLayout()
-        row.setSpacing(6)
-        row.addWidget(self.saveBtn)
-        row.addWidget(self.refreshBtn)
-        idx = self.classGroupLo.indexOf(self.saveBtn)
-        self.classGroupLo.removeWidget(self.saveBtn)
-        self.classGroupLo.insertLayout(idx, row)
 
         # ── 替换屏保/主题占位 QWidget 为 _ToggleSwitch ──
         self._ss_toggle = self._replace_widget_with_toggle('ssToggleHost')
@@ -216,7 +205,6 @@ class SettingsTab(QWidget):
     def _connect_signals(self):
         """连接信号"""
         self.saveBtn.clicked.connect(self._save)
-        self.refreshBtn.clicked.connect(self._load)
         self.shortcutSaveBtn.clicked.connect(self._save_shortcuts)
         self._ss_toggle.toggled.connect(self._on_ss_toggle)
         self._theme_toggle.toggled.connect(self._on_theme_toggle)

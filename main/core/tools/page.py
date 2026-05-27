@@ -68,6 +68,66 @@ class _ImportWorker(QObject):
             self.error.emit(str(e))
 
 
+# ── 压缩包解压辅助函数 ──
+
+def _extract_zip(path, dest):
+    import zipfile
+    count = 0
+    with zipfile.ZipFile(path, 'r') as zf:
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            name = info.filename
+            if '..' in name or name.startswith('/') or name.startswith('\\'):
+                continue
+            dst = (dest / name).resolve()
+            if not str(dst).startswith(str(dest.resolve())):
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            zf.extract(info, dest)
+            count += 1
+    return count
+
+
+def _extract_tar(path, dest):
+    import tarfile
+    count = 0
+    stem = Path(path).name.lower()
+    if stem.endswith('.tar.gz') or stem.endswith('.tgz'):
+        mode = 'r:gz'
+    elif stem.endswith('.tar.bz2'):
+        mode = 'r:bz2'
+    elif stem.endswith('.tar.xz'):
+        mode = 'r:xz'
+    else:
+        mode = 'r'
+    with tarfile.open(path, mode) as tf:
+        for info in tf.getmembers():
+            if not info.isfile():
+                continue
+            name = info.name
+            if '..' in name or name.startswith('/') or name.startswith('\\'):
+                continue
+            dst = (dest / name).resolve()
+            if not str(dst).startswith(str(dest.resolve())):
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            tf.extract(info, dest)
+            count += 1
+    return count
+
+
+def _extract_patool(path, dest):
+    import patoolib
+    patoolib.extract_archive(path, outdir=str(dest))
+    # count extracted files
+    count = 0
+    for f in dest.rglob('*'):
+        if f.is_file():
+            count += 1
+    return count
+
+
 class ToolsTab(QWidget):
     """工具标签页 — 视频导入工具"""
 
@@ -90,6 +150,8 @@ class ToolsTab(QWidget):
         # objectName: titleLabel, colsLo,
         #   col1Lo, dataGroup, importLabel, importPath, importBtn, importProgress, dataStatus,
         #   otherGroup, otherGroup2, otherGroup3
+        #   labelRow, labelLabel, labelFolderCombo, labelExportBtn,
+        #   labelImportRow, labelImportLabel, labelImportPath, labelImportBtn, labelStatus
 
     def _post_process_ui(self):
         """主题适配，stretch 比例"""
@@ -147,8 +209,9 @@ class ToolsTab(QWidget):
         ''')
 
         # ── Label import/export widgets ──
-        self.labelPath.setStyleSheet(
-            f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
+        self.labelLabel.setStyleSheet(
+            f'font-size:10px;font-weight:600;color:{TEXT3};padding:0;margin:0;')
+        self.labelLabel.setFixedHeight(14)
         self.labelStatus.setStyleSheet(
             f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
         self.labelFolderCombo.setStyleSheet(f'''
@@ -157,6 +220,11 @@ class ToolsTab(QWidget):
             QComboBox:focus{{border-color:{PRI};}}
             QComboBox::drop-down{{border:none;width:16px;}}
         ''')
+        from PyQt5.QtWidgets import QListView
+        _lv = QListView()
+        _lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.labelFolderCombo.setView(_lv)
+        self.labelFolderCombo.setMaxVisibleItems(10)
         self.labelExportBtn.setStyleSheet(f'''
             QPushButton{{background:{PRI};color:#fff;border:none;
                 padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
@@ -164,10 +232,17 @@ class ToolsTab(QWidget):
             QPushButton:disabled{{background:#a5d6a5;}}
         ''')
         self.labelImportBtn.setStyleSheet(f'''
-            QPushButton{{background:{AMBER};color:#fff;border:none;
+            QPushButton{{background:{PRI};color:#fff;border:none;
                 padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
-            QPushButton:hover{{background:#d97706;}}
-            QPushButton:disabled{{background:#fcd34d;}}
+            QPushButton:hover{{background:{PRI_H};}}
+            QPushButton:disabled{{background:#a5d6a5;}}
+        ''')
+        self.labelImportLabel.setStyleSheet(
+            f'font-size:10px;font-weight:600;color:{TEXT3};padding:0;margin:0;')
+        self.labelImportLabel.setFixedHeight(14)
+        self.labelImportPath.setStyleSheet(f'''
+            QLineEdit{{background:{BG};border:1px solid {BORDER};
+                border-radius:3px;padding:1px 6px;font-size:10px;color:{TEXT3};}}
         ''')
 
         # ── Progress bar ──
@@ -200,16 +275,16 @@ class ToolsTab(QWidget):
         label_dir = paths.get('label_dir', '')
         if label_dir:
             after = Path(label_dir) / 'after'
-            self.labelPath.setText(str(after) if after.exists() else '—')
             self._label_after = after
-            # 填充子文件夹下拉
+            self.labelImportPath.setText(str(after) if after.exists() else '—')
+            # 填充子文件夹下拉（Export 用）
             self.labelFolderCombo.clear()
             if after.exists():
                 dirs = sorted([d.name for d in after.iterdir() if d.is_dir()])
                 if dirs:
                     self.labelFolderCombo.addItems(dirs)
         else:
-            self.labelPath.setText('—')
+            self.labelImportPath.setText('—')
             self._label_after = None
 
     # ═══════════════════════════════════════════
@@ -268,10 +343,10 @@ class ToolsTab(QWidget):
     # ═══════════════════════════════════════════
 
     def _export_label_zip(self):
-        """将选中的子文件夹压缩为 ZIP"""
+        """将选中的子文件夹（来自 label_dir/after）压缩为 ZIP"""
         after = self._label_after
-        if not after or not after.exists():
-            self._set_label_status(RED, 'No after dir configured in Settings')
+        if not after:
+            self._set_label_status(RED, 'No label dir configured in Settings')
             return
 
         folder_name = self.labelFolderCombo.currentText()
@@ -301,7 +376,7 @@ class ToolsTab(QWidget):
                     if f.is_file():
                         arcname = str(f.relative_to(after))
                         zf.write(str(f), arcname)
-            self._set_label_status(GREEN, f'Exported → {Path(save_path).name}')
+            self._set_label_status(GREEN, f'Exported \u2192 {Path(save_path).name}')
         except Exception as e:
             self._set_label_status(RED, f'Export failed: {e}')
         finally:
@@ -309,16 +384,17 @@ class ToolsTab(QWidget):
             self.labelImportBtn.setEnabled(True)
 
     def _import_label_zip(self):
-        """导入 ZIP 压缩包并解压到 original/after"""
+        """导入压缩包（zip/rar/7z/tar/…）并解压到 label_dir/after"""
         after = self._label_after
         if not after:
-            self._set_label_status(RED, 'No after dir configured in Settings')
+            self._set_label_status(RED, 'No label dir configured in Settings')
             return
 
-        zip_path, _ = QFileDialog.getOpenFileName(
-            self, 'Import Label ZIP', '', 'ZIP Files (*.zip)',
+        archive_path, _ = QFileDialog.getOpenFileName(
+            self, 'Import Label Archive', '',
+            'Archives (*.zip *.rar *.7z *.tar *.tar.gz *.tgz *.tar.bz2 *.tar.xz)',
             options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not zip_path:
+        if not archive_path:
             return
 
         self._set_label_status(AMBER, 'Extracting...')
@@ -327,24 +403,27 @@ class ToolsTab(QWidget):
         QApplication.processEvents()
 
         try:
-            extracted = 0
-            with zipfile.ZipFile(zip_path, 'r') as zf:
-                for info in zf.infolist():
-                    if info.is_dir():
-                        continue
-                    # 安全解压：防止 zip slip
-                    name = info.filename
-                    if '..' in name or name.startswith('/') or name.startswith('\\'):
-                        continue
-                    dst = (after / name).resolve()
-                    if not str(dst).startswith(str(after.resolve())):
-                        continue
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    zf.extract(info, after)
-                    extracted += 1
-            self._set_label_status(GREEN, f'Extracted {extracted} file(s) to after/')
+            after.mkdir(parents=True, exist_ok=True)
+            suffix = Path(archive_path).suffix.lower()
+            stem = Path(archive_path).name.lower()
+
+            if suffix == '.zip':
+                extracted = _extract_zip(archive_path, after)
+            elif suffix == '.rar' or suffix == '.7z':
+                extracted = _extract_patool(archive_path, after)
+            elif stem.endswith('.tar.gz') or stem.endswith('.tgz') \
+                 or stem.endswith('.tar.bz2') or stem.endswith('.tar.xz') \
+                 or suffix == '.tar':
+                extracted = _extract_tar(archive_path, after)
+            else:
+                self._set_label_status(RED, f'Unsupported format: {suffix}')
+                return
+            self._set_label_status(GREEN, f'Extracted {extracted} file(s)')
         except Exception as e:
-            self._set_label_status(RED, f'Import failed: {e}')
+            msg = str(e)
+            if 'Cannot find working tool' in msg:
+                msg = 'Need 7-Zip or WinRAR installed to extract this format'
+            self._set_label_status(RED, f'Import failed: {msg}')
         finally:
             self.labelExportBtn.setEnabled(True)
             self.labelImportBtn.setEnabled(True)

@@ -39,6 +39,13 @@ class DistillTab(QWidget):
 
     def _init_widgets(self):
         self.de_sz.addItems(['416', '512', '640', '800'])
+        from PyQt5.QtWidgets import QListView
+        _lv = QListView()
+        _lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.de_sz.setView(_lv)
+        self.de_sz.setMaxVisibleItems(10)
+        fm = self.de_sz.fontMetrics()
+        self.de_sz.view().setMaximumHeight((fm.height() + 4) * 10 + 4)
         self._replace_metric_cards()
         self._setup_chart_styles()
         self._load_defaults()

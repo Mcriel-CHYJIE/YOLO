@@ -87,6 +87,13 @@ class TrainTab(QWidget):
         else:
             self.dev.setCurrentText('GPU' if t['device'] in ('auto', '0', 'GPU') else 'CPU')
 
+        for cb in (self.m, self.sz, self.opt, self.dev, self.sch, self.attn_type):
+            from PyQt5.QtWidgets import QListView
+            _lv = QListView()
+            _lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            cb.setView(_lv)
+            cb.setMaxVisibleItems(10)
+
         # MetricCard 占位替换
         for placeholder, label, color, default, attr_val, attr_card in [
             (self.epochCard, 'Epoch', TEXT, '0', '_me', '_me_card'),

@@ -10,7 +10,7 @@ from PyQt5 import uic
 import yaml, random, shutil
 from collections import Counter
 from PIL import Image
-from .service import load_dataset_preview, import_dataset
+from .service import load_dataset_preview, import_dataset, count_importable
 
 
 class DatasetTab(QWidget):
@@ -266,6 +266,21 @@ class DatasetTab(QWidget):
 
     def _import_dataset(self):
         """自动从 original/label 文件夹导入数据集"""
+        train_c, val_c, total, err = count_importable()
+        if err:
+            QMessageBox.warning(self, 'Error', err)
+            return
+        if total == 0:
+            QMessageBox.information(self, 'Nothing to Import',
+                'No images found in original/label/images/')
+            return
+        reply = QMessageBox.question(self, 'Confirm Import',
+            f'Import {total} images from original/label?\n'
+            f'  Train: {train_c}  |  Val: {val_c}\n\n'
+            'This will copy all labeled images into datasets/',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
         copied, total, err = import_dataset()
         if err:
             if 'not found' in err:

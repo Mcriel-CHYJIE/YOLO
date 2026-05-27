@@ -469,9 +469,19 @@ class LabelTab(QWidget):
         self.srcPathLabel.setStyleSheet(
             f"font-size:9px;color:{TEXT3};padding:4px 6px;background:{BG};"
             f"border-radius:4px;border:1px solid {BORDER};")
+        self.srcPathLabel.setWordWrap(True)
+        self.srcPathLabel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Minimum)
+        self.srcCombo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        from PyQt5.QtWidgets import QListView
+        _lv = QListView()
+        _lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.srcCombo.setView(_lv)
+        self.srcCombo.setMaxVisibleItems(10)
         self.filterStatsLabel.setStyleSheet(
             f"font-size:9px;color:{TEXT2};font-weight:500;padding:3px 5px;"
             f"background:{BG};border-radius:3px;border:1px solid {BORDER};")
+        self.filterStatsLabel.setWordWrap(True)
+        self.filterStatsLabel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Minimum)
         # Separators
         for sep in (self.sourceSep, self.exportSep, self.classSep3):
             sep.setStyleSheet(f"background:{BORDER};")
@@ -514,6 +524,19 @@ class LabelTab(QWidget):
             f"color:{TEXT};font-size:13px;font-weight:500;}}"
             f"QPushButton:hover{{background:{PRI}20;border-color:{PRI};}}"
             f"QPushButton:pressed{{background:{PRI}40;}}")
+        # Auto button — green, display-only
+        self.autoBtn.setEnabled(False)
+        self.autoBtn.setStyleSheet(
+            f"QPushButton{{background:{PRI};color:#fff;border:none;border-radius:4px;"
+            f"padding:6px 16px;font-size:11px;font-weight:600;}}"
+            f"QPushButton:hover{{background:{PRI_H};}}"
+            f"QPushButton:disabled{{background:{PRI};color:#fff;}}")
+        # Export button — amber
+        self.exportBtn.setStyleSheet(
+            f"QPushButton{{background:{AMBER};color:#fff;border:none;border-radius:4px;"
+            f"padding:6px 16px;font-size:11px;font-weight:600;}}"
+            f"QPushButton:hover{{background:{PRI_H};}}"
+            f"QPushButton:disabled{{background:{AMBER}80;color:#ffffffaa;}}")
         # Export status
         self.exportStatus.setStyleSheet(
             f"font-size:8px;color:{TEXT3};padding:2px 4px;background:{BG};"
@@ -521,6 +544,11 @@ class LabelTab(QWidget):
         # Config labels
         for lbl in (self.confLabel, self.iouLabel, self.trainLabel, self.valLabel2):
             lbl.setStyleSheet(f"font-size:9px;color:{TEXT2};")
+        from PyQt5.QtWidgets import QListView
+        _lv = QListView()
+        _lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.modelCombo.setView(_lv)
+        self.modelCombo.setMaxVisibleItems(10)
         self.confLabel.setMinimumWidth(32)
         self.iouLabel.setMinimumWidth(28)
         self.trainLabel.setMinimumWidth(32)
@@ -557,7 +585,6 @@ class LabelTab(QWidget):
         self.modeManual.toggled.connect(self._on_mode_changed)
         self.modeAuto.toggled.connect(self._on_mode_changed)
         self.browseModelBtn.clicked.connect(self._browse_model)
-        self.autoBtn.clicked.connect(self._start_auto)
         self.trainRatio.valueChanged.connect(
             lambda v: self.valLabel.setText(f"{100 - v}%"))
         self.exportBtn.clicked.connect(self._export)
@@ -637,7 +664,11 @@ class LabelTab(QWidget):
 
     def _on_mode_changed(self):
         is_auto = self.modeAuto.isChecked()
-        self.autoPanel.setEnabled(is_auto)
+        self.autoPanel.setEnabled(True)  # 父容器永远启用，子控件各自控制自己的状态
+        self.modelCombo.setEnabled(is_auto)
+        self.browseModelBtn.setEnabled(is_auto)
+        self.alConf.setEnabled(is_auto)
+        self.alIou.setEnabled(is_auto)
         self._is_auto_mode = is_auto
 
     def _on_annotation_changed(self):

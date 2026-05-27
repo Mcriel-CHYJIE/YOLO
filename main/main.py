@@ -150,6 +150,20 @@ class Studio(QMainWindow):
 
         lo.addStretch()
 
+        # 刷新按钮
+        self._refresh_btn = QPushButton('⟳')
+        self._refresh_btn.setToolTip('Refresh all paths and file lists')
+        self._refresh_btn.setFixedSize(32, 28)
+        self._refresh_btn.setCursor(Qt.PointingHandCursor)
+        self._refresh_btn.setFont(QFont('Segoe UI Symbol', 14))
+        self._refresh_btn.setStyleSheet(f'''
+            QPushButton{{background:{BG};border:1px solid {BORDER};
+                border-radius:4px;color:{TEXT2};padding:0;}}
+            QPushButton:hover{{background:{BTN_HOVER};color:{TEXT};}}
+        ''')
+        self._refresh_btn.clicked.connect(self.refresh_all)
+        lo.addWidget(self._refresh_btn)
+
         # 细底部分隔线
         w.setStyleSheet(f'background:{TOP_BG};border-bottom:1px solid {BORDER};')
         self._top_bar = w
@@ -241,6 +255,7 @@ class Studio(QMainWindow):
             self.stack.setCurrentWidget(tab)
         # 更新顶栏标签页名称
         name_map = dict((k, l) for l, k in NAV_ITEMS)
+        self._current_tab_name = key
         self._tab_label.setText(name_map.get(key, key))
 
     # ── 主题刷新 ──
@@ -281,6 +296,35 @@ class Studio(QMainWindow):
                     tab.on_theme_changed()
                 except Exception as e:
                     print(f'Theme refresh error in {key}: {e}')
+
+    def refresh_all(self):
+        """刷新所有标签页的文件读取与状态"""
+        from main.config import load_paths
+        import main.core.base as base_mod
+        import importlib
+        base_mod = importlib.reload(base_mod)
+
+        paths = load_paths()
+        for key, tab in self._tabs.items():
+            try:
+                # 各标签页的刷新入口
+                if hasattr(tab, '_load_paths'):
+                    tab._load_paths()
+                if hasattr(tab, '_refresh_source_folders'):
+                    tab._refresh_source_folders()
+                if hasattr(tab, '_refresh_folder_list'):
+                    tab._refresh_folder_list()
+                if hasattr(tab, 'rebuild_class_buttons'):
+                    tab.rebuild_class_buttons()
+            except Exception as e:
+                print(f'Refresh error in {key}: {e}')
+        self._tab_label.setText('Refreshed')
+        # 2秒后恢复
+        from PyQt5.QtCore import QTimer
+        name_map = dict((k, l) for l, k in NAV_ITEMS)
+        original = name_map.get(self._current_tab_name, '')
+        if original:
+            QTimer.singleShot(2000, lambda o=original: self._tab_label.setText(o))
 
     # ── 创建各标签页 ──
     def _create_tabs(self):

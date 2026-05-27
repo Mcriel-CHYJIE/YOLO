@@ -58,6 +58,34 @@ def load_dataset_preview(split: str) -> dict:
     }
 
 
+def count_importable() -> tuple:
+    """统计 original/label 中可导入的新图片数（去重已存在的），返回 (train_new, val_new, total_new, error_msg)"""
+    src = Path(_lbl_path()) / 'label'
+    if not src.exists():
+        return 0, 0, 0, f'Label directory not found: {src}'
+
+    img_src = src / 'images'
+    lbl_src = src / 'labels'
+    if not img_src.exists() or not lbl_src.exists():
+        return 0, 0, 0, 'Invalid dataset structure'
+
+    dst = Path(_ds_path())
+    _IMG_EXT = ('.jpg', '.png', '.jpeg', '.webp')
+
+    counts = {'train': 0, 'val': 0}
+    for split in ['train', 'val']:
+        si = img_src / split
+        if not si.exists():
+            continue
+        di = dst / 'images' / split
+        existing = {f.name for f in di.iterdir()} if di.exists() else set()
+        for f in si.iterdir():
+            if f.suffix.lower() in _IMG_EXT and f.name not in existing:
+                counts[split] += 1
+    total = counts['train'] + counts['val']
+    return counts['train'], counts['val'], total, ''
+
+
 def import_dataset() -> tuple:
     """从 original/label 导入数据集到 datasets/，返回 (copied, total, error_msg)"""
     src = Path(_lbl_path()) / 'label'
