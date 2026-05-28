@@ -1,0 +1,35 @@
+# 均衡型方案 — 通用默认
+# 精度与召回兼顾，适合迭代调试和通用场景
+name: 均衡型
+tip: V11n-clsPW0.7-IoU0.75-conf0.45
+training:
+  model: yolo11n.pt
+  epochs: 500
+  batch: 48
+  imgsz: 640
+  optimizer: AdamW
+  device: auto
+  scheduler: Cosine
+  patience: 40
+  lr0: 0.0005
+  lrf: 0.01
+  warmup_epochs: 10
+  workers: 12
+  momentum: 0.937
+  weight_decay: 0.0005
+  cls_pw: 0.7
+  iou: 0.75
+  close_mosaic: 20
+  copy_paste: 0.12
+  degrees: 3.0
+  multi_scale: false
+  hsv_h: 0.012
+  hsv_s: 0.7
+  hsv_v: 0.4
+  translate: 0.12
+  scale: 0.45
+  flip_lr: 0.4
+  flipud: 0.0
+  attention: None
+  mosaic: 1.0
+  mixup: 0.2

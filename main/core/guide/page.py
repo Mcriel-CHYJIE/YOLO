@@ -15,43 +15,86 @@ TAB_GUIDES = [
         'brief': '配置超参数并启动 YOLO 模型训练，实时查看 Loss / mAP 曲线和日志',
         'color': PRI,
         'steps': [
-            ('Model Selection', '从下拉框选择预训练权重（.pt），自动扫描 models/ 目录。续训时选 previous best.pt'),
-            ('Set Hyperparameters', '配置 Epochs/Batch/ImgSz/Optimizer/Device。推荐：Epochs=800, Batch=32, ImgSz=640, AdamW'),
-            ('Learning Rate', 'LR=0.001-0.002, LRF=0.01, Warmup=15。续训时 LR 降 10 倍至 0.0001, Warmup=1'),
-            ('Scheduler', 'Cosine（余弦退火，平滑衰减） / Linear（线性衰减）。续训推荐 Linear'),
-            ('Augmentation', 'Rotation=15°, IoU=0.7, Close Mosaic=30, Copy-Paste=0.3, cls_pw=0.75'),
-            ('Attention Injection (Settings → 第三列下拉)', '在训练前向 YOLO 的 C2f 模块注入注意力机制——SE（Squeeze-and-Excitation，轻量通道注意力，~2C/r 参数）、CBAM（通道+空间双注意力，精度提升最稳）、CA（Coordinate Attention，位置编码，小目标友好）。零推理成本：训练后导出不含注意力模块，不影响部署速度。'),
-            ('Start Training', '点击 Start Training 按钮。参数自动锁定，停止/中断后恢复'),
-            ('Monitor', '训练中实时查看 Loss Chart（红色曲线）和 mAP Chart（绿色曲线）'),
-            ('Auto-Save', '每轮自动保存 best.pt / last.pt，best.pt 保留 mAP 最高的 epoch'),
-        ],
-    },
-    {
-        'name': 'Validate',
-        'icon': '✅',
-        'brief': '在验证集上评估已训练模型的检测性能',
-        'color': GREEN,
-        'steps': [
-            ('Model Selection', '自动搜索 runs/*/weights/best.pt 选取最新模型，也可手动选择 .pt 文件'),
-            ('Parameters', '配置验证 ImgSz（640）、Batch（48）、Conf Threshold（0.35）、IoU（0.5）'),
-            ('Metrics', '输出 mAP@0.5 / mAP@0.5:0.95 / Precision / Recall 四项核心指标'),
-            ('Per-Class Table', '每类的 AP、Precision、Recall、F1 详细数值，帮助定位弱势类别'),
-            ('Confusion Matrix', '混淆矩阵可视化，分析类别间误检情况（例如 fallen 误检为 sitting）'),
-            ('Output', '验证结果（图表 + 指标明细）保存到 runs/val/ 目录'),
+            ('Model',
+             'Model: 选预训练 .pt 或 .yaml 架构，自动扫描 models/，续训选 best.pt\n'
+             'ImgSz: 416/512/640/800，默认 640\n'
+             'Multi-Scale: 每轮随机缩放 ±25%，增强泛化，增 VRAM'),
+            ('Training',
+             'Epochs: 总轮数，推荐 500-800\n'
+             'Batch: 每批样本数，yolo11n 可 64，大模型/大数据 32\n'
+             'Workers: 加载线程，推荐 CPU 核数减半，Win 4-8'),
+            ('Optimization',
+             'Optimizer: AdamW(推荐) / Adam / SGD\n'
+             'Schedule: Cosine(余弦退火) / Linear(续训推荐)\n'
+             'Device: GPU(自动) / CPU(调试)'),
+            ('LR',
+             'LR: 初始学习率 0.0005-0.002，CBAM 注入减半\n'
+             'LR Final: 最终 = LR × LRF，默认 0.01\n'
+             'Warmup: 预热轮数，CBAM 推荐 10-15'),
+            ('Control',
+             'Patience: 早停，mAP 连续 N 轮不升即停，40-100\n'
+             'WarmM: 预热期动量 0.8\n'
+             'Momentum: 默认 0.937，一般不动'),
+            ('Regularization',
+             'Weight Decay: L2 权重衰减 0.0005\n'
+             'Dropout: 0.0(关) / 0.1-0.3(过拟合时)\n'
+             'cls_pw: <1 降误报(高精度)，>1 提召回'),
+            ('Loss / AMP',
+             'IoU: 训练 NMS 阈值 0.7-0.8，高 IoU 降 FP\n'
+             'Close Mosaic: 最后 N 轮关 Mosaic，15-30\n'
+             'AMP: 混合精度，减 VRAM ~30%'),
+            ('Cache',
+             'Cache: 数据集缓存到 RAM，加速加载，吃内存'),
+            ('Aug — Geometric',
+             'Rotation: 随机旋转 0-45°，摔倒 2-5\n'
+             'Scale: 缩放 0-2.0，摔倒 0.3\n'
+             'Translate: 平移 0-1.0，推荐 0.1\n'
+             'Shear: 剪切 0-45°，通用 0\n'
+             'Persp: 透视 0-0.01，通用 0'),
+            ('Aug — Mix / Flip / Color',
+             'Mosaic: 4 图拼 1 训练，概率 0-1，默认 1.0\n'
+             'MixUp: 两图混合，高召回 0.3，高精度 0.1\n'
+             'Copy-Paste: 粘贴物体，摔倒 0.05\n'
+             'flip_lr: 左右翻转 0.5，摔倒 0.3\n'
+             'flipud: 上下翻转，摔倒 0.0(禁止)\n'
+             'HSV_H/S/V: 色调/饱和度/明度扰动'),
+            ('Attention',
+             'SE: 轻量通道，~2C/r 参数\n'
+             'CBAM: 通道+空间，精度最稳\n'
+             'CA: 位置编码，小目标友好\n'
+             'ECA: 1D 卷积，极轻量(3 参/模块)\n'
+             'SimAM: 无参数，能量函数\n'
+             'EMA: 多尺度并行\n'
+             'GAM: 全维度，保留精细结构\n'
+             '注：训练后导出不含注意力，零推理成本'),
+            ('Presets',
+             '高精度低误报: cls_pw=0.5, IoU=0.8, mixup=0.1\n'
+             '高召回率: cls_pw=1.0, IoU=0.7, mixup=0.3\n'
+             '均衡型: cls_pw=0.7, IoU=0.75, mixup=0.2'),
+            ('Monitor',
+             'Loss/mAP 实时曲线 + Stats 面板\n'
+             'Epoch / mAP@0.5 / Best / Loss / mAP50:95 / Prec / Recall\n'
+             '自动保存 best.pt(最高 mAP) + last.pt'),
         ],
     },
     {
         'name': 'Predict',
         'icon': '👁️',
-        'brief': '对单张图片或视频进行实时目标检测推理',
+        'brief': '对图片或视频进行实时目标检测推理',
         'color': AMBER,
         'steps': [
-            ('Source', '选择图片（.jpg/.png）或视频（.mp4/.avi/.mov）文件'),
-            ('Model', '选择已训练的 .pt 模型文件，推荐使用 best.pt'),
-            ('Thresholds', 'Confidence=0.35（过滤低分框）, IoU=0.5（NMS 去重）'),
-            ('Run', '点击 Start 开始推理，检测框实时叠加在画面上'),
-            ('Results', '每帧显示 FPS、各类别检测数量统计、推理耗时'),
-            ('Save', '预测结果图片/视频保存到 runs/predict/ 目录'),
+            ('Source',
+             '选图片 .jpg/.png 或视频 .mp4/.avi/.mov'),
+            ('Model',
+             '选 .pt 模型，推荐 best.pt'),
+            ('Thresholds',
+             'Conf: 0.55(过滤低分框) | IoU: 0.5(NMS 去重)'),
+            ('Run',
+             'Start 开始推理，检测框实时叠加画面'),
+            ('Results',
+             '每帧 FPS + 各类别数量 + 推理耗时'),
+            ('Save',
+             '结果保存到 runs/predict/'),
         ],
     },
     {
@@ -60,24 +103,34 @@ TAB_GUIDES = [
         'brief': '查看数据集结构与类别分布统计',
         'color': '#8b5cf6',
         'steps': [
-            ('Data Info', '显示总图片数、总标注数、总实例数等概览统计'),
-            ('Distribution', '类别分布直方图，直观展示各类别实例数量是否均衡'),
-            ('Split', '支持切换 Train / Val 查看不同分片的统计信息'),
-            ('Class Balance', '每类标注框数量统计，快速定位类别不平衡问题'),
+            ('Overview',
+             '总图片数 / 总标注数 / 总实例数概览'),
+            ('Distribution',
+             '类别分布直方图，检查各类实例数是否均衡'),
+            ('Split View',
+             '切换 Train / Val 查看不同分片统计'),
+            ('Class Balance',
+             '每类标注框数量，定位不平衡问题'),
         ],
     },
     {
         'name': 'Preprocess',
         'icon': '🎞️',
-        'brief': '视频预处理流水线：集中 → 重命名 → 缩放 → 抽帧',
+        'brief': '视频预处理：收集 → 重命名 → 缩放 → 抽帧',
         'color': '#14b8a6',
         'steps': [
-            ('Step 1 — Collect', '将散落在子文件夹中的视频统一收集到指定目录'),
-            ('Step 2 — Rename', '按文件名排序统一重命名为 00.ext, 01.ext ...'),
-            ('Step 3 — Resize', '保持宽高比 Letterbox 缩放至目标尺寸（默认 640×640），黑边填充'),
-            ('Step 4 — Extract Frames', '按目标 FPS（推荐 1-2 fps）均匀抽取帧，JPEG 质量 95'),
-            ('Output Format', '输出命名：{视频源}-{编号}-{秒数:04d}.jpg'),
-            ('Tips', '推荐采样率 1-2 fps 以避免时序相邻帧过于相似。连续帧间差异过大会降低标注效率'),
+            ('Collect',
+             '将子文件夹中的视频集中到指定目录'),
+            ('Rename',
+             '按文件名排序重命名为 00.ext, 01.ext...'),
+            ('Resize',
+             'Letterbox 缩放至目标尺寸(默认 640)，黑边填充'),
+            ('Extract',
+             '按目标 FPS(推荐 1-2)均匀抽帧，JPEG 质量 95'),
+            ('Naming',
+             '输出: {视频源}-{编号}-{秒数:04d}.jpg'),
+            ('Tips',
+             '1-2 fps 避免相邻帧过相似，提高标注效率'),
         ],
     },
     {
@@ -86,51 +139,106 @@ TAB_GUIDES = [
         'brief': '手动标注 / 自动标注 / 审核导出全流程',
         'color': '#ec4899',
         'steps': [
-            ('Select Source', '选择待标注的图片目录（或使用 Preprocess 输出的帧目录）'),
-            ('Manual Labeling', '选择类别 → 在图片上拖拽绘制矩形框。单击框可移动，四角手柄调整尺寸，右键删除'),
-            ('Auto-Label', '选择检测模型对全部图片自动预测生成标注 → 再逐张审核修正'),
-            ('Navigation', '← → 或 Prev/Next 按钮浏览图片，快捷键可配置'),
-            ('Save Progress', '标注自动保存到内存，切换图片时持久化。避免意外丢失'),
-            ('Export Dataset', '按比例随机切分 Train/Val → 生成 YOLO 格式 .txt 标注文件和 config.yaml'),
+            ('Source',
+             '选图片目录(或 Preprocess 输出的帧目录)'),
+            ('Manual',
+             '选类 → 拖拽画框。单击框移动，四角调大小，右键删除'),
+            ('Auto-Label',
+             '选检测模型自动预测生成标注 → 逐张审核修正'),
+            ('Navigate',
+             '← → 或 Prev/Next 翻图，快捷键可设置'),
+            ('Export',
+             '按比例随机切分 Train/Val，生成 YOLO .txt + data.yaml'),
         ],
     },
     {
         'name': 'Distill',
         'icon': '🔬',
-        'brief': '知识蒸馏：大模型（Teacher）教小模型（Student），提升小模型精度',
+        'brief': '知识蒸馏：大模型(Teacher)教小模型(Student)',
         'color': '#f97316',
         'steps': [
-            ('Concept', 'Teacher 模型冻结权重，Student 同时学习 One-Hot 标签和 Teacher 的 Soft Prediction'),
-            ('Alpha', '蒸馏权重 0.5（50% 检测 Loss + 50% 蒸馏 Loss），控制两个目标的平衡'),
-            ('Teacher', '自动搜索 runs/ 下最新的 best.pt，也可手动指定更大模型（如 yolo11m）'),
-            ('Student', '通常选择小模型（yolo11n/s），蒸馏后推理速度不变但精度接近 Teacher'),
-            ('Parameters', 'LR=0.002（略高于普通训练加速知识迁移）, Batch=24（Teacher 冻结可更大）'),
-            ('Output', 'Student 权重保存到 runs/distill/，可直接用于 Predict / Export'),
-            ('Benefit', '小模型蒸馏后 mAP50 可提升 6-11%，推理速度保持与 Student 一致'),
+            ('Concept',
+             'Teacher 冻结，Student 同时学 One-Hot 标签 + Teacher Soft Prediction'),
+            ('Alpha',
+             '蒸馏权重 0.5(50% 检测 Loss + 50% 蒸馏 Loss)'),
+            ('Teacher',
+             '自动选 runs/ 下最新 best.pt，也可手动指定大模型'),
+            ('Student',
+             '选小模型 yolo11n/s，推理速度不变，精度接近 Teacher'),
+            ('Params',
+             'LR: 0.002(加速迁移) | Batch: 24 | Epochs: 150'),
+            ('Output',
+             'Student 权重 → runs/distill/，可直接 Predict/Export'),
+            ('Benefit',
+             'mAP50 提升 6-11%，推理速度保持 Student 水平'),
         ],
     },
     {
         'name': 'Export',
         'icon': '📦',
-        'brief': '将训练好的 .pt 模型导出为部署格式',
+        'brief': '将 .pt 模型导出为部署格式',
         'color': RED,
         'steps': [
-            ('Select Model', '选择需要导出的 .pt 文件（best.pt 或蒸馏输出）'),
-            ('Choose Format', 'ONNX（通用）/ TorchScript / NCNN / OpenVINO / TensorRT / TFLite / CoreML'),
-            ('Set Options', 'ImgSz（默认 640）、Half（FP16 缩小体积）、NMS（内嵌非极大抑制）'),
-            ('Export', '点击 Export 按钮，转换进度显示在控制台'),
-            ('Output', '导出文件保存到模型同级目录，文件名带格式后缀'),
+            ('Model',
+             '选 .pt 文件(best.pt 或蒸馏输出)'),
+            ('Format',
+             'ONNX(通用) / TorchScript / NCNN / OpenVINO / TensorRT / TFLite / CoreML'),
+            ('Options',
+             'ImgSz: 640 | Half(FP16) | NMS(内嵌)'),
+            ('Export',
+             '点 Export，进度显示在控制台'),
+            ('Output',
+             '保存到模型同级目录，文件名 + 格式后缀'),
+        ],
+    },
+    {
+        'name': 'AI Agent',
+        'icon': '🤖',
+        'brief': '内置 LLM 助手，提供 YOLO 领域知识和参数建议',
+        'color': '#3b82f6',
+        'steps': [
+            ('Chat',
+             '在输入框提问，Agent 基于 YOLO 知识库回答'),
+            ('Parameter Advice',
+             '询问训练参数推荐、数据增强策略等'),
+            ('Troubleshooting',
+             '描述报错信息，Agent 提供排查建议'),
+            ('Pipeline Guide',
+             '咨询完整工作流(数据→训练→导出→部署)'),
+        ],
+    },
+    {
+        'name': 'Tools',
+        'icon': '🛠️',
+        'brief': '视频导入 + 标注导出/导入 + 图片爬虫',
+        'color': '#f59e0b',
+        'steps': [
+            ('Preproc Import',
+             '将视频文件夹导入预处理目录，自动复制'),
+            ('Label Export',
+             '按选中子文件夹导出标注为 .zip 压缩包'),
+            ('Label Import',
+             '导入 .zip/.rar/.7z 标注压缩包到指定目录'),
+            ('Image Crawler',
+             '输入关键词 → 选保存目录 → Start，爬取百度图片'),
         ],
     },
     {
         'name': 'Settings',
         'icon': '⚙️',
-        'brief': '编辑项目配置文件中的类别名称（仅此一项功能）',
+        'brief': '工作目录配置 + 类别名编辑 + 主题/快捷键',
         'color': '#666',
         'steps': [
-            ('Edit Names', '每行一个类别名称，顺序决定索引（第 1 行 = 0, 第 2 行 = 1...）'),
-            ('Save', '保存后自动更新 project.yaml 的 classes 列表和 names 映射'),
-            ('Hot Reload', '配置立即生效，窗口标题、类别名称等全局常量自动更新'),
+            ('Directories',
+             '配置各模块工作目录(train_output / dataset_dir / label_dir 等)'),
+            ('Init Wizard',
+             '选根目录自动创建完整文件夹结构'),
+            ('Classes',
+             '编辑类别名称，每行一个，顺序决定索引(第1行=0)'),
+            ('Theme',
+             '切换 Dark / Light 主题，立即生效'),
+            ('Shortcuts',
+             '自定义键盘快捷键映射'),
         ],
     },
     ]
@@ -163,7 +271,7 @@ def _make_tab_item(name, icon, brief, steps, color):
 
     # 简短说明
     brief_lbl = QLabel(brief)
-    brief_lbl.setStyleSheet(f"font-size:12px;color:{TEXT2};border:none;font-weight:500;")
+    brief_lbl.setStyleSheet(f"font-size:14px;color:{TEXT2};border:none;font-weight:500;")
     brief_lbl.setWordWrap(True)
     layout.addWidget(brief_lbl)
 
@@ -179,18 +287,18 @@ def _make_tab_item(name, icon, brief, steps, color):
         sh = QHBoxLayout()
         sh.setSpacing(6)
         bullet = QLabel("▸")
-        bullet.setStyleSheet(f"font-size:11px;color:{color};border:none;font-weight:700;")
+        bullet.setStyleSheet(f"font-size:14px;color:{color};border:none;font-weight:700;")
         bullet.setFixedWidth(14)
         sh.addWidget(bullet)
         sn = QLabel(step_name)
-        sn.setStyleSheet(f"font-size:12px;font-weight:600;color:{TEXT};border:none;")
+        sn.setStyleSheet(f"font-size:14px;font-weight:600;color:{TEXT};border:none;")
         sh.addWidget(sn)
         sh.addStretch()
         wl.addLayout(sh)
 
         # 步骤描述
         sd = QLabel(step_desc)
-        sd.setStyleSheet(f"font-size:11px;color:{TEXT3};border:none;padding-left:20px;")
+        sd.setStyleSheet(f"font-size:13px;color:{TEXT3};border:none;padding-left:20px;")
         sd.setWordWrap(True)
         wl.addWidget(sd)
 
@@ -236,7 +344,7 @@ class GuideTab(QWidget):
         # 段落正文
         paras = [
             'YOLO Training Studio 是一个基于 PyQt5 的桌面应用程序，专为 YOLO 系列模型的训练、验证、预测、标注和部署提供一站式工作流。核心训练引擎基于 Ultralytics YOLO，支持 YOLOv8/YOLO11 全部模型变体。',
-            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 130px 窄边栏，右侧内容自适应。支持 Training / Predict / Dataset / Preprocess / Label / Distill / Validate / Export / Guide / Settings 共 10 个功能模块。',
+            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 130px 窄边栏，右侧内容自适应。支持 Training / Predict / Dataset / Preprocess / Label / Distill / Export / AI Agent / Tools / Settings 共 10 个功能模块。',
         ]
         for text in paras:
             p = QLabel(text)

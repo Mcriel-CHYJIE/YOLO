@@ -17,6 +17,9 @@ from main.config import ROOT, load_paths
 _WORKER = None
 _THREAD = None
 
+_CRAWLER_WORKER = None
+_CRAWLER_THREAD = None
+
 
 class _ImportWorker(QObject):
     """后台复制整个文件夹到预处理目录的工作线程"""
@@ -128,6 +131,97 @@ def _extract_patool(path, dest):
     return count
 
 
+class _CrawlerWorker(QObject):
+    """百度图片爬虫工作线程"""
+    progress = pyqtSignal(int, int)   # (downloaded, total)
+    finished = pyqtSignal(int)         # total downloaded
+    error = pyqtSignal(str)
+
+    def __init__(self, keyword, dst_dir):
+        super().__init__()
+        self.keyword = keyword
+        self.dst_dir = Path(dst_dir)
+        self._stopped = False
+
+    def stop(self):
+        self._stopped = True
+
+    def run(self):
+        try:
+            self.dst_dir.mkdir(parents=True, exist_ok=True)
+            total = self._baidu_crawl()
+            self.finished.emit(total)
+        except Exception as e:
+            self.error.emit(str(e))
+
+    def _baidu_crawl(self):
+        """百度图片搜索爬虫"""
+        import urllib.request, urllib.parse, json, os, time, ssl
+
+        ssl._create_default_https_context = ssl._create_unverified_context
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }
+
+        keyword_enc = urllib.parse.quote(self.keyword)
+        downloaded = 0
+        target = 100  # 默认抓取100张
+        page = 0
+
+        while downloaded < target and not self._stopped:
+            url = (f'https://image.baidu.com/search/acjson?tn=resultjson_com&logid=&ipn=rj&ct=201326592&is=&fp=result&fr=&word={keyword_enc}'
+                   f'&queryWord={keyword_enc}&cl=2&lm=-1&ie=utf-8&oe=utf-8&adpicid=&st=-1&z=&ic=0&hd=&latest=&copyright=&s=&se=&tab=&width=&height=&face=0&istype=2&qc=&nc=1&expermode=&nojc=&isAsync=&pn={page*30}&rn=30&gsm=1e&1669525513756=')
+
+            req = urllib.request.Request(url, headers=headers)
+            try:
+                resp = urllib.request.urlopen(req, timeout=15)
+                data = json.loads(resp.read().decode('utf-8', errors='ignore'))
+            except:
+                page += 1
+                continue
+
+            imgs = data.get('data', [])
+            if not imgs:
+                break
+
+            for img in imgs:
+                if self._stopped:
+                    break
+                img_url = img.get('thumbURL') or img.get('middleURL') or img.get('objURL') or ''
+                if not img_url:
+                    continue
+
+                # 过滤掉gif
+                ext = os.path.splitext(img_url.split('?')[0])[1].lower()
+                if ext in ('.gif',):
+                    continue
+                if not ext:
+                    ext = '.jpg'
+
+                fname = f'{self.keyword}_{downloaded+1}{ext}'
+                fpath = self.dst_dir / fname
+                if fpath.exists():
+                    continue
+
+                try:
+                    img_req = urllib.request.Request(img_url, headers=headers)
+                    img_resp = urllib.request.urlopen(img_req, timeout=10)
+                    with open(fpath, 'wb') as f:
+                        f.write(img_resp.read())
+                    downloaded += 1
+                    self.progress.emit(downloaded, target)
+                    if downloaded >= target:
+                        break
+                except:
+                    continue
+                time.sleep(0.2)
+
+            page += 1
+
+        return downloaded
+
+
 class ToolsTab(QWidget):
     """工具标签页 — 视频导入工具"""
 
@@ -159,6 +253,18 @@ class ToolsTab(QWidget):
         self.colsLo.setStretch(0, 1)
         self.colsLo.setStretch(1, 1)
         self.colsLo.setStretch(2, 1)
+
+        # ── 第一列：爬虫组件自然高度，底部加 other 占位组件 ──
+        self.otherCrawlerPlaceholder = QGroupBox('... Other')
+        self.otherCrawlerPlaceholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.otherCrawlerPlaceholder.setStyleSheet(f'''
+            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
+                border:1px solid {BORDER};border-radius:6px;
+                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
+            QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
+                background:{CARD};}}
+        ''')
+        self.col1Lo.addWidget(self.otherCrawlerPlaceholder, 1)
 
         # ── 标题 ──
         self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
@@ -245,12 +351,42 @@ class ToolsTab(QWidget):
                 border-radius:3px;padding:1px 6px;font-size:10px;color:{TEXT3};}}
         ''')
 
-        # ── Progress bar ──
+        # ── 导入进度条 ──
         self.importProgress.setStyleSheet(f'''
             QProgressBar{{border:none;border-radius:1px;height:3px;
                 background:{BORDER};text-align:center;}}
             QProgressBar::chunk{{background:{PRI};border-radius:1px;}}
         ''')
+
+        # ── Image Crawler ──
+        self.crawlerKeyword.setStyleSheet(f'''
+            QPlainTextEdit{{background:{BG};border:1px solid {BORDER};
+                border-radius:4px;padding:4px 8px;font-size:13px;color:{TEXT};}}
+            QPlainTextEdit:focus{{border-color:{PRI};}}
+        ''')
+        self.crawlerKeyword.setPlaceholderText('Enter keywords to search...')
+        self.crawlerPath.setStyleSheet(f'''
+            QLineEdit{{background:{BG};border:1px solid {BORDER};
+                border-radius:3px;padding:1px 6px;font-size:10px;color:{TEXT3};}}
+        ''')
+        self.crawlerBrowseBtn.setStyleSheet(f'''
+            QPushButton{{background:{CARD};border:1px solid {BORDER};
+                border-radius:3px;font-size:12px;padding:0;}}
+            QPushButton:hover{{background:{BORDER};}}
+        ''')
+        self.crawlerStartBtn.setStyleSheet(f'''
+            QPushButton{{background:{PRI};color:#fff;border:none;
+                padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
+            QPushButton:hover{{background:{PRI_H};}}
+            QPushButton:disabled{{background:#a5d6a5;}}
+        ''')
+        self.crawlerProgress.setStyleSheet(f'''
+            QProgressBar{{border:1px solid {BORDER};border-radius:3px;height:16px;
+                background:{BG};text-align:center;font-size:8px;color:{TEXT3};}}
+            QProgressBar::chunk{{background:{PRI};border-radius:2px;}}
+        ''')
+        self.crawlerInfo.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
 
     # ═══════════════════════════════════════════
     # Signals
@@ -260,6 +396,8 @@ class ToolsTab(QWidget):
         self.importBtn.clicked.connect(self._start_import)
         self.labelExportBtn.clicked.connect(self._export_label_zip)
         self.labelImportBtn.clicked.connect(self._import_label_zip)
+        self.crawlerBrowseBtn.clicked.connect(self._crawler_browse)
+        self.crawlerStartBtn.clicked.connect(self._crawler_start)
 
     # ═══════════════════════════════════════════
     # Data Loading
@@ -432,6 +570,67 @@ class ToolsTab(QWidget):
         self.labelStatus.setStyleSheet(f'font-size:9px;color:{color};padding:0;margin:0;')
         self.labelStatus.setText(msg)
         self.labelStatus.repaint()
+
+    # ═══════════════════════════════════════════
+    # Image Crawler
+    # ═══════════════════════════════════════════
+
+    def _crawler_browse(self):
+        d = QFileDialog.getExistingDirectory(self, 'Select download directory',
+            options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if d:
+            self.crawlerPath.setText(d)
+
+    def _crawler_start(self):
+        keyword = self.crawlerKeyword.toPlainText().strip()
+        if not keyword:
+            self.crawlerInfo.setText('Please enter a keyword')
+            return
+        dst = self.crawlerPath.text().strip()
+        if not dst:
+            self.crawlerInfo.setText('Please select a download directory')
+            return
+
+        self.crawlerStartBtn.setEnabled(False)
+        self.crawlerStartBtn.setText('Running...')
+        self.crawlerProgress.setValue(0)
+        QApplication.processEvents()
+
+        global _CRAWLER_WORKER, _CRAWLER_THREAD
+        _CRAWLER_WORKER = _CrawlerWorker(keyword, dst)
+        _CRAWLER_THREAD = QThread()
+        _CRAWLER_WORKER.moveToThread(_CRAWLER_THREAD)
+        _CRAWLER_THREAD.started.connect(_CRAWLER_WORKER.run)
+        _CRAWLER_WORKER.finished.connect(self._crawler_done)
+        _CRAWLER_WORKER.progress.connect(self._crawler_progress)
+        _CRAWLER_WORKER.error.connect(self._crawler_error)
+        _CRAWLER_THREAD.start()
+
+    def _crawler_progress(self, count, total):
+        self.crawlerProgress.setValue(int(count / total * 100))
+        self.crawlerProgress.setFormat(f'{count}/{total}')
+        self.crawlerInfo.setText(f'Downloading {self.crawlerKeyword.toPlainText().strip()}...')
+
+    def _crawler_done(self, count):
+        self.crawlerStartBtn.setEnabled(True)
+        self.crawlerStartBtn.setText('▶ Start')
+        self.crawlerProgress.setValue(100)
+        self.crawlerProgress.setFormat(f'{count} images')
+        self.crawlerInfo.setText(f'Done — saved to {self.crawlerPath.text()}')
+        global _CRAWLER_THREAD
+        if _CRAWLER_THREAD:
+            _CRAWLER_THREAD.quit()
+            _CRAWLER_THREAD = None
+
+    def _crawler_error(self, msg):
+        self.crawlerStartBtn.setEnabled(True)
+        self.crawlerStartBtn.setText('▶ Start')
+        self.crawlerProgress.setValue(0)
+        self.crawlerProgress.setFormat('Error')
+        global _CRAWLER_THREAD
+        if _CRAWLER_THREAD:
+            _CRAWLER_THREAD.quit()
+            _CRAWLER_THREAD = None
 
     # ═══════════════════════════════════════════
     # 主题刷新

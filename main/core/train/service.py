@@ -1,5 +1,6 @@
 """训练业务逻辑 — 配置构建 + 训练工作线程"""
-from main.core.base import ROOT, cfg, DATA_YAML, IS_FALL, StreamEmitter
+from pathlib import Path
+from main.core.base import ROOT, cfg, DATA_YAML, StreamEmitter
 from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
 import json, torch, threading
@@ -18,6 +19,12 @@ def build_train_config(
     iou_val, cm_val, cp_val, dg_val, ms_checked,
     momentum_val, wd_val, hsv_h_val, hsv_s_val, hsv_v_val,
     translate_val, scale_val, cls_pw_val,
+    mosaic_val=1.0, mixup_val=0.2,
+    flip_lr_val=0.5, flipud_val=0.0,
+    shear_val=0.0, perspective_val=0.0,
+    dropout_val=0.0, warmup_momentum_val=0.8,
+    amp_val=True, cache_val=False,
+    lora_rank=0,
 ) -> dict:
     """从 UI 控件值构建训练参数字典"""
     print(f'[build_train_config] entered', flush=True)
@@ -51,13 +58,19 @@ def build_train_config(
         device='0' if studio_gpu_ok and dev_idx == 0 else 'cpu',
         cos_lr=sch_idx == 0, warmup_epochs=wu_val, workers=wk_val,
         momentum=momentum_val, weight_decay=wd_val,
-        mixup=g.get('mixup', 0.2),
+        mixup=mixup_val,
         cls_pw=cls_pw_val,
+        mosaic=mosaic_val,
         iou=iou_val,
         close_mosaic=cm_val, copy_paste=cp_val, degrees=dg_val,
         multi_scale=ms_checked,
         hsv_h=hsv_h_val, hsv_s=hsv_s_val, hsv_v=hsv_v_val,
         translate=translate_val, scale=scale_val,
+        flip_lr=flip_lr_val, flipud=flipud_val,
+        shear=shear_val, perspective=perspective_val,
+        dropout=dropout_val, warmup_momentum=warmup_momentum_val,
+        amp=amp_val, cache=cache_val,
+        lora_rank=lora_rank,
     )
     _mdl = result.get('model', '?')
     print(f'[build_train_config] done, model={_mdl}', flush=True)
@@ -131,6 +144,8 @@ class Trainer(QObject):
 
     def _run(self):
         import sys
+        import matplotlib
+        matplotlib.use('Agg')  # 禁止弹出图表窗口
         print(f'[Trainer] _run entered', flush=True)
         torch.set_num_threads(1)
         original_stdout = sys.stdout; original_stderr = sys.stderr
@@ -158,6 +173,20 @@ class Trainer(QObject):
                         self.log.emit(f' [{attn.upper()}] Injected attention into {replaced} C2f blocks')
             except Exception as e:
                 self.log.emit(f' [WARN] Attention injection failed: {e}')
+
+            # ── LoRA 注入 ──
+            lora_r = cfg.get('lora_rank', 0)
+            if lora_r > 0:
+                try:
+                    from main.core.train.attention import inject_lora
+                    replaced = inject_lora(m.model, lora_r)
+                    self.log.emit(f' [LoRA] Injected LoRA (rank={lora_r}) into {replaced} Conv2d layers')
+                    # 统计可训练参数量
+                    total = sum(p.numel() for p in m.model.parameters())
+                    trainable = sum(p.numel() for p in m.model.parameters() if p.requires_grad)
+                    self.log.emit(f'  Parameters: {trainable/1e6:.2f}M trainable / {total/1e6:.2f}M total')
+                except Exception as e:
+                    self.log.emit(f' [WARN] LoRA injection failed: {e}')
             
             exp = f'{ROOT.name}_{datetime.now().strftime("%m%d_%H%M")}'
             model_name = cfg['model'] if cfg['model'] else 'Scratch'
@@ -187,20 +216,44 @@ class Trainer(QObject):
                     self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', min(ep/max(cfg['epochs'],1),1.0), self.best_map, m50, loss)
                     self.chart.emit()
                 except: pass
+            m.add_callback('on_train_start', lambda t: self.log.emit(' Training started (first epoch may take a while to initialize)'))
+            # ── 每个 batch 处理完后发射进度（每 10% 报一次） ──
+            _last_batch_pct = [0]
+            def on_batch(t):
+                try:
+                    ni = t.ni if hasattr(t, 'ni') else 0
+                    nf = t.epoch_len if hasattr(t, 'epoch_len') else 1
+                    pct = int(ni / max(nf, 1) * 100)
+                    if pct >= _last_batch_pct[0] + 10:
+                        _last_batch_pct[0] = pct
+                        self.log.emit(f'  Epoch progress: {pct}% ({ni}/{nf} batches)')
+                except:
+                    pass
+            m.add_callback('on_train_batch_end', on_batch)
             m.add_callback('on_train_epoch_end', cb)
             train_args = dict(data=str(DATA_YAML), epochs=cfg['epochs'], batch=cfg['batch'], imgsz=cfg['imgsz'],
                 lr0=cfg['lr0'], lrf=cfg['lrf'], optimizer=cfg['optimizer'], patience=cfg['patience'],
-                device=cfg['device'], warmup_epochs=cfg.get('warmup_epochs', 3), warmup_momentum=0.8, cos_lr=cfg['cos_lr'],
+                device=cfg['device'], warmup_epochs=cfg.get('warmup_epochs', 3), warmup_momentum=cfg.get('warmup_momentum', 0.8), cos_lr=cfg['cos_lr'],
                 momentum=cfg.get('momentum', 0.937), weight_decay=cfg.get('weight_decay', 0.0005),
                 cls_pw=cfg.get('cls_pw', 0.75),
-                flipud=0.0 if IS_FALL else 0.3, fliplr=0.5, mosaic=1.0, mixup=cfg.get('mixup', 0.2), workers=cfg.get('workers', 4),
+                flipud=cfg.get('flipud', 0.0), fliplr=cfg.get('flip_lr', 0.5), mosaic=cfg.get('mosaic', 1.0), mixup=cfg.get('mixup', 0.2), workers=cfg.get('workers', 4),
                 iou=cfg['iou'], close_mosaic=cfg['close_mosaic'],
                 copy_paste=cfg['copy_paste'] if cfg['copy_paste'] > 0 else 0,
                 degrees=cfg['degrees'] if cfg['degrees'] > 0 else 0, multi_scale=cfg['multi_scale'],
                 hsv_h=cfg.get('hsv_h', 0.015), hsv_s=cfg.get('hsv_s', 0.7), hsv_v=cfg.get('hsv_v', 0.4),
                 translate=cfg.get('translate', 0.15), scale=cfg.get('scale', 0.6),
-                project=self._train_dir, name=exp, exist_ok=True, amp=True, verbose=False)
+                shear=cfg.get('shear', 0.0), perspective=cfg.get('perspective', 0.0),
+                dropout=cfg.get('dropout', 0.0),
+                amp=cfg.get('amp', True), cache=cfg.get('cache', False),
+                project=self._train_dir, name=exp, exist_ok=True, verbose=False)
             train_args = {k: v for k, v in train_args.items() if v is not None}
+            # ── 校验数据集路径 ──
+            _dp = train_args.get('data', '')
+            if not _dp or not Path(_dp).exists():
+                self.log.emit(f' [ERROR] Dataset not configured or not found')
+                self.log.emit(f'  Checked: {_dp}')
+                self.log.emit(f'  Go to Settings → Dataset dir to configure the correct path.')
+                raise FileNotFoundError(f'Dataset not found: {_dp}. Configure it in Settings → Dataset dir.')
             try: m.train(**train_args)
             except RuntimeError as e:
                 if 'CUDA out of memory' in str(e):

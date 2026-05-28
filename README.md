@@ -1,192 +1,267 @@
-# YOLO Training Studio
+<p align="center">
+  <img src="assets/YOLO.png" width="120" alt="YOLO Training Studio" />
+</p>
 
-基于 [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) 的通用目标检测训练平台，提供桌面级 GUI 操作界面。
+<h1 align="center">YOLO Training Studio</h1>
 
-## 功能
+<p align="center">
+  <strong>Desktop GUI for Ultralytics YOLO — Train, Evaluate, Deploy.</strong>
+  <br />
+  <strong>桌面级 YOLO 训练与管理工具 — 训练、评估、部署一体化。</strong>
+  <br />
+  WeChat-style sidebar, dark/light theme, real-time monitoring.
+  <br />
+  微信风格侧边栏，黑暗/明亮主题，实时监控。
+</p>
 
-| 模块 | 功能 |
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+" />
+  <img src="https://img.shields.io/badge/framework-PyQt5-green" alt="PyQt5" />
+  <img src="https://img.shields.io/badge/YOLO-v8%20%7C%20v11-orange" alt="YOLO v8/v11" />
+  <img src="https://img.shields.io/badge/license-MIT-yellow" alt="MIT License" />
+</p>
+
+---
+
+## Overview / 概述
+
+**EN** | YOLO Training Studio is a full-featured desktop application for object detection workflows built on [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). It provides a complete pipeline from data preparation and annotation to model training, evaluation, distillation, and deployment — all through an intuitive graphical interface.
+
+**中文** | YOLO Training Studio 是一款基于 [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) 的全功能桌面端目标检测工具。提供从数据准备、标注到模型训练、评估、蒸馏和部署的完整工作流，全部通过直观的图形界面完成。
+
+The application is packaged as a standalone Windows installer for production use, while remaining fully runnable from source for development and customization.
+
+支持打包为独立的 Windows 安装程序用于生产环境，同时保留从源码运行的能力便于开发和定制。
+
+---
+
+## Features / 功能特性
+
+| Module / 模块 | Description / 说明 |
 |---|---|
-| **Training** | 模型训练，支持 YOLOv8/v11，注意力模块注入（SE/CBAM/CA），实时 loss/mAP 图表 |
-| **Predict** | 图片/视频推理，实时帧检测，FPS 监控，结果导出 |
-| **Dataset** | 数据集管理与预览 |
-| **Preprocess** | 视频帧提取、图片预处理 |
-| **Label** | 手动标注（YOLO 格式），自动标注辅助，数据集导出 |
-| **Distill** | 知识蒸馏训练（Teacher-Student），自定义蒸馏损失 |
-| **Validate** | 模型验证，mAP 指标评估 |
-| **Export** | 导出为 ONNX / TensorRT / OpenVINO / TFLite 等格式 |
-| **Settings** | 类别名称编辑、快捷键配置、黑白主题切换、工作目录配置、项目结构初始化 |
-| **AI Agent** | AI 助手面板 |
+| **Training / 训练** | YOLOv8/v11 training with SE / CBAM / CA attention injection, real-time loss & mAP charts, hyperparameter tuning, auto-NMS. / 支持注意力模块注入，实时损失与 mAP 曲线，超参数调优。 |
+| **Predict / 推理** | Image & video inference with live frame detection, FPS monitoring, result export. / 图片与视频推理，实时帧检测，FPS 监控，结果导出。 |
+| **Dataset / 数据集** | Per-split preview, class distribution, annotation coverage stats. / 各分片预览，类别分布，标注覆盖率统计。 |
+| **Preprocess / 预处理** | Video frame extraction, image resizing, batch preprocessing. / 视频帧提取，图像缩放，批量预处理。 |
+| **Label / 标注** | Manual YOLO-format annotation, keyboard shortcuts, auto-labeling assist, dataset export. / 手动 YOLO 格式标注，快捷键，辅助自动标注，数据集导出。 |
+| **Distill / 蒸馏** | Teacher-Student knowledge distillation with configurable alpha and feature-map MSE loss. / 师生知识蒸馏，可配置蒸馏权重与特征图 MSE 损失。 |
+| **Export / 导出** | ONNX, TensorRT, OpenVINO, NCNN, TFLite, CoreML, TorchScript, EdgeTPU. |
+| **Validate / 验证** | mAP metrics, confusion matrix analysis. / mAP 指标与混淆矩阵分析。 |
+| **Settings / 设置** | Workspace management, class name editor, theme switch, shortcut config. / 工作区管理，类别名编辑，主题切换，快捷键配置。 |
+| **AI Agent / AI 助手** | Integrated LLM assistant with YOLO-domain expertise. / 集成大模型助手，提供 YOLO 领域知识支持。 |
+| **Tools / 工具** | GPU benchmark, speed test, integrity check, batch rename. / GPU 基准测试，速度测试，完整性检查，批量重命名。 |
 
-## 环境要求
+---
 
-- Python 3.10+
-- Windows / Linux（建议 NVIDIA GPU，CUDA 12+）
-- 推荐：RTX 30/40/50 系列 + 16GB+ 显存
+## Architecture / 架构
 
-### 核心依赖
-
-```
-ultralytics>=8.0.0
-PyQt5
-torch>=2.0.0
-opencv-python
-numpy
-matplotlib
-pyyaml
-```
-
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-pip install ultralytics PyQt5 torch opencv-python numpy matplotlib pyyaml
-```
-
-或使用 Conda：
-
-```bash
-conda install -c pytorch pytorch torchvision
-conda install pyqt opencv matplotlib pyyaml
-pip install ultralytics
-```
-
-### 2. 启动
-
-```bash
-python run.py
-```
-
-首次启动会提示配置工作目录。在 **Settings → Init** 选择项目根目录即可自动创建目录结构。
-
-## 项目结构
+### Module Layout / 模块布局
 
 ```
 YOLO/
-├── run.py              # 启动入口，自动添加根目录到 sys.path
+├── run.py                      # Entry point / 入口
 ├── main/
-│   ├── config/         # 配置模块（包）
-│   │   ├── __init__.py # cfg 单例 + 路径常量 + load_paths()
-│   │   ├── project.yaml# 项目配置文件（唯一数据源）
-│   │   ├── paths.json  # 工作目录配置（运行时读写）
-│   │   ├── attention.json # 注意力模块选择（运行时读写）
-│   │   ├── theme.json  # 主题状态（运行时生成）
-│   │   └── shortcuts.json # 快捷键映射（运行时生成）
+│   ├── config/                 # Configuration manager / 配置管理
+│   │   ├── __init__.py         # cfg singleton + path constants
+│   │   ├── project.yaml        # Defaults (单数据源)
+│   │   ├── paths.json          # Workspace dirs (runtime)
+│   │   ├── attention.json      # Attention module (runtime)
+│   │   ├── theme.json          # Theme state (runtime)
+│   │   └── shortcuts.json      # Shortcut mappings (runtime)
 │   ├── core/
-│   │   ├── base.py     # 共享组件（颜色常量、MetricCard、LogPanel、Chart 等）
-│   │   ├── main.py     # 程序入口（Studio 主窗口）
-│   │   ├── train/      # 训练页
-│   │   │   ├── page.py     # UI 事件
-│   │   │   ├── service.py  # 配置构建 + Trainer 工作线程
-│   │   │   └── attention.py # 注意力模块（SE/CBAM/CA）
-│   │   ├── predict/    # 推理页
-│   │   ├── dataset/    # 数据集页
-│   │   ├── preprocess/ # 预处理页
-│   │   ├── label/      # 标注页
-│   │   ├── distill/    # 蒸馏页
-│   │   ├── validate/   # 验证页
-│   │   ├── export/     # 导出页
-│   │   ├── settings/   # 设置页（目录配置、快捷键、主题）
-│   │   ├── guide/      # 使用引导页
-│   │   └── agent/      # AI 助手页
-│   └── project.yaml    # 项目配置
-├── assets/             # 图标资源
+│   │   ├── base.py             # Shared UI components / 共享组件
+│   │   ├── train/              # Model training / 训练
+│   │   ├── predict/            # Inference engine / 推理
+│   │   ├── dataset/            # Dataset browser / 数据集浏览
+│   │   ├── preprocess/         # Preprocessing / 预处理
+│   │   ├── label/              # Annotation tool / 标注
+│   │   ├── distill/            # Knowledge distillation / 蒸馏
+│   │   ├── export/             # Format converter / 导出
+│   │   ├── settings/           # Configuration / 设置
+│   │   ├── guide/              # Walkthrough / 引导
+│   │   ├── agent/              # AI assistant / AI 助手
+│   │   └── tools/              # Utility suite / 工具集
+│   └── project.yaml            # Deployed config
+├── assets/                     # Icons, images / 图标、图片
+├── pack.py                     # Build script / 打包脚本
+├── rthook_torch.py             # PyTorch DLL hook for PyInstaller
+├── installer.iss               # Inno Setup definition
 ├── README.md
 └── LICENSE
 ```
 
-### 模块说明
+### Design Pattern / 设计模式
 
-每个功能页遵循三层分离架构：
-
-```
-page.py     — UI 事件处理、信号连接、动态控件构建
-service.py  — 业务逻辑函数 + 后台工作线程（Trainer/Distiller/Detector）
-[name].ui   — Qt Designer 静态布局
-```
-
-共享模块：
+Each tab follows a **three-layer separation** (每个标签页采用三层分离):
 
 ```
-main/config/__init__.py  — cfg 单例：读取 project.yaml 作为唯一数据源
-main/core/base.py        — 颜色常量（WeChat 风格）、MetricCard、LogPanel、Chart
+page.py      — UI event wiring, signal/slot connections / 事件绑定
+service.py   — Business logic + background worker threads / 业务逻辑 + 后台线程
+[name].ui    — Qt Designer static layout / 静态布局
 ```
 
-## 配置
+Shared infrastructure in `main/core/base.py` includes (共享基础设施): WeChat-style green accent `#07C160`, **MetricCard** (KPI card), **LogPanel** (scrolling log viewer), **Chart** (matplotlib embedded).
 
-### project.yaml
+---
 
-所有默认参数通过 `main/project.yaml` 配置：
+## Technology Stack / 技术栈
+
+| Category / 类别 | Technology / 技术 |
+|---|---|
+| **GUI Framework** | PyQt5 |
+| **CV / ML Runtime** | Ultralytics YOLO v8/v11, PyTorch 2.x, OpenCV |
+| **Inference Backend** | ONNX Runtime, TensorRT, OpenVINO, NCNN, TFLite |
+| **Visualization** | matplotlib (training curves), OpenCV (frame rendering) |
+| **Configuration** | YAML (defaults), JSON (runtime state) |
+| **Packaging** | PyInstaller + Inno Setup |
+
+---
+
+## Getting Started / 快速开始
+
+### Prerequisites / 环境要求
+
+- **Python** 3.10+
+- **OS** Windows 10/11 (Linux supported for development / 开发环境支持 Linux)
+- **GPU** Recommended: NVIDIA with CUDA 12+ and 8GB+ VRAM (推荐)
+
+### Run from Source / 源码运行
+
+```bash
+# Clone
+git clone https://github.com/Mcriel-CHYJIE/YOLO.git
+cd YOLO
+
+# Install dependencies / 安装依赖
+pip install ultralytics PyQt5 torch torchvision opencv-python numpy matplotlib pyyaml psutil scipy
+
+# Launch / 启动
+python run.py
+```
+
+On first launch, navigate to **Settings → Init** to select a root directory — the required folder structure will be created automatically.
+首次启动后进入 **设置 → 初始化** 选择根目录，自动创建所需文件夹结构。
+
+### Build Standalone Installer / 打包安装程序
+
+```bash
+# Quick build (PyInstaller only) / 仅打包 EXE
+python pack.py
+
+# Full build with Inno Setup installer / 打包安装程序
+python pack.py --installer
+```
+
+Output: `Output/YOLO_Training_Studio_Setup_v1.exe`
+
+---
+
+## Configuration / 配置
+
+### project.yaml (Defaults / 默认配置)
+
+All defaults are in a single YAML file at `main/project.yaml` — the single source of truth.
+所有默认值定义在 `main/project.yaml`，是唯一的默认数据源。
 
 ```yaml
 project:
   name: YOLO Training Studio
   task: detect
-  data_yaml: datasets/config.yaml
+  data_yaml: datasets/data.yaml
 
 training:
-  model: yolov8n.pt
-  epochs: 300
+  model: yolo11n.pt
+  epochs: 500
+  batch: 32
+  optimizer: AdamW
+  lr0: 0.0005
   ...
 ```
 
-完整默认值见 `main/config/__init__.py` 中的 `_FALLBACK`。
+### Workspace Layout / 工作区结构
 
-### 工作目录配置（paths.json）
-
-启动会检查路径是否完整，未配置时弹出提示。可在 **Settings → Directories** 中配置：
-
-| 配置项 | 说明 |
+| Directory / 目录 | Purpose / 用途 |
 |---|---|
-| Training output | 训练日志和权重输出目录 |
-| Predict output | 推理结果输出目录 |
-| Dataset dir | 数据集目录 |
-| Preprocess dir | 预处理原始数据目录 |
-| Label dir | 标注数据目录 |
-| Export dir | 模型导出目录 |
-| Models dir | 预训练权重下载和读取目录 |
+| `train_output` | Training logs & weights / 训练日志与权重 |
+| `predict_output` | Inference results / 推理结果 |
+| `dataset_dir` | Dataset images & labels / 数据集图片与标签 |
+| `preproc_dir` | Raw footage for frame extraction / 原始视频素材 |
+| `label_dir` | Active annotation workspace / 标注工作区 |
+| `export_dir` | Exported model files / 导出模型文件 |
+| `models_dir` | Pretrained weights cache / 预训练权重缓存 |
 
-点击 **Init Project Structure** 按钮，选择根目录后自动创建目录结构并填充配置。
+---
 
-### JSON 配置文件
+## Training / 训练
 
-| 文件 | 路径 | 说明 |
+### Standard Workflow / 标准流程
+
+1. **Select model** — Pretrained weight or `.yaml` architecture / 选择预训练权重或架构文件
+2. **Configure hyperparameters** — epochs, batch, lr, optimizer, augmentation, NMS / 配置超参数
+3. **(Optional) Inject attention** — SE / CBAM / CA via dropdown / 可选注入注意力模块
+4. **Start training** — Monitor real-time loss & mAP curves / 开始训练，实时监控曲线
+5. **Review results** — Access logs & weights from output directory / 查看结果
+
+### Attention Module Injection / 注意力模块注入
+
+| Module / 模块 | Type / 类型 | Description / 说明 |
 |---|---|---|
-| `paths.json` | `main/config/` | 工作目录配置（运行时读写） |
-| `attention.json` | `main/config/` | 注意力模块选择 |
-| `theme.json` | `main/config/` | 黑白主题状态 |
-| `shortcuts.json` | `main/config/` | 快捷键映射 |
+| **SE** | Channel | Squeeze-and-Excitation — 全局池化 + 全连接层 |
+| **CBAM** | Channel + Spatial | 通道与空间注意力串联 |
+| **CA** | Coordinate | 坐标注意力，编码位置信息 |
 
-## 训练
+### Knowledge Distillation / 知识蒸馏
 
-1. 在 Training 页选择预训练权重（`yolov8n.pt` / `yolov11n.pt`）或从零训练（`.yaml` 架构）
-2. 模型自动从 ultralytics 下载到配置的 `models_dir`
-3. 配置超参数：epochs、batch size、learning rate 等
-4. 可选注入注意力模块（Settings → Other → Attention 选择）
-5. 点击训练，实时监控 loss 和 mAP 图表
+Teacher model frozen; Student learns from both labels and teacher feature maps. Adjustable `alpha` weight.
+教师模型冻结，学生模型同时从真实标签和教师特征图学习，支持可调蒸馏权重。
 
-### 注意力模块
+### Real-time Monitoring / 实时监控
 
-支持三种注意力机制，通过训练页的 attention 下拉框选择，训练时自动注入到 C2f 模块：
+- **Training curves** — Live loss & mAP charts / 实时损失与 mAP 曲线
+- **System monitor** — CPU, memory, disk, GPU, VRAM / 系统监控栏
+- **FPS counter** — Inference preview speed / 推理 FPS 计数
 
-- **SE** — Squeeze-and-Excitation，通道注意力
-- **CBAM** — 通道+空间注意力
-- **CA** — Coordinate Attention，坐标注意力
+---
 
-### 知识蒸馏
+## Export / 导出
 
-Distill 页支持 Teacher-Student 知识蒸馏：
+```
+ONNX → TensorRT → OpenVINO → NCNN → TFLite → CoreML → TorchScript → EdgeTPU
+```
 
-- Teacher 模型冻结，Student 模型学习
-- 可调节蒸馏权重 alpha
-- 自定义蒸馏损失（特征图 MSE）
+Parameters configurable via Export tab UI (format, input size, half-precision, INT8, NMS inclusion).
+通过导出标签页配置格式、输入尺寸、半精度、INT8 量化等参数。
 
-## 窗口自适应
+---
 
-窗口缩放时全局字体按比例自动调整（参考宽度 1400px，缩放范围 0.7～1.5 倍）。
+## Packaging / 打包
 
-## 许可证
+1. **PyInstaller** — Bundles Python + dependencies + resources into a single directory / 打包为单目录
+2. **Inno Setup** — Wraps output into installer with shortcut, uninstall, license / 封装为安装程序
 
-MIT License — 仅限学习交流，禁止商用倒卖。
+### Runtime Hooks / 运行时钩子
 
-Copyright (c) 2025 Mcriel-CHYJIE
+- `rthook_torch.py` — Pre-loads VC++ runtime DLLs to prevent `OSError 1114` on c10.dll / 预加载 VC++ 运行时 DLL，防止 c10.dll 加载失败
+- Config files stored in `%APPDATA%\YOLO Training Studio\` to survive reinstallation / 配置文件存于 APPDATA，重装不丢失
+
+### System Requirements / 系统要求
+
+- **OS**: Windows 10/11 (64-bit)
+- **Disk**: ~4 GB (extracted / 解压后)
+- **RAM**: 8 GB minimum, 16 GB+ recommended / 建议 16 GB+
+- **GPU**: NVIDIA with CUDA 12+ and 8 GB+ VRAM for training (CPU-only inference works but is slow) / 训练建议，纯 CPU 推理可用但慢
+
+---
+
+## License / 许可证
+
+MIT License — for educational and research purposes only. Commercial redistribution and resale are prohibited.
+MIT 许可证 — 仅限学习与研究用途，禁止商业倒卖。
+
+Copyright &copy; 2025 Mcriel-CHYJIE
+
+---
+
+<p align="center">
+  <sub>Built with PyQt5 &middot; Ultralytics YOLO &middot; PyTorch</sub>
+</p>

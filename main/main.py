@@ -352,6 +352,20 @@ class Studio(QMainWindow):
             self._nav_btns[0][0].setChecked(True)
             self._switch('training')
 
+    # ── 关闭窗口确认 ──
+    def closeEvent(self, event):
+        """训练中退出时弹出确认框"""
+        tab = self._tabs.get('training')
+        if tab and hasattr(tab, 'trainer') and tab.trainer and tab.trainer.isRunning():
+            from PyQt5.QtWidgets import QMessageBox
+            reply = QMessageBox.question(self, '训练正在进行',
+                '模型训练正在进行中，确定要退出吗？\n\n退出后训练将被中断，进度可能会丢失。',
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                event.ignore()
+                return
+        event.accept()
+
     # ── 系统监控 ──
     def _start_sys_monitor(self):
         self._sys_timer = QTimer()

@@ -79,10 +79,10 @@ def label_root() -> Path:
 
 def load_session(session_path: Path):
     """
-    从 _annotations.json 加载 session。
+    从 _annotations.json 加载 session（相对路径转回绝对路径）。
 
     返回 (annotations_dict, current_idx)
-        annotations_dict: {img_path_str: [Annotation, ...]}
+        annotations_dict: {absolute_path_str: [Annotation, ...]}
         current_idx: int
     """
     data = {}
@@ -92,10 +92,12 @@ def load_session(session_path: Path):
             data = json.loads(session_path.read_text("utf-8"))
         except Exception:
             data = {}
+    base = session_path.parent
     saved = data.get("annotations", {})
     annotations = {}
     for k, v in saved.items():
-        annotations[k] = [Annotation.from_dict(a) for a in v]
+        ap = base / k  # 相对路径 → 绝对路径
+        annotations[str(ap)] = [Annotation.from_dict(a) for a in v]
     current_idx = data.get("current_idx", 0)
     return annotations, current_idx
 
@@ -103,15 +105,18 @@ def load_session(session_path: Path):
 def save_session_file(session_path: Path, current_idx: int,
                       annotations: dict) -> dict:
     """
-    将当前标注数据写入 session 文件。
-
-    返回 dict: {"ok": bool, "saved": bool, "error": str}
+    将当前标注数据写入 session 文件（路径存为相对路径）。
     """
     if session_path is None:
         return {"ok": False, "saved": False, "error": "no session path"}
+    base = session_path.parent
     annotations_serialized = {}
     for k, v in annotations.items():
-        annotations_serialized[k] = [a.to_dict() for a in v]
+        try:
+            rel = Path(k).relative_to(base).as_posix()
+        except ValueError:
+            rel = k  # 不在同一目录下则保留绝对路径
+        annotations_serialized[rel] = [a.to_dict() for a in v]
     data = {
         "current_idx": current_idx,
         "annotations": annotations_serialized,
@@ -343,12 +348,13 @@ class ExportWorker(QThread):
                     exported_count += 1
                     self.progress.emit(int(exported_count / total * 100))
 
-            # 生成 data.yaml
+            # 生成 data.yaml（使用相对路径，可移植）
             class_names = sorted(set(a.class_id for anns_list in self._annotations.values()
                                       for a in anns_list))
             data_yaml = {
-                "train": str(self._out_root / "images" / "train"),
-                "val": str(self._out_root / "images" / "val"),
+                "path": ".",
+                "train": "images/train",
+                "val": "images/val",
                 "nc": len(class_names),
                 "names": {i: f"class_{i}" for i in class_names},
             }

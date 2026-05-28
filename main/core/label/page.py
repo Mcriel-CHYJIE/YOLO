@@ -524,8 +524,7 @@ class LabelTab(QWidget):
             f"color:{TEXT};font-size:13px;font-weight:500;}}"
             f"QPushButton:hover{{background:{PRI}20;border-color:{PRI};}}"
             f"QPushButton:pressed{{background:{PRI}40;}}")
-        # Auto button — green, display-only
-        self.autoBtn.setEnabled(False)
+        # Auto button — green
         self.autoBtn.setStyleSheet(
             f"QPushButton{{background:{PRI};color:#fff;border:none;border-radius:4px;"
             f"padding:6px 16px;font-size:11px;font-weight:600;}}"
@@ -585,6 +584,7 @@ class LabelTab(QWidget):
         self.modeManual.toggled.connect(self._on_mode_changed)
         self.modeAuto.toggled.connect(self._on_mode_changed)
         self.browseModelBtn.clicked.connect(self._browse_model)
+        self.autoBtn.clicked.connect(self._start_auto)
         self.trainRatio.valueChanged.connect(
             lambda v: self.valLabel.setText(f"{100 - v}%"))
         self.exportBtn.clicked.connect(self._export)
@@ -665,6 +665,7 @@ class LabelTab(QWidget):
     def _on_mode_changed(self):
         is_auto = self.modeAuto.isChecked()
         self.autoPanel.setEnabled(True)  # 父容器永远启用，子控件各自控制自己的状态
+        self.autoBtn.setEnabled(is_auto)
         self.modelCombo.setEnabled(is_auto)
         self.browseModelBtn.setEnabled(is_auto)
         self.alConf.setEnabled(is_auto)

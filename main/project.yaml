@@ -9,7 +9,7 @@ project:
   name: YOLO Training Studio         # Window title
   task: detect                         # YOLO task (detect / segment / classify)
   data_yaml: datasets/data.yaml         # Relative to project root
-  tip: "V11n-CBAM-clsPW0.7-IoU0.75"    # Shown in Algorithm group box
+  tip: "V11n-CBAM-clsPW0.5-IoU0.8-conf0.55"    # Shown in Algorithm group box
 
 # ── Training Defaults ──
 training:
@@ -17,8 +17,8 @@ training:
   model_options:
     - yolo11n.pt
     - yolov8n.pt
-  epochs: 500                          # 充分收敛（CBAM 需更多轮数）
-  batch: 48                            # RTX 5070 Ti 16GB，batch=64+CBAM OOM 故降到 48
+  epochs: 500                          # 充分收敛，高精度需更久训练
+  batch: 32                            # RTX 5070 Ti 16GB，大数据集 batch 64 易 OOM 降到 32
   imgsz: 640
   imgsz_options: [416, 512, 640, 800]
   optimizer: AdamW
@@ -26,32 +26,43 @@ training:
   device: auto
   scheduler: Cosine
   scheduler_options: [Cosine, Linear]
-  patience: 100                        # 长耐心不早停
+  patience: 40                         # 100→40: 缩短早停耐心，epoch 100 左右最佳即停
   lr0: 0.0005                          # CBAM 注入后 LR 减半防震荡
   lrf: 0.01                            # 最终 LR = 5e-6
   warmup_epochs: 10                    # CBAM 需要更长预热
   workers: 12
   momentum: 0.937
   weight_decay: 0.0005
-  cls_pw: 0.7                          # <1 压低正类权重，模型更保守→减少误报
-  iou: 0.75                            # 严格 NMS，减少重复框降 FP
-  close_mosaic: 30                     # 最后 30 轮关 Mosaic 精细调优
-  copy_paste: 0.15                     # 少量复制增强
-  degrees: 5.0                         # 摔倒方向敏感，减小旋转
-  multi_scale: false                    # 16GB 显存开不起（峰值~18GB OOM），用 scale+copy_paste 补偿
-  hsv_h: 0.015
+  cls_pw: 0.7                          # 0.5→0.7: 提高分类权重，防止 val/cls 回升过拟合
+  iou: 0.8                             # 0.75→0.8: 更严格 NMS，减少重叠框降 FP
+  close_mosaic: 25                     # 15→25: 延迟关闭 Mosaic，增加样本多样性对抗过拟合
+  # ── Training hyperparams ──
+  dropout: 0.0                         # Dropout 正则化
+  warmup_momentum: 0.8                 # 预热期动量
+  amp: true                            # 混合精度训练
+  cache: false                         # 数据集缓存到内存
+  lora_rank: 0                         # LoRA 低秩适配秩数（0=关闭）
+  # ── Augmentation ──
+  copy_paste: 0.05                     # 0.15→0.05: 摔倒人体复制粘贴易产生不自然样本
+  degrees: 2.0                         # 5.0→2.0: 摔倒方向性极强，仅微小旋转防止假样本
+  multi_scale: false                    # 保持关闭（16GB 显存负担大）
+  hsv_h: 0.01                          # 人类衣着颜色变化不大，减小色相漂移
   hsv_s: 0.7
   hsv_v: 0.4
   translate: 0.1
-  scale: 0.5
-  flip_lr: 0.5
+  scale: 0.3                           # 摔倒人体尺度较一致，减小缩放范围
+  flip_lr: 0.3                         # 降低翻转率，摔倒有左右不对称
   flipud: 0.0                          # 摔倒有方向性，上下翻转有害
+  shear: 0.0                           # 剪切增强
+  perspective: 0.0                     # 透视增强
+  mosaic: 1.0                          # Mosaic 增强概率
+  mixup: 0.2                           # MixUp 增强概率
 
 # ── Validation Defaults ──
 validation:
   imgsz: 640
-  batch: 48
-  conf: 0.45                           # 强力过滤低分框，降低误报
+  batch: 64
+  conf: 0.55                           # 0.45→0.55: 提高推理阈值，强力过滤误报
   iou: 0.5                             # NMS 去重
 
 # ── Distillation Defaults ──
@@ -70,7 +81,7 @@ distill:
 
 # ── Prediction / Inference Defaults ──
 predict:
-  conf: 0.45                           # 推理 conf 0.45，强力过滤低分框
+  conf: 0.55                           # 推理 conf 0.55，强力过滤低分框
   iou: 0.5
   imgsz: 640
 
