@@ -134,6 +134,9 @@ class SettingsTab(QWidget):
         """加载 Qt Designer .ui 文件中的静态布局"""
         ui_path = Path(__file__).resolve().parent / 'settings.ui'
         uic.loadUi(str(ui_path), self)
+        # ── 标题 ──
+        self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
+        self.titleLabel.setFixedHeight(24)
         # 通过 objectName 获得：classEditor, saveBtn, statusLabel, hintLabel,
         #   shortcutPrev/Next/DelBox/DelImg, shortcutSaveBtn, shortcutStatus,
         #   classShortcutsContainer, ssToggleHost, themeToggleHost,

@@ -7,6 +7,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
 import cv2, numpy as np, threading
 from ultralytics import YOLO
+from .visualizer import compute_heatmap, extract_feature_maps, render_feature_map_grid, draw_boxes
 
 
 # ══════════════════════════════════════════════════════════════
@@ -15,7 +16,7 @@ from ultralytics import YOLO
 
 def run_batch_inference(
     model_path: Path, source_path: Path, conf: float, iou: float,
-    gpu_ok: bool, save: bool = False
+    gpu_ok: bool, save: bool = False,
 ) -> dict:
     """执行批量推理，返回结果数据集"""
     import numpy as np
@@ -28,7 +29,7 @@ def run_batch_inference(
         device='0' if gpu_ok else 'cpu',
         save=save, save_txt=False, verbose=False,
         project=_pred_path,
-        name=f'predict_{datetime.now().strftime("%m%d_%H%M")}')
+        name=f'predict_{datetime.now().strftime("%m%d_%H%M%S")}')
 
     total_imgs = len(results)
     total_dets = sum(len(r.boxes) for r in results if r.boxes is not None)
@@ -41,13 +42,89 @@ def run_batch_inference(
 
     save_dir = str(results[0].save_dir) if results and hasattr(results[0], 'save_dir') else ''
 
+    # ── 热力图 / 特征图 预计算（批模式始终计算）──
+    heatmaps = []
+    featuremaps = []       # 合并图（保存用）
+    fm_layers_all = []     # 逐层图 [每张图片 → [ (name, grid_img), ... ]]
+    for r in results:
+        orig = r.orig_img if hasattr(r, 'orig_img') else None
+        if orig is None:
+            orig = cv2.imread(r.path) if hasattr(r, 'path') and r.path else None
+        if orig is None:
+            heatmaps.append(None)
+            featuremaps.append(None)
+            fm_layers_all.append([])
+            continue
+
+        hm = None
+        fm_layers = []
+        try:
+            hm = compute_heatmap(model, orig, conf_threshold=conf)
+        except Exception:
+            hm = None
+        try:
+            raw = extract_feature_maps(model, orig)  # [(name, grid_img, dims), ...]
+            if raw:
+                fm_layers = [(name, grid) for name, grid, _ in raw]
+                fm = render_feature_map_grid(raw, orig)
+            else:
+                fm = None
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            fm = None
+        heatmaps.append(hm)
+        featuremaps.append(fm)
+        fm_layers_all.append(fm_layers)
+
+    # ── 保存全部视图（若开启导出）──
+    saved_views_dir = ''
+    if save and results:
+        saved_views_dir = _save_all_views(results, heatmaps, fm_layers_all, _pred_path)
+
     return dict(
         results=results,
         total_imgs=total_imgs,
         total_dets=total_dets,
         cls_counts=dict(cls_counts),
         save_dir=save_dir,
+        saved_views_dir=saved_views_dir,
+        heatmaps=heatmaps,
+        featuremaps=featuremaps,
+        fm_layers_all=fm_layers_all,
     )
+
+
+def _save_all_views(results, heatmaps, fm_layers_all, base_dir):
+    """保存每张图的 5 个视图到 predict_output 子目录"""
+    try:
+        ts = datetime.now().strftime('%m%d_%H%M%S')
+        out = Path(base_dir) / f'views_{ts}'
+        out.mkdir(parents=True, exist_ok=True)
+
+        for i, r in enumerate(results):
+            stem = f'{i:04d}'
+            # 原图
+            orig = r.orig_img if hasattr(r, 'orig_img') and r.orig_img is not None else None
+            if orig is not None:
+                cv2.imwrite(str(out / f'{stem}_orig.jpg'), orig)
+            # 检测图
+            det = r.plot() if hasattr(r, 'plot') else None
+            if det is not None:
+                cv2.imwrite(str(out / f'{stem}_det.jpg'), det)
+            # 热力图
+            if i < len(heatmaps) and heatmaps[i] is not None:
+                cv2.imwrite(str(out / f'{stem}_hm.jpg'), heatmaps[i])
+            # 特征图（每层单独保存）
+            if i < len(fm_layers_all):
+                for li, (lname, grid) in enumerate(fm_layers_all[i]):
+                    cv2.imwrite(str(out / f'{stem}_fm{li}.jpg'), grid)
+
+        return str(out)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return ''
 
 
 # ══════════════════════════════════════════════════════════════
@@ -60,13 +137,15 @@ class Detector(QObject):
     fps_updated = pyqtSignal(float); stats_updated = pyqtSignal(dict)
     log_signal = pyqtSignal(str); finished = pyqtSignal()
 
-    def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None):
+    def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None,
+                 show_heatmap=False):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
         self.conf = conf; self.iou = iou
         self._pause_event = threading.Event()
         self._stop_event = threading.Event()
         self.export_path = None; self.target_fps = target_fps
+        self._show_heatmap = show_heatmap
         self._thread = None
 
     def stop(self):
@@ -81,6 +160,10 @@ class Detector(QObject):
 
     def isRunning(self):
         return self._thread is not None and self._thread.is_alive()
+
+    def set_heatmap(self, enabled: bool):
+        """运行时切换热力图"""
+        self._show_heatmap = enabled
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -112,14 +195,25 @@ class Detector(QObject):
                 idx += 1
                 results = model(frame, conf=self.conf, iou=self.iou, verbose=False)[0]
                 annotated = results.plot(line_width=2, font_size=8)
-                if writer is not None: writer.write(annotated)
+                # 热力图叠加
+                display_frame = annotated
+                if self._show_heatmap:
+                    try:
+                        hm = compute_heatmap(model, frame, conf_threshold=self.conf)
+                        # 热力图 + 检测框叠加
+                        hm = draw_boxes(hm, results, model.names, conf_threshold=self.conf)
+                        display_frame = hm
+                    except Exception:
+                        pass
+                if writer is not None:
+                    writer.write(annotated if not self._show_heatmap else display_frame)
                 now = datetime.now(); fps_val = 1.0 / max((now - t_prev).total_seconds(), 0.001); t_prev = now
                 stats = {}
                 if results.boxes is not None:
                     for cls_id in results.boxes.cls:
                         name = model.names.get(int(cls_id), f'cls_{int(cls_id)}')
                         stats[name] = stats.get(name, 0) + 1
-                self.frame_ready.emit(annotated, idx, total)
+                self.frame_ready.emit(display_frame, idx, total)
                 self.fps_updated.emit(fps_val); self.stats_updated.emit(stats)
             if writer is not None: writer.release(); self.log_signal.emit(f' Video saved: {Path(self.export_path).name}')
             cap.release()

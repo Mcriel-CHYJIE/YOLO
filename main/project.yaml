@@ -9,7 +9,7 @@ project:
   name: YOLO Training Studio         # Window title
   task: detect                         # YOLO task (detect / segment / classify)
   data_yaml: datasets/data.yaml         # Relative to project root
-  tip: "V11n-CBAM-clsPW0.5-IoU0.8-conf0.55"    # Shown in Algorithm group box
+  tip: "yolo11n-CBAM-PW0.5-IoU0.8-conf0.55"    # Shown in Algorithm group box
 
 # ── Training Defaults ──
 training:

@@ -20,7 +20,7 @@ def build_distill_config(
     """构建蒸馏配置参数"""
     return dict(
         teacher=teacher_path, student=student_path, data=data_path,
-        name=f'distill_{__import__("datetime").datetime.now().strftime("%m%d_%H%M")}',
+        name=f'distill_{__import__("datetime").datetime.now().strftime("%m%d_%H%M%S")}',
         epochs=epochs, batch=batch, lr0=lr0, alpha=alpha,
         patience=patience, imgsz=imgsz,
         device='cuda:0' if gpu_ok else 'cpu',

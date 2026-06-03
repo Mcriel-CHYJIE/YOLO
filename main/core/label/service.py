@@ -27,11 +27,20 @@ class Annotation:
     __slots__ = ('class_id', 'xc', 'yc', 'w', 'h')
 
     def __init__(self, class_id, xc, yc, w, h):
-        self.class_id = class_id
-        self.xc = xc
-        self.yc = yc
-        self.w = w
-        self.h = h
+        # 防护：NaN/Inf → 修复为有效值
+        import math
+        def _clean(v, default, lo=0.0, hi=1.0):
+            if not math.isfinite(v) or v < lo:
+                return default
+            if v > hi:
+                return hi
+            return v
+        # w/h 最小 0.005（对应 640 图上约 3 像素）
+        self.class_id = int(class_id) if class_id is not None else 0
+        self.xc = _clean(xc, 0.5, 0.0, 1.0)
+        self.yc = _clean(yc, 0.5, 0.0, 1.0)
+        self.w = max(0.005, _clean(w, 0.05, 0.0, 1.0))
+        self.h = max(0.005, _clean(h, 0.05, 0.0, 1.0))
 
     def to_yolo(self):
         return f"{self.class_id} {self.xc:.6f} {self.yc:.6f} {self.w:.6f} {self.h:.6f}"

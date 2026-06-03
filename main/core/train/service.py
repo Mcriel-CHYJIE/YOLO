@@ -188,13 +188,40 @@ class Trainer(QObject):
                 except Exception as e:
                     self.log.emit(f' [WARN] LoRA injection failed: {e}')
             
-            exp = f'{ROOT.name}_{datetime.now().strftime("%m%d_%H%M")}'
+            # 输出目录命名：{日期}_{预设} 或 {日期}_{模型}
+            preset = cfg.get('preset_name', '')
+            if not preset:
+                # 从模型路径提取主干名
+                m_path = cfg.get('model', '')
+                preset = Path(m_path).stem if m_path else ROOT.name
+            exp = f'{datetime.now().strftime("%m%d_%H%M")}_{preset}'
             model_name = cfg['model'] if cfg['model'] else 'Scratch'
             self.log.emit(f' {model_name} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
             if cfg.get('lr0', 0) <= 0: cfg['lr0'] = 0.001; self.log.emit(f'  LR0 was 0, reset to 0.001')
             if torch.cuda.is_available() and cfg['device'] != 'cpu':
                 gi = self._check_gpu_memory()
                 if gi: self.log.emit(f' GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free')
+            # ── 自动检测 batch 是否可能爆显存 ──
+            if torch.cuda.is_available() and cfg['device'] != 'cpu':
+                try:
+                    model_name = str(cfg.get('model', '')).lower()
+                    bs = cfg['batch']
+                    extra = cfg.get('lora_rank', 0) > 0 or cfg.get('attention', 'None') != 'None'
+                    # 根据模型规模估算安全 batch
+                    if 'yolo11n' in model_name or 'yolov8n' in model_name:
+                        safe_max = 24 if extra else 32
+                    elif 'yolo11s' in model_name or 'yolov8s' in model_name:
+                        safe_max = 12 if extra else 24
+                    elif 'yolo11m' in model_name or 'yolov8m' in model_name:
+                        safe_max = 8 if extra else 16
+                    else:
+                        safe_max = 24
+                    if bs > safe_max:
+                        self.log.emit(f' ⚠️  batch={bs} 在当前模型配置下可能爆显存')
+                        self.log.emit(f'  建议: batch ≤ {safe_max}（含额外模块={extra}）')
+                        self.log.emit(f'  仍将使用 batch={bs} 启动，OOM 时请降低 batch')
+                except Exception as _e:
+                    pass
             def cb(t):
                 if self._stop_event.is_set(): t.stop = True; return
                 try:
@@ -203,7 +230,7 @@ class Trainer(QObject):
                     if loss == 0.0 and hasattr(t,'tloss') and t.tloss is not None: loss = float(t.tloss)
                     mt = getattr(t,'metrics',None) or {}
                     m50 = float(mt.get('metrics/mAP50(B)',0)); m95 = 0.0
-                    for k in ['metrics/mAP50_95(B)','metrics/mAP50_95','metrics/mAP_0.5:0.95']:
+                    for k in ['metrics/mAP50-95(B)','metrics/mAP50_95(B)','metrics/mAP50_95','metrics/mAP_0.5:0.95']:
                         v = mt.get(k)
                         if v is not None:
                             try: m95 = float(v); break

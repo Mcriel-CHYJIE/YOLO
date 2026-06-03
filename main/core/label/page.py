@@ -6,6 +6,7 @@
 
 """标注标签页 UI — 加载 .ui 文件，业务逻辑委托给 label_service"""
 
+import math
 from PyQt5 import uic
 from main.core.base import *
 from . import service as lbsvc
@@ -144,6 +145,12 @@ class AnnotationCanvas(QWidget):
 
     def _draw_ann(self, painter, ann, selected=False):
         x1, y1, x2, y2 = self._ann_rect(ann)
+        # 防护：跳过无效框
+        import math
+        if not all(math.isfinite(v) for v in (x1, y1, x2, y2)):
+            return
+        if int(x2 - x1) <= 0 or int(y2 - y1) <= 0:
+            return
         color = CLASS_COLORS[ann.class_id % len(CLASS_COLORS)]
         qc = QColor(color)
         painter.setBrush(Qt.NoBrush)
@@ -175,18 +182,28 @@ class AnnotationCanvas(QWidget):
 
     def _hit_test(self, cx, cy):
         for i, ann in enumerate(self._annotations):
-            x1, y1, x2, y2 = self._ann_rect(ann)
-            if x1 <= cx <= x2 and y1 <= cy <= y2:
-                return i
+            try:
+                x1, y1, x2, y2 = self._ann_rect(ann)
+                if not all(math.isfinite(v) for v in (x1, y1, x2, y2)):
+                    continue
+                if x1 <= cx <= x2 and y1 <= cy <= y2:
+                    return i
+            except Exception:
+                continue
         return -1
 
     def _hit_handle(self, cx, cy):
         for i, ann in enumerate(self._annotations):
-            x1, y1, x2, y2 = self._ann_rect(ann)
-            corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]
-            for j, (hx, hy) in enumerate(corners):
-                if abs(cx - hx) <= 5 and abs(cy - hy) <= 5:
-                    return i, j
+            try:
+                x1, y1, x2, y2 = self._ann_rect(ann)
+                if not all(math.isfinite(v) for v in (x1, y1, x2, y2)):
+                    continue
+                corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]
+                for j, (hx, hy) in enumerate(corners):
+                    if abs(cx - hx) <= 5 and abs(cy - hy) <= 5:
+                        return i, j
+            except Exception:
+                continue
         return -1, -1
 
     def mousePressEvent(self, event):
@@ -239,6 +256,8 @@ class AnnotationCanvas(QWidget):
             self.update()
             return
         if self._drag_mode == "move" and self._drag_idx >= 0:
+            if self._drag_idx >= len(self._annotations):
+                self._drag_mode = None; self._drag_idx = -1; return
             dx = (cx - self._drag_start[0]) / (self._scale * self._img_w)
             dy = (cy - self._drag_start[1]) / (self._scale * self._img_h)
             ann = self._annotations[self._drag_idx]
@@ -249,6 +268,8 @@ class AnnotationCanvas(QWidget):
             self.update()
             return
         if self._drag_mode == "resize" and self._drag_idx >= 0:
+            if self._drag_idx >= len(self._annotations):
+                self._drag_mode = None; self._drag_idx = -1; return
             ann = self._annotations[self._drag_idx]
             nx, ny = self._can2img(cx, cy)
             nx = max(0, min(1, nx))
@@ -383,6 +404,7 @@ class LabelTab(QWidget):
         self._class_ids = []
         self._class_btns = []
         self._shortcut_keys = {}
+        self._image_cache = {}  # {str(path): np.ndarray} 图像像素缓存
 
     # ═══════════════ UI LOADING ═══════════════
 
@@ -392,6 +414,10 @@ class LabelTab(QWidget):
 
     def _post_process_ui(self):
         """替换占位 widget + 初始化动态区域"""
+        # ── 标题 ──
+        self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
+        self.titleLabel.setFixedHeight(24)
+
         # ── 替换 canvasPlaceholder 为 AnnotationCanvas ──
         self.canvas = AnnotationCanvas(self.centerPanel)
         self.canvas.annotation_changed.connect(self._on_annotation_changed)
@@ -701,6 +727,7 @@ class LabelTab(QWidget):
         self._current_idx = 0
         self._annotations = {}
         self._auto_anns = {}
+        self._image_cache.clear()
         self._session_file = folder / "_annotations.json"
         if self._session_file.exists():
             try:
@@ -742,7 +769,13 @@ class LabelTab(QWidget):
         if idx < 0 or idx >= len(self._image_paths):
             return
         img_path = self._image_paths[idx]
-        self._current_image = cv2.imread(str(img_path))
+        key = str(img_path)
+        if key in self._image_cache:
+            self._current_image = self._image_cache[key]
+        else:
+            self._current_image = cv2.imread(str(img_path))
+            if self._current_image is not None:
+                self._image_cache[key] = self._current_image
         if self._current_image is None:
             return
         self._canvas_save = save
@@ -950,8 +983,11 @@ class LabelTab(QWidget):
         self.annList.clear()
         for i, ann in enumerate(self.canvas.annotations):
             name = lbsvc.resolve_class_name(ann.class_id)
-            self.annList.addItem(
-                f"[{i}] {name}  ({ann.xc:.3f}, {ann.yc:.3f})  {ann.w:.3f}x{ann.h:.3f}")
+            try:
+                self.annList.addItem(
+                    f"[{i}] {name}  ({ann.xc:.3f}, {ann.yc:.3f})  {ann.w:.3f}x{ann.h:.3f}")
+            except Exception:
+                self.annList.addItem(f"[{i}] {name}  (invalid)")
             if i == self.canvas.selected_idx:
                 self.annList.setCurrentRow(i)
         self.annList.blockSignals(False)

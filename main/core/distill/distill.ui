@@ -1,24 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>DistillPage</class>
- <widget class="QWidget" name="DistillPage">
-<layout class="QHBoxLayout" name="mainLo">
-   <property name="leftMargin">
-       <number>4</number>
-      </property><property name="topMargin">
-       <number>4</number>
-      </property>
-   <property name="rightMargin">
-       <number>4</number>
-      </property><property name="bottomMargin">
-       <number>4</number>
-      </property>
-   <property name="spacing">
-       <number>6</number>
-      </property>
+  <widget class="QWidget" name="DistillPage">
+ <layout class="QVBoxLayout" name="mainLo">
+    <property name="leftMargin">
+        <number>4</number>
+       </property><property name="topMargin">
+        <number>4</number>
+       </property>
+    <property name="rightMargin">
+        <number>4</number>
+       </property><property name="bottomMargin">
+        <number>4</number>
+       </property>
+    <property name="spacing">
+        <number>6</number>
+       </property>
 
-   <item>
-    <widget class="QWidget" name="leftPanel" native="true">
+    <!-- Title -->
+    <item><widget class="QLabel" name="titleLabel">
+     <property name="text"><string>🧪  Distill</string></property>
+     <property name="minimumHeight"><number>24</number></property>
+     <property name="maximumHeight"><number>24</number></property>
+     <property name="styleSheet"><string>font-size:18px;font-weight:700;padding:0;margin:0;</string></property>
+    </widget></item>
+
+    <item>
+     <layout class="QHBoxLayout" name="contentLo">
+      <property name="spacing">
+        <number>6</number>
+       </property>
+
+    <item>
+     <widget class="QWidget" name="leftPanel" native="true">
      <property name="minimumSize"><size><width>340</width><height>0</height></size></property>
      <property name="maximumSize"><size><width>340</width><height>16777215</height></size></property>
      <layout class="QVBoxLayout" name="leftLo">
@@ -366,15 +380,17 @@
        </widget></item>
       </layout></item>
       <item><widget class="LogPanel" name="log_panel" native="true"/></item>
-     </layout>
-    </widget>
-   </item>
-  </layout>
- </widget>
- <resources/>
- <connections/>
- <customwidgets>
-  <customwidget><class>Chart</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
-  <customwidget><class>LogPanel</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
- </customwidgets>
-</ui>
+      </layout>
+      </widget>
+      </item>
+      </layout>
+      </item>
+      </layout>
+      </widget>
+      <resources/>
+      <connections/>
+      <customwidgets>
+      <customwidget><class>Chart</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
+      <customwidget><class>LogPanel</class><extends>QWidget</extends><header>main.core.base</header></customwidget>
+      </customwidgets>
+      </ui>

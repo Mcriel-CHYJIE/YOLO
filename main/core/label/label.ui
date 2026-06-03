@@ -9,6 +9,14 @@
    <property name="bottomMargin"><number>0</number></property>
    <property name="spacing"><number>0</number></property>
 
+   <!-- Title -->
+   <item><widget class="QLabel" name="titleLabel">
+    <property name="text"><string>🏷️  Label</string></property>
+    <property name="minimumHeight"><number>24</number></property>
+    <property name="maximumHeight"><number>24</number></property>
+    <property name="styleSheet"><string>font-size:18px;font-weight:700;padding:0;margin:0;</string></property>
+   </widget></item>
+
    <item><layout class="QHBoxLayout" name="mainLoH">
     <property name="spacing"><number>0</number></property>
 
@@ -67,16 +75,18 @@
           <property name="frameShadow"><enum>QFrame::Sunken</enum></property>
          </widget></item>
 
-         <item><widget class="QLabel" name="filterStatsLabel">
-          <property name="text"><string>0 → 0 images</string></property>
-          <property name="alignment"><enum>Qt::AlignCenter</enum></property>
-         </widget></item>
-
-         <item><widget class="QPushButton" name="filterBtn">
-          <property name="text"><string> Random Filter</string></property>
-          <property name="objectName"><string>pri</string></property>
-          <property name="minimumHeight"><number>26</number></property>
-         </widget></item>
+         <item><layout class="QHBoxLayout" name="filterRow">
+          <property name="spacing"><number>6</number></property>
+          <item><widget class="QLabel" name="filterStatsLabel">
+           <property name="text"><string>0 → 0 images</string></property>
+           <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+          </widget></item>
+          <item><widget class="QPushButton" name="filterBtn">
+           <property name="text"><string> Random Filter</string></property>
+           <property name="objectName"><string>pri</string></property>
+           <property name="minimumHeight"><number>26</number></property>
+          </widget></item>
+         </layout></item>
         </layout>
        </widget></item>
 

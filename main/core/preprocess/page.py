@@ -34,6 +34,9 @@ class PreprocessTab(QWidget):
     def _build_ui(self):
         ui_path = Path(__file__).resolve().parent / 'preprocess.ui'
         uic.loadUi(str(ui_path), self)
+        # ── 标题 ──
+        self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
+        self.titleLabel.setFixedHeight(24)
 
     def _init_widgets(self):
         # 浏览按钮加文件夹图标

@@ -27,12 +27,11 @@ if sys.platform == 'win32':
 
 from main.core.train import TrainTab
 from main.core.distill import DistillTab
-from main.core.dataset import DatasetTab
 from main.core.predict import PredictTab
 from main.core.preprocess import PreprocessTab
 from main.core.label import LabelTab
+from main.core.review import RelabelTab
 from main.core.guide import GuideTab
-from main.core.export import ExportTab
 from main.core.settings import SettingsTab
 from main.core.agent import AgentTab
 from main.core.tools import ToolsTab
@@ -43,11 +42,10 @@ SIDE_W = 110  # 侧边栏宽度
 NAV_ITEMS = [
     ('🎯  Training',   'training'),
     ('👁️  Predict',   'predict'),
-    ('📁  Dataset',    'dataset'),
     ('🎞️  Preproc',    'preprocess'),
     ('🏷️  Label',      'label'),
+    ('🔁  Review',     'review'),
     ('🔬  Distill',    'distill'),
-    ('📦  Export',     'export'),
     ('🤖  AI Agent',   'agent'),
     ('🛠  Tools',      'tools'),
     ('⚙️  Settings',   'settings'),
@@ -333,11 +331,10 @@ class Studio(QMainWindow):
         pages = [
             ('training',   TrainTab(self)),
             ('predict',    PredictTab(self)),
-            ('dataset',    DatasetTab(self)),
             ('preprocess', PreprocessTab(self)),
             ('label',      LabelTab(self)),
+            ('review',    RelabelTab(self)),
             ('distill',    DistillTab(self)),
-            ('export',     ExportTab(self)),
             ('agent',      AgentTab(self)),
             ('tools',      ToolsTab(self)),
             ('settings',   SettingsTab(self)),
@@ -364,6 +361,19 @@ class Studio(QMainWindow):
             if reply != QMessageBox.Yes:
                 event.ignore()
                 return
+
+        # 检查 label / review 页未保存的标注
+        for key, name in [('label', 'Label'), ('review', 'Review')]:
+            tab = self._tabs.get(key)
+            if tab and getattr(tab, '_has_unsaved', False):
+                from PyQt5.QtWidgets import QMessageBox
+                reply = QMessageBox.question(self, f'{name} 未保存',
+                    f'{name} 页有未保存的标注，确定要退出吗？\n\n退出后未保存的更改将丢失。',
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply != QMessageBox.Yes:
+                    event.ignore()
+                    return
+
         event.accept()
 
     # ── 系统监控 ──

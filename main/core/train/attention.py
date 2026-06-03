@@ -180,9 +180,11 @@ class EMA(nn.Module):
 # ═══════════════════════════════════════════
 class GAM(nn.Module):
     """Global Attention — reduce→conv→expand 全维度"""
-    def __init__(self, channels, reduction=8):
+    def __init__(self, channels, reduction=16):
         super().__init__()
         c = max(channels // reduction, 4)
+        # 确保 groups 能整除 channels 和 c
+        self._groups = self._valid_groups(channels, c, 4)
         # 通道注意力
         self.channel_attn = nn.Sequential(
             nn.Conv2d(channels, c, 1),
@@ -192,12 +194,19 @@ class GAM(nn.Module):
         )
         # 空间注意力
         self.spatial_attn = nn.Sequential(
-            nn.Conv2d(channels, c, 7, padding=3, groups=min(channels, 4)),
+            nn.Conv2d(channels, c, 7, padding=3, groups=self._groups),
             nn.BatchNorm2d(c),
             nn.ReLU(inplace=True),
-            nn.Conv2d(c, channels, 7, padding=3, groups=min(channels, 4)),
+            nn.Conv2d(c, channels, 7, padding=3, groups=self._groups),
         )
         self.sigmoid = nn.Sigmoid()
+
+    @staticmethod
+    def _valid_groups(ch, c, max_groups):
+        for g in range(min(max_groups, ch, c), 0, -1):
+            if ch % g == 0 and c % g == 0:
+                return g
+        return 1
 
     def forward(self, x):
         # 通道门控
@@ -244,12 +253,12 @@ def inject_attention(model, attn_type):
     遍历 model.model 中的所有模块，将 C2f / C3k2 等替换为 AttentionWrapper。
     """
     if attn_type == 'none' or not attn_type:
-        return
+        return 0
 
     try:
         from ultralytics.nn.modules import C2f, C3k2, Bottleneck, C3
     except ImportError:
-        return
+        return 0
 
     TARGETS = (C2f, C3k2, C3, Bottleneck)
     replaced = 0
@@ -319,7 +328,7 @@ def inject_lora(model, rank):
             if isinstance(child, nn.Conv2d):
                 ks = child.kernel_size
                 s = child.stride
-                if ks[0] == ks[1] and ks[0] >= 3 and s[0] == 1 and s[1] == 1:
+                if ks[0] == ks[1] and ks[0] >= 3 and s[0] == 1 and s[1] == 1 and child.padding[0] == ks[0] // 2:
                     setattr(module, name, LoRAConv2d(child, rank))
                     replaced += 1
             else:

@@ -6,7 +6,7 @@
 
 """Tools 标签页 — 导入视频到预处理目录 + 标签导入导出"""
 
-import shutil, zipfile
+import shutil, zipfile, os
 from pathlib import Path
 from PyQt5 import uic
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -222,12 +222,21 @@ class _CrawlerWorker(QObject):
         return downloaded
 
 
+class _AnalyzeSignal(QObject):
+    """从工作线程发射信号到主线程更新 UI"""
+    done = pyqtSignal(str, str)       # summary, error
+    progress_update = pyqtSignal(int, int)  # current, total
+
+
 class ToolsTab(QWidget):
     """工具标签页 — 视频导入工具"""
 
     def __init__(self, studio):
         super().__init__()
         self.studio = studio
+        self._analyze_signal = _AnalyzeSignal()
+        self._analyze_signal.done.connect(self._analyze_done)
+        self._analyze_signal.progress_update.connect(self._on_analyze_progress)
         self._load_ui()
         self._post_process_ui()
         self._connect_signals()
@@ -252,26 +261,14 @@ class ToolsTab(QWidget):
         # ── 三列等宽 ──
         self.colsLo.setStretch(0, 1)
         self.colsLo.setStretch(1, 1)
-        self.colsLo.setStretch(2, 1)
-
-        # ── 第一列：爬虫组件自然高度，底部加 other 占位组件 ──
-        self.otherCrawlerPlaceholder = QGroupBox('... Other')
-        self.otherCrawlerPlaceholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
-        self.otherCrawlerPlaceholder.setStyleSheet(f'''
-            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
-                border:1px solid {BORDER};border-radius:6px;
-                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
-            QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
-                background:{CARD};}}
-        ''')
-        self.col1Lo.addWidget(self.otherCrawlerPlaceholder, 1)
+        self.colsLo.setStretch(2, 1)  # col3 占位
 
         # ── 标题 ──
         self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
         self.titleLabel.setFixedHeight(24)
 
         # ── 所有 QGroupBox 统一样式 ──
-        for g in (self.otherGroup, self.otherGroup2, self.otherGroup3, self.otherPlaceholder):
+        for g in (self.otherGroup, self.otherGroup3, self.otherPlaceholder, self.exportGroup):
             g.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
             g.setStyleSheet(f'''
                 QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
@@ -280,10 +277,16 @@ class ToolsTab(QWidget):
                 QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
                     background:{CARD};}}
             ''')
-        # Label group 自然高度，替代默认 Preferred
+        self.otherGroup3.setVisible(True)  # col3 占位
+        # Label group 自然高度
         self.otherGroup.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        # exportGroup 自然高度
         # dataGroup 自然高度
         self.dataGroup.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        # Crawler 组填充剩余空间
+        self.otherPlaceholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        # 关键字输入框填充组内剩余高度
+        self.crawlerKeyword.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.dataGroup.setStyleSheet(f'''
             QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
                 border:1px solid {BORDER};border-radius:6px;
@@ -388,6 +391,125 @@ class ToolsTab(QWidget):
         self.crawlerInfo.setStyleSheet(
             f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
 
+        # ── Export widgets ──
+        self.exportWeights.setStyleSheet(f'''
+            QLineEdit{{background:{BG};border:1px solid {BORDER};
+                border-radius:3px;padding:1px 6px;font-size:10px;color:{TEXT3};}}
+        ''')
+        self.exportBrowseBtn.setStyleSheet(f'''
+            QPushButton{{background:{CARD};border:1px solid {BORDER};
+                border-radius:3px;font-size:12px;padding:0;}}
+            QPushButton:hover{{background:{BORDER};}}
+        ''')
+        self.exportFmt.setStyleSheet(f'''
+            QComboBox{{border:1px solid {BORDER};border-radius:4px;
+                padding:2px 6px;background:{CARD};font-size:10px;color:{TEXT};}}
+            QComboBox:focus{{border-color:{PRI};}}
+            QComboBox::drop-down{{border:none;width:16px;}}
+        ''')
+        self.exportSz.setStyleSheet(f'''
+            QComboBox{{border:1px solid {BORDER};border-radius:4px;
+                padding:2px 6px;background:{CARD};font-size:10px;color:{TEXT};}}
+            QComboBox:focus{{border-color:{PRI};}}
+            QComboBox::drop-down{{border:none;width:16px;}}
+        ''')
+        self.exportBtn.setStyleSheet(f'''
+            QPushButton{{background:{PRI};color:#fff;border:none;
+                padding:4px 0;font-size:11px;font-weight:600;border-radius:4px;}}
+            QPushButton:hover{{background:{PRI_H};}}
+            QPushButton:disabled{{background:#a5d6a5;}}
+        ''')
+        self.exportStatus.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};padding:0;margin:0;')
+
+        # ── 模型分析组件（Column 2）──
+        self.col2Placeholder.setTitle('🔎 Model Analysis')
+        lo = self.col2Placeholder.layout()
+
+        # 模型路径行：Model 标签 + 路径框 + 📁 按钮
+        row1 = QWidget()
+        r1 = QHBoxLayout(row1); r1.setContentsMargins(0,0,0,0); r1.setSpacing(4)
+        r1.addWidget(QLabel('Model'))
+        self.analyze_model_path = QLineEdit()
+        self.analyze_model_path.setPlaceholderText('Auto (latest best.pt)')
+        self.analyze_model_path.setStyleSheet(
+            f'font-size:10px;padding:2px 6px;border:1px solid {BORDER};'
+            f'border-radius:3px;background:{BG};color:{TEXT};')
+        r1.addWidget(self.analyze_model_path)
+        self.analyze_model_btn = QPushButton('📁')
+        self.analyze_model_btn.setFixedSize(24,22)
+        self.analyze_model_btn.setStyleSheet(f'''
+            QPushButton{{background:{CARD};border:1px solid {BORDER};
+                border-radius:3px;font-size:12px;padding:0;}}
+            QPushButton:hover{{background:{BORDER};}}
+        ''')
+        self.analyze_model_btn.clicked.connect(self._analyze_browse_model)
+        r1.addWidget(self.analyze_model_btn)
+        lo.addWidget(row1)
+
+        # 参数行：Split + Conf + spinbox + ▶ Analyze
+        btn_row = QWidget()
+        br = QHBoxLayout(btn_row); br.setContentsMargins(0,0,0,0); br.setSpacing(6)
+        br.addWidget(QLabel('Split'))
+        self.analyze_split = QComboBox()
+        self.analyze_split.addItems(['val', 'test'])
+        self.analyze_split.setCurrentText('test')
+        self.analyze_split.setStyleSheet(
+            f'font-size:10px;padding:2px 4px;border:1px solid {BORDER};'
+            f'border-radius:3px;background:{CARD};color:{TEXT};')
+        br.addWidget(self.analyze_split)
+        br.addWidget(QLabel('Conf'))
+        self.analyze_conf = QDoubleSpinBox()
+        self.analyze_conf.setRange(0.0, 0.99); self.analyze_conf.setDecimals(2)
+        self.analyze_conf.setSingleStep(0.05); self.analyze_conf.setValue(0.0)
+        self.analyze_conf.setStyleSheet(
+            f'font-size:10px;padding:2px 4px;border:1px solid {BORDER};'
+            f'border-radius:3px;background:{CARD};color:{TEXT};')
+        br.addWidget(self.analyze_conf)
+        self.analyze_btn = QPushButton('▶ Analyze')
+        self.analyze_btn.setStyleSheet(
+            f'background:{PRI};color:#fff;border:none;padding:6px 12px;'
+            f'font-size:12px;font-weight:600;border-radius:4px;')
+        self.analyze_btn.clicked.connect(self._run_analyze)
+        br.addWidget(self.analyze_btn)
+        lo.addWidget(btn_row)
+
+        # 进度条
+        self.analyze_progress = QProgressBar()
+        self.analyze_progress.setVisible(True)
+        self.analyze_progress.setTextVisible(True)
+        self.analyze_progress.setStyleSheet(f'''
+            QProgressBar{{border:none;border-radius:2px;height:14px;
+                background:{BORDER};text-align:center;font-size:8px;color:{TEXT};}}
+            QProgressBar::chunk{{background:{PRI};border-radius:2px;}}
+        ''')
+        lo.addWidget(self.analyze_progress)
+
+        # 状态
+        self.analyze_status = QLabel('')
+        self.analyze_status.setStyleSheet(f'font-size:9px;color:{TEXT3};padding:0;')
+        self.analyze_status.setWordWrap(True)
+        lo.addWidget(self.analyze_status)
+        lo.addStretch()
+
+        # Col 2 组件自然高度
+        self.col2Placeholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.col2Placeholder.setStyleSheet(f'''
+            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
+                border:1px solid {BORDER};border-radius:6px;
+                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
+            QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
+                background:{CARD};}}
+        ''')
+        self.col2Other.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.col2Other.setStyleSheet(f'''
+            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
+                border:1px solid {BORDER};border-radius:6px;
+                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
+            QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
+                background:{CARD};}}
+        ''')
+
     # ═══════════════════════════════════════════
     # Signals
     # ═══════════════════════════════════════════
@@ -398,6 +520,8 @@ class ToolsTab(QWidget):
         self.labelImportBtn.clicked.connect(self._import_label_zip)
         self.crawlerBrowseBtn.clicked.connect(self._crawler_browse)
         self.crawlerStartBtn.clicked.connect(self._crawler_start)
+        self.exportBrowseBtn.clicked.connect(self._export_browse)
+        self.exportBtn.clicked.connect(self._run_export)
 
     # ═══════════════════════════════════════════
     # Data Loading
@@ -425,6 +549,24 @@ class ToolsTab(QWidget):
             self.labelImportPath.setText('—')
             self._label_after = None
 
+        # ── Export 初始化 ──
+        e = cfg['export']
+        self.exportFmt.clear()
+        self.exportFmt.addItems(e['format_options'])
+        self.exportFmt.setCurrentText(e['format'])
+        self.exportSz.addItems([str(v) for v in e['imgsz_options']])
+        self.exportSz.setCurrentText(str(e['imgsz']))
+        self.exportHalf.setChecked(e['half'])
+        self.exportInt8.setChecked(e['int8'])
+        self.exportNms.setChecked(e['nms'])
+        from PyQt5.QtWidgets import QListView
+        for cb in (self.exportFmt, self.exportSz):
+            lv = QListView()
+            lv.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            cb.setView(lv)
+            cb.setMaxVisibleItems(10)
+        self._export_load_latest()
+
     # ═══════════════════════════════════════════
     # Import Logic
     # ═══════════════════════════════════════════
@@ -447,6 +589,15 @@ class ToolsTab(QWidget):
         self.dataStatus.setText('Importing...')
 
         global _WORKER, _THREAD
+        # 清理旧线程/工作器，防止快速重复点击
+        if _THREAD is not None:
+            _THREAD.quit()
+            _THREAD.wait(3000)
+            _THREAD = None
+        if _WORKER is not None:
+            _WORKER.deleteLater()
+            _WORKER = None
+
         _WORKER = _ImportWorker(src, dst)
         _THREAD = QThread(self)
         _WORKER.moveToThread(_THREAD)
@@ -474,6 +625,9 @@ class ToolsTab(QWidget):
         self.dataStatus.setText(msg)
 
     def _on_import_thread_done(self):
+        global _WORKER, _THREAD
+        _WORKER = None
+        _THREAD = None
         self.importBtn.setEnabled(True)
 
     # ═══════════════════════════════════════════
@@ -511,8 +665,11 @@ class ToolsTab(QWidget):
         try:
             with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for f in src_folder.rglob('*'):
-                    if f.is_file():
-                        arcname = str(f.relative_to(after))
+                    if f.is_file() or f.is_symlink():
+                        try:
+                            arcname = str(f.relative_to(after))
+                        except ValueError:
+                            continue  # 跳过指向外部的符号链接
                         zf.write(str(f), arcname)
             self._set_label_status(GREEN, f'Exported \u2192 {Path(save_path).name}')
         except Exception as e:
@@ -597,8 +754,17 @@ class ToolsTab(QWidget):
         QApplication.processEvents()
 
         global _CRAWLER_WORKER, _CRAWLER_THREAD
+        # 清理旧线程
+        if _CRAWLER_THREAD is not None:
+            _CRAWLER_THREAD.quit()
+            _CRAWLER_THREAD.wait(3000)
+            _CRAWLER_THREAD = None
+        if _CRAWLER_WORKER is not None:
+            _CRAWLER_WORKER.deleteLater()
+            _CRAWLER_WORKER = None
+
         _CRAWLER_WORKER = _CrawlerWorker(keyword, dst)
-        _CRAWLER_THREAD = QThread()
+        _CRAWLER_THREAD = QThread(self)
         _CRAWLER_WORKER.moveToThread(_CRAWLER_THREAD)
         _CRAWLER_THREAD.started.connect(_CRAWLER_WORKER.run)
         _CRAWLER_WORKER.finished.connect(self._crawler_done)
@@ -617,20 +783,194 @@ class ToolsTab(QWidget):
         self.crawlerProgress.setValue(100)
         self.crawlerProgress.setFormat(f'{count} images')
         self.crawlerInfo.setText(f'Done — saved to {self.crawlerPath.text()}')
-        global _CRAWLER_THREAD
+        global _CRAWLER_THREAD, _CRAWLER_WORKER
         if _CRAWLER_THREAD:
             _CRAWLER_THREAD.quit()
+            _CRAWLER_THREAD.wait(3000)
             _CRAWLER_THREAD = None
+        if _CRAWLER_WORKER:
+            _CRAWLER_WORKER.deleteLater()
+            _CRAWLER_WORKER = None
 
     def _crawler_error(self, msg):
         self.crawlerStartBtn.setEnabled(True)
         self.crawlerStartBtn.setText('▶ Start')
         self.crawlerProgress.setValue(0)
         self.crawlerProgress.setFormat('Error')
-        global _CRAWLER_THREAD
+        global _CRAWLER_THREAD, _CRAWLER_WORKER
         if _CRAWLER_THREAD:
             _CRAWLER_THREAD.quit()
+            _CRAWLER_THREAD.wait(3000)
             _CRAWLER_THREAD = None
+        if _CRAWLER_WORKER:
+            _CRAWLER_WORKER.deleteLater()
+            _CRAWLER_WORKER = None
+
+    # ═══════════════════════════════════════════
+    # Export Logic
+    # ═══════════════════════════════════════════
+
+    def _export_load_latest(self):
+        from main.core.base import find_latest_best
+        w = find_latest_best()
+        if w:
+            self.exportWeights.setText(w)
+
+    def _export_browse(self):
+        opts = QFileDialog.Options()
+        opts |= QFileDialog.DontUseNativeDialog
+        p, _ = QFileDialog.getOpenFileName(self, 'Select Weights', str(ROOT / 'models'), MODEL_FILTER, options=opts)
+        if p:
+            self.exportWeights.setText(p)
+
+    def _run_export(self):
+        w = self.exportWeights.text().strip()
+        if not w or not Path(w).exists():
+            from main.core.base import find_latest_best
+            w2 = find_latest_best()
+            if w2:
+                self.exportWeights.setText(w2); w = w2
+            else:
+                self._set_export_status(RED, 'No weights found')
+                return
+        fmt = self.exportFmt.currentText()
+        self._set_export_status(AMBER, f'Exporting to {fmt.upper()}...')
+        self.exportBtn.setEnabled(False)
+        QApplication.processEvents()
+        try:
+            from ultralytics import YOLO
+            model = YOLO(w)
+            kw = dict(
+                format=fmt,
+                imgsz=int(self.exportSz.currentText()),
+                half=self.exportHalf.isChecked(),
+                int8=self.exportInt8.isChecked(),
+                nms=self.exportNms.isChecked(),
+                device='0' if self.studio.gpu_ok else 'cpu',
+            )
+            if fmt == 'onnx':
+                kw['opset'] = 12
+                kw['simplify'] = True
+                kw['dynamic'] = False
+
+            out = model.export(**kw)
+            sz = Path(out).stat().st_size / 1e6
+            self._set_export_status(GREEN, f'{fmt.upper()} → {Path(out).name} ({sz:.1f}MB)')
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            self._set_export_status(RED, f'Failed: {e}')
+        finally:
+            self.exportBtn.setEnabled(True)
+
+    def _set_export_status(self, color, msg):
+        self.exportStatus.setStyleSheet(f'font-size:9px;color:{color};padding:0;margin:0;')
+        self.exportStatus.setText(msg)
+
+    # ═══════════════════════════════════════════
+    # 模型分析
+    # ═══════════════════════════════════════════
+
+    def _analyze_browse_model(self):
+        p, _ = QFileDialog.getOpenFileName(
+            self, 'Select Model', 'runs', 'PyTorch (*.pt)')
+        if p:
+            self.analyze_model_path.setText(p)
+
+    def _on_analyze_progress(self, current, total):
+        """主线程更新进度条和状态"""
+        self.analyze_progress.setMaximum(max(total, 1))
+        self.analyze_progress.setValue(current)
+        if total > 0:
+            self.analyze_status.setText(f'{current}/{total}')
+
+    def _run_analyze(self):
+        """执行模型分析（后台线程 + 实时进度）"""
+        import subprocess, sys, threading
+
+        model_path = self.analyze_model_path.text().strip()
+        split = self.analyze_split.currentText()
+        conf = self.analyze_conf.value()
+        export_dir = load_paths().get('export_dir', '') or ''
+
+        self.analyze_btn.setEnabled(False)
+        self.analyze_status.setStyleSheet(f'font-size:9px;color:{AMBER};padding:0;')
+        self.analyze_status.setText('正在加载')
+        self.analyze_progress.setVisible(True)
+        self.analyze_progress.setValue(0)
+        self.analyze_progress.setMaximum(0)
+
+        def worker():
+            import time as _t
+            try:
+                cmd = [sys.executable, 'main/core/tools/analyze.py', '--source', split]
+                if export_dir:
+                    cmd += ['--output', export_dir]
+                if model_path:
+                    cmd += ['--model', model_path]
+                if conf > 0:
+                    cmd += ['--conf', str(conf)]
+                print(f'[Analyze] 启动子进程: {" ".join(cmd)}', flush=True)
+
+                env = os.environ.copy()
+                env['PYTHONUNBUFFERED'] = '1'
+                t0 = _t.time()
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        text=True, bufsize=1, encoding='utf-8', errors='replace', env=env)
+                output_lines = []
+                total = 0
+                for line in iter(proc.stdout.readline, ''):
+                    if not line:
+                        break
+                    line = line.rstrip('\n\r')
+                    print(f'  {line}', flush=True)  # 回显到控制台
+                    output_lines.append(line)
+                    # 解析进度
+                    if line.startswith('[PROGRESS] '):
+                        msg = line[11:]
+                        if '/' in msg and msg.split('/')[0].strip().isdigit():
+                            parts = msg.split('/')
+                            cur, total = int(parts[0]), int(parts[1])
+                            self._analyze_signal.progress_update.emit(cur, total)
+                        else:
+                            # 文字消息（推理开始/完成）— 设置总数
+                            if '/' in msg:
+                                parts = msg.split('/')
+                                try:
+                                    total = int(parts[-1])
+                                    self._analyze_signal.progress_update.emit(0, total)
+                                except: pass
+                proc.wait(timeout=600)
+                elapsed = _t.time() - t0
+                print(f'[Analyze] 子进程完成, 耗时 {elapsed:.1f}s', flush=True)
+                output = '\n'.join(output_lines)
+
+                lines = output.strip().split('\n')
+                summary = '\n'.join(l for l in lines if any(
+                    kw in l for kw in ['TP:', 'FP:', 'FN:', 'Precision:', 'Recall:',
+                                       'F1:', '最佳', '输出:', '曲线:', '按类别']))
+                if not summary:
+                    summary = output[-400:] if len(output) > 400 else output
+
+                self._analyze_signal.done.emit(summary, '')
+
+            except subprocess.TimeoutExpired:
+                self._analyze_signal.done.emit('', 'Timed out')
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                self._analyze_signal.done.emit('', str(e))
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+    def _analyze_done(self, summary, error=''):
+        """回到主线程更新 UI（分析完成）"""
+        self.analyze_btn.setEnabled(True)
+        self.analyze_status.setStyleSheet(f'font-size:9px;color:{GREEN};padding:0;')
+        if error:
+            self.analyze_status.setStyleSheet(f'font-size:9px;color:{RED};padding:0;')
+            self.analyze_status.setText('失败')
+        else:
+            self.analyze_status.setText('完成')
 
     # ═══════════════════════════════════════════
     # 主题刷新

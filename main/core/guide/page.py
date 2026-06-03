@@ -12,69 +12,59 @@ TAB_GUIDES = [
     {
         'name': 'Training',
         'icon': '🎯',
-        'brief': '配置超参数并启动 YOLO 模型训练，实时查看 Loss / mAP 曲线和日志',
+        'brief': '配置超参数并启动 YOLO 模型训练，实时查看 Loss / mAP 曲线和日志\n    LoRA 低秩适配 + 7 种注意力模块 + 20 套参数预设',
         'color': PRI,
         'steps': [
-            ('Model',
-             'Model: 选预训练 .pt 或 .yaml 架构，自动扫描 models/，续训选 best.pt\n'
+            ('Model & Data',
+             'Model: 选预训练 .pt 或 .yaml 架构，自动扫描 models/\n'
+             'Epochs: 总轮数，推荐 200-500\n'
+             'Batch: 每批样本数，yolo11n 可 48，大模型 32'),
+            ('Input & Compute',
              'ImgSz: 416/512/640/800，默认 640\n'
-             'Multi-Scale: 每轮随机缩放 ±25%，增强泛化，增 VRAM'),
-            ('Training',
-             'Epochs: 总轮数，推荐 500-800\n'
-             'Batch: 每批样本数，yolo11n 可 64，大模型/大数据 32\n'
-             'Workers: 加载线程，推荐 CPU 核数减半，Win 4-8'),
-            ('Optimization',
-             'Optimizer: AdamW(推荐) / Adam / SGD\n'
+             'Workers: 加载线程，推荐 CPU 核数减半，Win 4-8\n'
+             'Optimizer: AdamW(推荐) / Adam / SGD'),
+            ('Schedule & Device & LR',
              'Schedule: Cosine(余弦退火) / Linear(续训推荐)\n'
-             'Device: GPU(自动) / CPU(调试)'),
-            ('LR',
-             'LR: 初始学习率 0.0005-0.002，CBAM 注入减半\n'
+             'Device: GPU(自动) / CPU(调试)\n'
+             'LR: 初始学习率 0.0005-0.002，CBAM 注入减半'),
+            ('LR Final & Warmup & Patience',
              'LR Final: 最终 = LR × LRF，默认 0.01\n'
-             'Warmup: 预热轮数，CBAM 推荐 10-15'),
-            ('Control',
-             'Patience: 早停，mAP 连续 N 轮不升即停，40-100\n'
+             'Warmup: 预热轮数，CBAM 推荐 10-15\n'
+             'Patience: 早停，mAP 连续 N 轮不升即停'),
+            ('WarmM & Momentum & Weight Decay',
              'WarmM: 预热期动量 0.8\n'
-             'Momentum: 默认 0.937，一般不动'),
-            ('Regularization',
-             'Weight Decay: L2 权重衰减 0.0005\n'
+             'Momentum: 默认 0.937，一般不动\n'
+             'Weight Decay: L2 权重衰减 0.0005'),
+            ('Dropout & cls_pw & IoU',
              'Dropout: 0.0(关) / 0.1-0.3(过拟合时)\n'
-             'cls_pw: <1 降误报(高精度)，>1 提召回'),
-            ('Loss / AMP',
-             'IoU: 训练 NMS 阈值 0.7-0.8，高 IoU 降 FP\n'
+             'cls_pw: <1 降误报，>1 提召回\n'
+             'IoU: 训练 NMS 阈值 0.7-0.8'),
+            ('Close Mosaic & Toggles',
              'Close Mosaic: 最后 N 轮关 Mosaic，15-30\n'
-             'AMP: 混合精度，减 VRAM ~30%'),
-            ('Cache',
-             'Cache: 数据集缓存到 RAM，加速加载，吃内存'),
-            ('Aug — Geometric',
-             'Rotation: 随机旋转 0-45°，摔倒 2-5\n'
-             'Scale: 缩放 0-2.0，摔倒 0.3\n'
-             'Translate: 平移 0-1.0，推荐 0.1\n'
-             'Shear: 剪切 0-45°，通用 0\n'
-             'Persp: 透视 0-0.01，通用 0'),
-            ('Aug — Mix / Flip / Color',
-             'Mosaic: 4 图拼 1 训练，概率 0-1，默认 1.0\n'
-             'MixUp: 两图混合，高召回 0.3，高精度 0.1\n'
-             'Copy-Paste: 粘贴物体，摔倒 0.05\n'
-             'flip_lr: 左右翻转 0.5，摔倒 0.3\n'
-             'flipud: 上下翻转，摔倒 0.0(禁止)\n'
-             'HSV_H/S/V: 色调/饱和度/明度扰动'),
+             'AMP: 混合精度加速，减 VRAM ~30%\n'
+             'Cache: 数据集缓存到 RAM，加速加载\n'
+             'Multi-Scale: 每轮随机缩放 ±25%，增泛化'),
+            ('Augmentation',
+             'Rotation/Scale/Translate/Shear/Persp: 几何变换\n'
+             'Mosaic/MixUp/Copy-Paste: 混合增强\n'
+             'flip_lr/flipud: 翻转(摔倒禁 flipud)\n'
+             'HSV_H/S/V: 色彩扰动'),
             ('Attention',
-             'SE: 轻量通道，~2C/r 参数\n'
-             'CBAM: 通道+空间，精度最稳\n'
-             'CA: 位置编码，小目标友好\n'
-             'ECA: 1D 卷积，极轻量(3 参/模块)\n'
-             'SimAM: 无参数，能量函数\n'
-             'EMA: 多尺度并行\n'
-             'GAM: 全维度，保留精细结构\n'
-             '注：训练后导出不含注意力，零推理成本'),
-            ('Presets',
-             '高精度低误报: cls_pw=0.5, IoU=0.8, mixup=0.1\n'
-             '高召回率: cls_pw=1.0, IoU=0.7, mixup=0.3\n'
-             '均衡型: cls_pw=0.7, IoU=0.75, mixup=0.2'),
+             'SE/CBAM/CA/ECA/SimAM/EMA/GAM 七种可选\n'
+             'CBAM 精度最稳，ECA 极轻量，SimAM 无参数\n'
+             '训练后导出不含注意力模块，零推理成本'),
+            ('LoRA',
+             'LoRA Rank: 0=关闭，1-32 有效\n'
+             '低秩适配微调，大幅减少可训练参数量'),
+            ('Presets — 20 Profiles',
+             '4 基底模型 × 5 场景 = 20 套预设（profiles/ 目录）\n'
+             '场景: 均衡型 | +CBAM 高精度 | +LoRA 高精度 | +EMA 高召回 | 鲁棒泛化\n'
+             '每个场景针对 4 种模型 (11n/8n/11s/8s) 独立调参\n'
+             '加载自动填入: 全部超参数 + 注意力类型 + LoRA Rank'),
             ('Monitor',
-             'Loss/mAP 实时曲线 + Stats 面板\n'
+             'Loss/mAP 实时曲线 + Stats 信息面板\n'
              'Epoch / mAP@0.5 / Best / Loss / mAP50:95 / Prec / Recall\n'
-             '自动保存 best.pt(最高 mAP) + last.pt'),
+             '自动保存 best.pt + last.pt'),
         ],
     },
     {
@@ -174,24 +164,6 @@ TAB_GUIDES = [
         ],
     },
     {
-        'name': 'Export',
-        'icon': '📦',
-        'brief': '将 .pt 模型导出为部署格式',
-        'color': RED,
-        'steps': [
-            ('Model',
-             '选 .pt 文件(best.pt 或蒸馏输出)'),
-            ('Format',
-             'ONNX(通用) / TorchScript / NCNN / OpenVINO / TensorRT / TFLite / CoreML'),
-            ('Options',
-             'ImgSz: 640 | Half(FP16) | NMS(内嵌)'),
-            ('Export',
-             '点 Export，进度显示在控制台'),
-            ('Output',
-             '保存到模型同级目录，文件名 + 格式后缀'),
-        ],
-    },
-    {
         'name': 'AI Agent',
         'icon': '🤖',
         'brief': '内置 LLM 助手，提供 YOLO 领域知识和参数建议',
@@ -210,17 +182,19 @@ TAB_GUIDES = [
     {
         'name': 'Tools',
         'icon': '🛠️',
-        'brief': '视频导入 + 标注导出/导入 + 图片爬虫',
+        'brief': '视频导入 + 标注导出/导入 + 图片爬虫 + 模型导出',
         'color': '#f59e0b',
         'steps': [
             ('Preproc Import',
              '将视频文件夹导入预处理目录，自动复制'),
-            ('Label Export',
-             '按选中子文件夹导出标注为 .zip 压缩包'),
-            ('Label Import',
-             '导入 .zip/.rar/.7z 标注压缩包到指定目录'),
+            ('Label Export/Import',
+             '选中子文件夹导出标注 .zip，或导入 .zip/.rar/.7z 文件'),
             ('Image Crawler',
              '输入关键词 → 选保存目录 → Start，爬取百度图片'),
+            ('Model Export',
+             '选 .pt 权重 → 选择导出格式(ONNX/TensorRT/NCNN 等)\n'
+             '配置 ImgSz、FP16、INT8、NMS → Export\n'
+             '输出保存到模型同级目录'),
         ],
     },
     {
@@ -344,7 +318,7 @@ class GuideTab(QWidget):
         # 段落正文
         paras = [
             'YOLO Training Studio 是一个基于 PyQt5 的桌面应用程序，专为 YOLO 系列模型的训练、验证、预测、标注和部署提供一站式工作流。核心训练引擎基于 Ultralytics YOLO，支持 YOLOv8/YOLO11 全部模型变体。',
-            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 130px 窄边栏，右侧内容自适应。支持 Training / Predict / Dataset / Preprocess / Label / Distill / Export / AI Agent / Tools / Settings 共 10 个功能模块。',
+            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 110px 窄边栏，右侧内容自适应。支持 Training / Predict / Dataset / Preprocess / Label / Review / Distill / AI Agent / Tools / Settings 共 10 个功能模块（Guide 为使用指引）。',
         ]
         for text in paras:
             p = QLabel(text)

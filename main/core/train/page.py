@@ -36,6 +36,9 @@ class TrainTab(QWidget):
     def _build_ui(self):
         ui_path = Path(__file__).resolve().parent / 'train.ui'
         uic.loadUi(str(ui_path), self)
+        # ── 标题 ──
+        self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
+        self.titleLabel.setFixedHeight(24)
         # 按钮样式直接设置（规避全局 STYLE 传播时机问题）
         self.bs1.setStyleSheet(
             "QPushButton{background:#07C160;color:#fff;border:none;padding:3px 6px;min-height:16px;font-size:10px;font-weight:600;border-radius:3px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
@@ -310,20 +313,20 @@ class TrainTab(QWidget):
     def _load_from_cfg(self):
         """从 project.yaml 恢复默认值"""
         t = cfg['training']
-        self._set_combo_text(self.m, t['model'])
-        self.ep.setValue(t['epochs'])
-        self.bs.setValue(t['batch'])
-        self._set_combo_text(self.sz, str(t['imgsz']))
-        self._set_combo_text(self.opt, t['optimizer'])
-        self._set_combo_text(self.dev, 'GPU' if t['device'] in ('auto', '0', 'GPU') else 'CPU')
-        self._set_combo_text(self.sch, t['scheduler'].capitalize())
-        self.pt.setValue(t['patience'])
-        self.lr0.setValue(t['lr0'])
-        self.lrf.setValue(t['lrf'])
-        self.wu.setValue(t['warmup_epochs'])
+        self._set_combo_text(self.m, t.get('model', 'yolo11n.pt'))
+        self.ep.setValue(t.get('epochs', 500))
+        self.bs.setValue(t.get('batch', 32))
+        self._set_combo_text(self.sz, str(t.get('imgsz', 640)))
+        self._set_combo_text(self.opt, t.get('optimizer', 'AdamW'))
+        self._set_combo_text(self.dev, 'GPU' if t.get('device', 'auto') in ('auto', '0', 'GPU') else 'CPU')
+        self._set_combo_text(self.sch, t.get('scheduler', 'Cosine').capitalize())
+        self.pt.setValue(t.get('patience', 40))
+        self.lr0.setValue(t.get('lr0', 0.0005))
+        self.lrf.setValue(t.get('lrf', 0.01))
+        self.wu.setValue(t.get('warmup_epochs', 10))
         self.wk.setValue(min(t.get('workers', 8), self.studio.cpu_count))
-        self.iou_thresh.setValue(t['iou'])
-        self.cm.setValue(t['close_mosaic'])
+        self.iou_thresh.setValue(t.get('iou', 0.8))
+        self.cm.setValue(t.get('close_mosaic', 25))
         self.cp.setValue(t.get('copy_paste', 0))
         self.dg.setValue(t.get('degrees', 0))
         self.ms.setChecked(t.get('multi_scale', False))
@@ -587,7 +590,7 @@ class TrainTab(QWidget):
             try:
                 attn_cfg.update(json.loads(ATTENTION_FILE.read_text('utf-8')))
             except: pass
-        idx = self.attn_type.findText(attn_cfg.get('type', 'none').upper() if attn_cfg.get('type', 'none') != 'none' else 'None')
+        idx = self.attn_type.findText(attn_cfg.get('type', 'none').upper() if attn_cfg.get('type') and attn_cfg['type'] != 'none' else 'None')
         self.attn_type.setCurrentIndex(idx if idx >= 0 else 0)
 
         self._params = [self.m, self.ep, self.bs, self.sz, self.opt, self.dev,
@@ -688,6 +691,11 @@ class TrainTab(QWidget):
             print(f'[{_ts()}] _mc.upd error: {_e}', flush=True)
         print(f'[{_ts()}] building config...', flush=True)
         cfg = self._config()
+        # 传递预设标识给训练服务，用于输出文件夹命名
+        if self.presetCombo.currentIndex() > 0:
+            pf = self.presetCombo.currentData()
+            if pf:
+                cfg['preset_name'] = pf.stem
         self._log(f' {cfg["model"]} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
         print(f'[{_ts()}] creating Trainer...', flush=True)
         self.trainer = Trainer(cfg)

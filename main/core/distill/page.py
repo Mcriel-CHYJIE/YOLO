@@ -23,6 +23,9 @@ class DistillTab(QWidget):
     def _build_ui(self):
         ui_path = Path(__file__).resolve().parent / 'distill.ui'
         uic.loadUi(str(ui_path), self)
+        # ── 标题 ──
+        self.titleLabel.setStyleSheet(f'font-size:18px;font-weight:700;color:{TEXT};padding:0;margin:0;')
+        self.titleLabel.setFixedHeight(24)
         # 按钮样式直接设置（规避全局 STYLE 传播时机问题）
         self.ds1.setStyleSheet(
             "QPushButton{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}QPushButton:hover{background:#06ad56;}QPushButton:disabled{background:#a5d6a5;}"
