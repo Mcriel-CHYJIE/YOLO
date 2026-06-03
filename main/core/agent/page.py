@@ -8,27 +8,10 @@
 from pathlib import Path
 from PyQt5 import uic
 from PyQt5.QtGui import QPixmap, QTextDocument
-from PyQt5.QtCore import QUrl, QSize
+from PyQt5.QtCore import QUrl, QSize, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
 from main.core.base import *
 from . import service as svc
-
-
-class _ApiWorker(QObject):
-    """后台调用 API 的工作线程对象"""
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-
-    def __init__(self, messages, config):
-        super().__init__()
-        self.messages = messages
-        self.config = config
-
-    def run(self):
-        try:
-            reply = svc.send_message(self.messages, self.config)
-            self.finished.emit(reply)
-        except Exception as e:
-            self.error.emit(str(e))
 
 
 # ── 气泡常量 ──
@@ -55,7 +38,7 @@ class _UserBubble(QWidget):
 
         lbl = QLabel(text)
         lbl.setWordWrap(True)
-        lbl.setMaximumWidth(560)
+        lbl.setMaximumWidth(536)
         lbl.setStyleSheet(
             f"QLabel{{"
             f"background:{_GRAY};color:#1a1a1a;"
@@ -79,11 +62,18 @@ class _AssistantBubble(QWidget):
 
         # 头像
         if not avatar_pixmap.isNull():
+            ava_container = QWidget()
+            ava_container.setStyleSheet('background:transparent;')
+            ava_lo = QVBoxLayout(ava_container)
+            ava_lo.setContentsMargins(0, 0, 0, 0)
+            ava_lo.setSpacing(0)
             ava = QLabel()
             ava.setPixmap(avatar_pixmap)
             ava.setFixedSize(40, 40)
             ava.setStyleSheet('border-radius:6px;')
-            lo.addWidget(ava)
+            ava_lo.addWidget(ava)
+            ava_lo.addStretch()
+            lo.addWidget(ava_container)
             lo.addSpacing(8)
         else:
             lo.addSpacing(48)
@@ -91,7 +81,7 @@ class _AssistantBubble(QWidget):
         # 气泡
         lbl = QLabel(text)
         lbl.setWordWrap(True)
-        lbl.setMaximumWidth(520)
+        lbl.setMaximumWidth(536)
         lbl.setStyleSheet(
             f"QLabel{{"
             f"background:{_GREEN};color:#fff;"
@@ -105,6 +95,7 @@ class _AssistantBubble(QWidget):
 
 
 class AgentTab(QWidget):
+    _reply_signal = pyqtSignal(str, str)  # (type, text) type='reply'|'error'
     def __init__(self, studio):
         super().__init__()
         self.studio = studio
@@ -159,6 +150,9 @@ class AgentTab(QWidget):
             f"QPushButton:hover{{background:{BTN_HOVER};color:{TEXT};border-color:{PRI};}}")
         self.configBtn.clicked.connect(self._show_config)
 
+        # ── 跨线程信号 ──
+        self._reply_signal.connect(self._on_reply_from_thread)
+
         # ── 预加载头像 ──
         avatar_path = ROOT / 'assets' / 'YOLO.png'
         raw = QPixmap(str(avatar_path)) if avatar_path.exists() else QPixmap()
@@ -170,32 +164,66 @@ class AgentTab(QWidget):
 
     def _reset_chat(self):
         """初始化/重置对话"""
-        self._messages = [{'role': 'system', 'content': svc.SYSTEM_PROMPT}]
+        context = self._build_context()
+        system_msg = svc.SYSTEM_PROMPT + '\n\n' + context
+        self._messages = [{'role': 'system', 'content': system_msg}]
         self._loading = False
         self._set_controls_enabled(True)
         self.chatView.clear()
         self._show_welcome()
 
+    def _build_context(self):
+        """构建设备信息+项目环境上下文"""
+        from main.config import load_paths
+        paths = load_paths()
+        gpu = f'{self.studio.gpu_name} ({self.studio.gpu_mem})' if self.studio.gpu_ok else 'CPU'
+        ctx = f'当前环境：\n'
+        ctx += f'GPU: {gpu}\n'
+        ctx += f'类别: {", ".join(CLASSES)} ({len(CLASSES)} 类)\n'
+        ctx += f'数据集: {paths.get("dataset_dir", "未配置")}\n'
+        ctx += f'训练输出: {paths.get("train_output", "未配置")}\n'
+        ctx += f'预测输出: {paths.get("predict_output", "未配置")}\n'
+        ctx += f'导出目录: {paths.get("export_dir", "未配置")}\n'
+        ctx += f'模型目录: {paths.get("models_dir", "未配置")}\n'
+        # 扫描数据集目录中的 split
+        ds = paths.get('dataset_dir', '')
+        if ds:
+            from pathlib import Path
+            dp = Path(ds)
+            splits = []
+            for s in ('train', 'val', 'test'):
+                img_dir = dp / 'images' / s
+                if img_dir.exists():
+                    count = len(list(img_dir.glob('*')))
+                    splits.append(f'{s}:{count}张')
+            if splits:
+                ctx += f'数据集分片: {", ".join(splits)}\n'
+        return ctx
+
     def _show_welcome(self):
-        """在聊天区显示欢迎引导"""
+        """在聊天区显示欢迎引导（居中展示）"""
         w = QWidget()
         w.setStyleSheet('background:transparent;')
         lo = QVBoxLayout(w)
-        lo.setAlignment(Qt.AlignCenter)
+        lo.setContentsMargins(0, 0, 0, 0)
+        lo.addStretch()
         lbl = QLabel(
-            '👋 你好！我是 <b>YOLO 助手</b>，有什么可以帮你的？<br><br>'
+            '👋 你好！我是 <b>MIRO</b>，有什么可以帮你的？<br><br>'
             '试试问我：<br>'
-            '• YOLOv8 训练参数怎么调？<br>'
-            '• 什么是 mAP？<br>'
-            '• 小模型还是大模型？<br>'
-            '• 数据不够怎么办？')
+            '• 训练时 Loss 不下降怎么办？<br>'
+            '• mAP50 和 mAP50:95 有什么区别？<br>'
+            '• 过拟合了怎么调整？<br>'
+            '• 不同模型怎么选（n/s/m/l/x）？<br>'
+            '• 数据集怎么做数据增强？')
         lbl.setWordWrap(True)
         lbl.setStyleSheet(f'color:#999;font-size:14px;line-height:1.8;background:transparent;')
-        lbl.setAlignment(Qt.AlignLeft)
+        lbl.setAlignment(Qt.AlignCenter)
         lo.addWidget(lbl)
+        lo.addStretch()
 
         item = QListWidgetItem(self.chatView)
-        item.setSizeHint(w.sizeHint())
+        vh = self.chatView.viewport().height()
+        item.setSizeHint(QSize(w.sizeHint().width(), max(w.sizeHint().height(), vh)))
         self.chatView.setItemWidget(item, w)
 
     def _on_send(self):
@@ -213,30 +241,28 @@ class AgentTab(QWidget):
     def _call_api(self):
         cfg = svc.load_config()
         if not cfg.get('api_key', '').strip():
-            self._on_api_error('⚠️ API Key 未配置，请先在 ⚙ 设置中配置')
+            self._add_bubble('assistant', '⚠️ API Key 未配置，请先在 ⚙ 设置中配置')
+            self._loading = False
+            self._set_controls_enabled(True)
             return
 
-        self._thread = QThread(self)
-        worker = _ApiWorker(list(self._messages), cfg)
-        worker.moveToThread(self._thread)
-
-        self._thread.started.connect(worker.run)
-        worker.finished.connect(self._on_api_reply)
-        worker.error.connect(self._on_api_error)
-        worker.finished.connect(self._thread.quit)
-        worker.error.connect(self._thread.quit)
-        self._thread.finished.connect(worker.deleteLater)
-        self._thread.finished.connect(self._on_api_done)
+        import threading
+        def worker():
+            try:
+                reply = svc.send_message(list(self._messages), cfg)
+                self._reply_signal.emit('reply', reply)
+            except Exception as e:
+                self._reply_signal.emit('error', str(e))
+        self._thread = threading.Thread(target=worker, daemon=True)
         self._thread.start()
 
-    def _on_api_reply(self, reply):
-        self._messages.append({'role': 'assistant', 'content': reply})
-        self._add_bubble('assistant', reply)
-
-    def _on_api_error(self, err):
-        self._add_bubble('assistant', f'❌ {err}')
-
-    def _on_api_done(self):
+    def _on_reply_from_thread(self, typ, text):
+        """主线程槽：处理工作线程返回的结果"""
+        if typ == 'reply':
+            self._messages.append({'role': 'assistant', 'content': text})
+            self._add_bubble('assistant', text)
+        else:
+            self._add_bubble('assistant', f'❌ {text}')
         self._loading = False
         self._set_controls_enabled(True)
 
@@ -256,7 +282,7 @@ class AgentTab(QWidget):
         if self.chatView.count() == 1:
             first_item = self.chatView.item(0)
             w = self.chatView.itemWidget(first_item)
-            if w and 'YOLO 助手' in w.findChild(QLabel).text() if w.findChild(QLabel) else '':
+            if w and 'MIRO' in w.findChild(QLabel).text() if w.findChild(QLabel) else '':
                 self.chatView.takeItem(0)
 
         if role == 'user':
@@ -279,13 +305,13 @@ class AgentTab(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle('AI Agent 接口配置')
-        dialog.setFixedSize(520, 300)
+        dialog.setFixedSize(480, 200)
         dialog.setStyleSheet(f"""
             QDialog{{background:{CARD};}}
             QLabel{{color:{TEXT};font-size:13px;font-weight:500;}}
             QLineEdit,QSpinBox,QDoubleSpinBox{{
                 background:{BG};color:{TEXT};border:1px solid {BORDER};
-                border-radius:4px;padding:6px 10px;font-size:13px;min-height:28px;
+                border-radius:4px;padding:2px 8px;font-size:13px;min-height:20px;
             }}
             QLineEdit:focus{{border-color:{PRI};}}
         """)
@@ -317,28 +343,67 @@ class AgentTab(QWidget):
         api_key.setEchoMode(QLineEdit.Password)
         layout.addLayout(_make_row('API Key', api_key))
 
-        row3 = QHBoxLayout()
-        row3.setSpacing(10)
         model = QLineEdit(cfg['model'])
         model.setPlaceholderText('gpt-4, deepseek, ...')
-        row3.addWidget(QLabel('模型'), 0)
-        row3.addWidget(model, 1)
-        temp = QDoubleSpinBox()
-        temp.setRange(0.0, 2.0)
-        temp.setSingleStep(0.1)
-        temp.setValue(cfg.get('temperature', 0.7))
-        row3.addWidget(QLabel('温度'), 0)
-        row3.addWidget(temp, 1)
-        max_tokens = QSpinBox()
-        max_tokens.setRange(64, 65536)
-        max_tokens.setSingleStep(512)
-        max_tokens.setValue(cfg.get('max_tokens', 4096))
-        row3.addWidget(QLabel('Token'), 0)
-        row3.addWidget(max_tokens, 1)
-        layout.addLayout(row3)
+        layout.addLayout(_make_row('模型', model))
+
+        # ── 测试连接 ──
+        test_btn = QPushButton('测试连接')
+        test_btn.setStyleSheet(
+            f"QPushButton{{background:{BG};color:{TEXT};border:1px solid {BORDER};"
+            f"border-radius:4px;padding:7px 16px;font-size:12px;font-weight:500;}}"
+            f"QPushButton:hover{{background:{BTN_HOVER};}}"
+            f"QPushButton:disabled{{color:{TEXT3};border-color:{BORDER};}}")
+
+        def _run_test():
+            """后台测试 API 连接"""
+            url = base_url.text().strip()
+            key = api_key.text().strip()
+            mdl = model.text().strip()
+            if not url or not key or not mdl:
+                QMessageBox.warning(dialog, '测试连接', '请填写完整配置')
+                return
+            test_btn.setEnabled(False)
+            test_btn.setText('测试中...')
+
+            def _done(ok, msg=''):
+                test_btn.setEnabled(True)
+                test_btn.setText('测试连接')
+                if ok:
+                    QMessageBox.information(dialog, '测试连接', '✅ 连接成功')
+                else:
+                    QMessageBox.warning(dialog, '测试连接', f'❌ {msg}')
+
+            import threading
+            def _test():
+                try:
+                    import urllib.request, json
+                    payload = json.dumps({
+                        'model': mdl,
+                        'messages': [{'role': 'user', 'content': 'Hi'}],
+                        'max_tokens': 16,
+                    }).encode()
+                    req = urllib.request.Request(
+                        f'{url.rstrip("/")}/chat/completions',
+                        data=payload,
+                        headers={'Content-Type': 'application/json',
+                                 'Authorization': f'Bearer {key}'},
+                        method='POST')
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        body = json.loads(resp.read().decode())
+                    ok = bool(body.get('choices'))
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(0, lambda: _done(ok, '' if ok else 'API 返回异常'))
+                except Exception as e:
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(0, lambda: _done(False, str(e)[:80]))
+            threading.Thread(target=_test, daemon=True).start()
+        test_btn.clicked.connect(_run_test)
         layout.addStretch()
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        btn_row.addWidget(test_btn)
         btn_row.addStretch()
         cancel_btn = QPushButton('取消')
         cancel_btn.setStyleSheet(
@@ -352,20 +417,18 @@ class AgentTab(QWidget):
             "border-radius:4px;padding:7px 24px;font-size:13px;font-weight:600;}"
             "QPushButton:hover{background:#06ad56;}")
         save_btn.clicked.connect(lambda: self._save_config(
-            dialog, base_url, api_key, model, temp, max_tokens))
+            dialog, base_url, api_key, model))
         btn_row.addWidget(cancel_btn)
         btn_row.addWidget(save_btn)
         layout.addLayout(btn_row)
 
         dialog.exec_()
 
-    def _save_config(self, dialog, base_url, api_key, model, temp, max_tokens):
+    def _save_config(self, dialog, base_url, api_key, model):
         cfg = {
             'base_url': base_url.text().strip(),
             'api_key': api_key.text().strip(),
             'model': model.text().strip(),
-            'temperature': temp.value(),
-            'max_tokens': max_tokens.value(),
         }
         svc.save_config(cfg)
         dialog.accept()

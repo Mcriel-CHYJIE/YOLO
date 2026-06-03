@@ -20,7 +20,7 @@ training:
   epochs: 500                          # 充分收敛，高精度需更久训练
   batch: 32                            # RTX 5070 Ti 16GB，大数据集 batch 64 易 OOM 降到 32
   imgsz: 640
-  imgsz_options: [416, 512, 640, 800]
+  imgsz_options: [416, 512, 640, 720, 800]
   optimizer: AdamW
   optimizer_options: [AdamW, Adam, SGD]
   device: auto

@@ -46,7 +46,7 @@ NAV_ITEMS = [
     ('🏷️  Label',      'label'),
     ('🔁  Review',     'review'),
     ('🔬  Distill',    'distill'),
-    ('🤖  AI Agent',   'agent'),
+    ('🤖  MIRO',       'agent'),
     ('🛠  Tools',      'tools'),
     ('⚙️  Settings',   'settings'),
     ('📖  Guide',      'guide'),

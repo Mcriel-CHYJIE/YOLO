@@ -70,37 +70,43 @@ TAB_GUIDES = [
     {
         'name': 'Predict',
         'icon': '👁️',
-        'brief': '对图片或视频进行实时目标检测推理',
+        'brief': '对图片或视频进行实时目标检测推理，支持热力图和特征图可视化',
         'color': AMBER,
         'steps': [
             ('Source',
-             '选图片 .jpg/.png 或视频 .mp4/.avi/.mov'),
+             '选图片 .jpg/.png 或视频 .mp4/.avi/.mov，也支持摄像头'),
             ('Model',
-             '选 .pt 模型，推荐 best.pt'),
+             '选 .pt 模型，推荐 best.pt，自动扫描 models/'),
             ('Thresholds',
              'Conf: 0.55(过滤低分框) | IoU: 0.5(NMS 去重)'),
+            ('Visualization',
+             'Detection: 检测框+类别+置信度\n'
+             'Heatmap: 热力图叠加，可选透明度\n'
+             'Feature Map: 各层特征图格子排列'),
             ('Run',
              'Start 开始推理，检测框实时叠加画面'),
             ('Results',
              '每帧 FPS + 各类别数量 + 推理耗时'),
             ('Save',
-             '结果保存到 runs/predict/'),
+             '结果保存到 predict_output 目录'),
         ],
-    },
+        },
     {
-        'name': 'Dataset',
-        'icon': '📁',
-        'brief': '查看数据集结构与类别分布统计',
+        'name': 'Review',
+        'icon': '🔁',
+        'brief': '审查数据集标注：直接在 dataset 目录读写 .txt，实时修正标注',
         'color': '#8b5cf6',
         'steps': [
-            ('Overview',
-             '总图片数 / 总标注数 / 总实例数概览'),
-            ('Distribution',
-             '类别分布直方图，检查各类实例数是否均衡'),
-            ('Split View',
-             '切换 Train / Val 查看不同分片统计'),
-            ('Class Balance',
-             '每类标注框数量，定位不平衡问题'),
+            ('Source',
+             '选 data split (train/val)，自动加载对应图片和 .txt 标注'),
+            ('Edit',
+             '选类 → 画框/拖动/调角。标注变更直接写入 .txt，无 JSON 中间态'),
+            ('Navigate',
+             '← → 翻图，支持跳转到指定序号'),
+            ('Stats',
+             '每张图标注实例数 + 按类分布占比条，实时更新'),
+            ('Differences from Label',
+             'Review 直接从 dataset 目录读写，无 session、无自动标注、无导出'),
         ],
     },
     {
@@ -164,25 +170,26 @@ TAB_GUIDES = [
         ],
     },
     {
-        'name': 'AI Agent',
+        'name': 'MIRO',
         'icon': '🤖',
-        'brief': '内置 LLM 助手，提供 YOLO 领域知识和参数建议',
+        'brief': '内置 LLM 助手，提供 YOLO 领域知识和参数建议，仅回答 YOLO 相关问题',
         'color': '#3b82f6',
         'steps': [
             ('Chat',
-             '在输入框提问，Agent 基于 YOLO 知识库回答'),
-            ('Parameter Advice',
-             '询问训练参数推荐、数据增强策略等'),
-            ('Troubleshooting',
-             '描述报错信息，Agent 提供排查建议'),
-            ('Pipeline Guide',
-             '咨询完整工作流(数据→训练→导出→部署)'),
+             '在输入框提问，Agent 基于 YOLO 知识库回答，只回应 YOLO 相关话题'),
+            ('Configuration',
+             '点击 ⚙ 配置 API 地址、API Key 和模型名\n'
+             '支持任意 OpenAI 兼容 API（如 DeepSeek、OpenAI、本地 Ollama）'),
+            ('Test Connection',
+             '配置对话框中点击「测试连接」验证 API 连通性，结果弹窗提示'),
+            ('Clear Chat',
+             '点击清空按钮重置对话历史'),
         ],
     },
     {
         'name': 'Tools',
         'icon': '🛠️',
-        'brief': '视频导入 + 标注导出/导入 + 图片爬虫 + 模型导出',
+        'brief': '视频导入 + 标注导出/导入 + 图片爬虫 + 模型导出 + 模型分析',
         'color': '#f59e0b',
         'steps': [
             ('Preproc Import',
@@ -194,7 +201,11 @@ TAB_GUIDES = [
             ('Model Export',
              '选 .pt 权重 → 选择导出格式(ONNX/TensorRT/NCNN 等)\n'
              '配置 ImgSz、FP16、INT8、NMS → Export\n'
-             '输出保存到模型同级目录'),
+             '输出保存到 export 目录'),
+            ('Model Analysis',
+             '选 .pt 模型 → 选 Split(val/test) → 选 Conf 阈值\n'
+             '自动推理并输出 TP/FP/FN + 按类 P/R/F1 + F1-Confidence 曲线\n'
+             '结果保存到 export_dir'),
         ],
     },
     {
@@ -318,7 +329,7 @@ class GuideTab(QWidget):
         # 段落正文
         paras = [
             'YOLO Training Studio 是一个基于 PyQt5 的桌面应用程序，专为 YOLO 系列模型的训练、验证、预测、标注和部署提供一站式工作流。核心训练引擎基于 Ultralytics YOLO，支持 YOLOv8/YOLO11 全部模型变体。',
-            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 110px 窄边栏，右侧内容自适应。支持 Training / Predict / Dataset / Preprocess / Label / Review / Distill / AI Agent / Tools / Settings 共 10 个功能模块（Guide 为使用指引）。',
+            '界面采用 WeChat 风格侧边栏导航 + QStackedWidget 多标签页布局，左侧固定 110px 窄边栏，右侧内容自适应。支持 Training / Predict / Preprocess / Label / Review / Distill / AI Agent / Tools / Settings 共 9 个功能模块 + Guide 使用指引。',
         ]
         for text in paras:
             p = QLabel(text)
@@ -339,7 +350,7 @@ class GuideTab(QWidget):
             ('Classes', f'{", ".join(CLASSES)} ({len(CLASSES)} 类)'),
             ('Data Config', DATA_YAML),
             ('GPU', gpu_text),
-            ('Output', 'runs/train/ · runs/val/ · runs/predict/ · runs/distill/'),
+            ('Output', 'runs/train/ · runs/distill/ · predict_output/ · export_dir/'),
         ]
         for label, value in specs:
             row = QWidget()
