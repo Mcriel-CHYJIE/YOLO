@@ -9,7 +9,7 @@
 import json
 import yaml
 from pathlib import Path
-from main.config import THEME_FILE, SHORTCUTS_FILE, PATHS_FILE
+from main.config import SETTINGS_FILE, PATHS_FILE
 
 
 # ── 路径解析 ──
@@ -17,7 +17,56 @@ _ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 # ══════════════════════════════════════════════════════════════
-# Config / Data.yaml 操作
+# Unified settings 操作
+# ══════════════════════════════════════════════════════════════
+
+def _load_settings() -> dict:
+    """读取 settings.json，文件不存在或损坏时返回空字典"""
+    if not SETTINGS_FILE.exists():
+        return {}
+    try:
+        with open(SETTINGS_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_settings(data: dict) -> None:
+    """写入 settings.json，自动创建父目录"""
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ══════════════════════════════════════════════════════════════
+# Shortcuts 操作
+# ══════════════════════════════════════════════════════════════
+
+def load_shortcuts() -> dict[str, str]:
+    """从 settings.json 读取快捷键映射"""
+    return _load_settings().get('shortcuts', {})
+
+def save_shortcuts(data: dict[str, str]) -> None:
+    """将快捷键映射写入 settings.json"""
+    s = _load_settings()
+    s['shortcuts'] = data
+    _save_settings(s)
+
+
+# ══════════════════════════════════════════════════════════════
+# Theme 操作
+# ══════════════════════════════════════════════════════════════
+
+def load_theme_dark() -> bool:
+    """从 settings.json 读取深色主题状态"""
+    return _load_settings().get('theme', {}).get('dark', False)
+
+def save_theme_dark(dark: bool) -> None:
+    """将深色主题状态写入 settings.json"""
+    s = _load_settings()
+    if 'theme' not in s:
+        s['theme'] = {}
+    s['theme']['dark'] = dark
+    _save_settings(s)
 # ══════════════════════════════════════════════════════════════
 
 def resolve_data_yaml(rel_path: str = 'data.yaml') -> Path:
@@ -25,21 +74,9 @@ def resolve_data_yaml(rel_path: str = 'data.yaml') -> Path:
     return _ROOT / rel_path
 
 
-def resolve_shortcuts_file() -> Path:
-    """返回 shortcuts.json 的绝对路径"""
-    return SHORTCUTS_FILE
-
-
-def resolve_theme_file() -> Path:
-    """返回 theme.json 的绝对路径"""
-    return THEME_FILE
-
-
 def load_classes_from_yaml(yaml_path: Path) -> list[str]:
     """
     从 data.yaml 读取类别名称列表。
-
-    data.yaml 中的 names 为 {0: 'person', 1: 'car', ...} 格式，
     按 key 升序返回 ['person', 'car', ...]。
     文件不存在或格式异常时返回空列表。
     """
@@ -113,54 +150,6 @@ def override_classes_in_cfg(cfg: dict, yaml_path: Path) -> dict:
     except Exception:
         pass
     return cfg
-
-
-# ══════════════════════════════════════════════════════════════
-# Shortcuts 操作
-# ══════════════════════════════════════════════════════════════
-
-def load_shortcuts(filepath: Path) -> dict[str, str]:
-    """
-    从 shortcuts.json 读取快捷键映射。
-    文件不存在或解析失败时返回空字典。
-    """
-    if not filepath.exists():
-        return {}
-    try:
-        with open(filepath, encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_shortcuts(filepath: Path, data: dict[str, str]) -> None:
-    """将快捷键映射写入 shortcuts.json，自动创建父目录。"""
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# ══════════════════════════════════════════════════════════════
-# Theme 操作
-# ══════════════════════════════════════════════════════════════
-
-def load_theme_dark(filepath: Path) -> bool:
-    """
-    从 theme.json 读取深色主题状态。
-    文件不存在或解析失败时返回 False。
-    """
-    if not filepath.exists():
-        return False
-    try:
-        return bool(json.loads(filepath.read_text(encoding='utf-8')).get('dark', False))
-    except Exception:
-        return False
-
-
-def save_theme_dark(filepath: Path, dark: bool) -> None:
-    """将深色主题状态写入 theme.json，自动创建父目录。"""
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    filepath.write_text(json.dumps({'dark': dark}), encoding='utf-8')
 
 
 # ══════════════════════════════════════════════════════════════

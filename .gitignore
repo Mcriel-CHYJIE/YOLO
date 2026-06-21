@@ -71,6 +71,13 @@ temp/
 tmp/
 # API Keys & secrets
 main/core/agent/agent_config.json
+main/config/agent_config.json
 
 # Machine-local paths
 main/config/paths.json
+
+# Training profiles
+main/profiles/
+
+# Debug scripts (integrated into Tools)
+scripts/

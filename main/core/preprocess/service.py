@@ -27,6 +27,8 @@ class VideoPreprocessWorker(QThread):
 
     @staticmethod
     def _resize_image(img, target_size=640):
+        if target_size <= 0:
+            return img  # 原比例不缩放
         h, w = img.shape[:2]
         scale = target_size / max(h, w)
         nw, nh = int(w * scale), int(h * scale)

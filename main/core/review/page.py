@@ -49,6 +49,9 @@ class AnnotationCanvas(QWidget):
         self._disp_w = 0
         self._disp_h = 0
         self._pixmap = None
+        self._zoom = 1.0          # 缩放倍率 (1.0=适应窗口)
+        self._pan_x = 0            # 画布平移偏移 (像素)
+        self._pan_y = 0
         self._cursor = None
         self._color_timer = QTimer(self)
         self._color_timer.timeout.connect(self._update_drawing_color)
@@ -74,6 +77,9 @@ class AnnotationCanvas(QWidget):
         self._img_h, self._img_w = img.shape[:2]
         self._annotations = []
         self._selected_idx = -1
+        self._zoom = 1.0
+        self._pan_x = 0
+        self._pan_y = 0
         self._calc_display()
         rgb = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
         h, w = rgb.shape[:2]
@@ -97,12 +103,14 @@ class AnnotationCanvas(QWidget):
         cw, ch = self.width(), self.height()
         if cw <= 0 or ch <= 0:
             return
-        scale = min(cw / self._img_w, ch / self._img_h)
-        self._scale = scale
-        self._disp_w = int(self._img_w * scale)
-        self._disp_h = int(self._img_h * scale)
-        self._ox = (cw - self._disp_w) // 2
-        self._oy = (ch - self._disp_h) // 2
+        fit_scale = min(cw / self._img_w, ch / self._img_h)
+        self._scale = fit_scale * self._zoom
+        self._disp_w = int(self._img_w * self._scale)
+        self._disp_h = int(self._img_h * self._scale)
+        base_ox = (cw - self._disp_w) // 2
+        base_oy = (ch - self._disp_h) // 2
+        self._ox = base_ox + self._pan_x
+        self._oy = base_oy + self._pan_y
 
     def _img2can(self, x, y):
         return (x * self._img_w * self._scale + self._ox,
@@ -194,6 +202,12 @@ class AnnotationCanvas(QWidget):
         if self._image is None:
             return event.ignore()
         cx, cy = event.x(), event.y()
+        # 中键平移 — 仅在缩放 > 1 时有效
+        if event.button() == Qt.MidButton and self._zoom > 1.0:
+            self._drag_mode = "pan"
+            self._drag_start = (cx, cy)
+            event.accept()
+            return
         if not self._in_image(cx, cy):
             return event.ignore()
         event.accept()
@@ -238,6 +252,16 @@ class AnnotationCanvas(QWidget):
         cx, cy = event.x(), event.y()
         if self._drawing and self._drag_start:
             self._drag_end = (cx, cy)
+            self.update()
+            return
+        if self._drag_mode == "pan":
+            dx = cx - self._drag_start[0]
+            dy = cy - self._drag_start[1]
+            self._pan_x += dx
+            self._pan_y += dy
+            self._ox += dx
+            self._oy += dy
+            self._drag_start = (cx, cy)
             self.update()
             return
         if self._drag_mode == "move" and 0 <= self._drag_idx < len(self._annotations):
@@ -289,6 +313,10 @@ class AnnotationCanvas(QWidget):
 
     def mouseReleaseEvent(self, event):
         event.accept()
+        if event.button() == Qt.MidButton:
+            if self._drag_mode == "pan":
+                self._drag_mode = ""
+            return
         if event.button() != Qt.LeftButton:
             return
         if self._drawing and self._drag_start and self._drag_end:
@@ -325,6 +353,44 @@ class AnnotationCanvas(QWidget):
         self._calc_display()
         self.update()
 
+    def wheelEvent(self, event):
+        """鼠标滚轮缩放 — 以光标位置为中心缩放"""
+        if self._image is None:
+            return
+        cx, cy = event.pos().x(), event.pos().y()
+        if not self._in_image(cx, cy):
+            return
+        factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
+        new_zoom = self._zoom * factor
+        new_zoom = max(1.0, min(20.0, new_zoom))
+        if abs(new_zoom - self._zoom) < 0.001:
+            return
+        # 缩放前光标下的图像归一化坐标
+        ix = (cx - self._ox) / (self._scale * self._img_w)
+        iy = (cy - self._oy) / (self._scale * self._img_h)
+        self._zoom = new_zoom
+        self._calc_display()
+        # 调整平移使光标下的图像点保持不动
+        new_cx, new_cy = self._img2can(ix, iy)
+        self._pan_x += int(cx - new_cx)
+        self._pan_y += int(cy - new_cy)
+        self._ox += int(cx - new_cx)
+        self._oy += int(cy - new_cy)
+        self.update()
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        """双击重置缩放为适应窗口"""
+        if self._image is None:
+            return
+        if event.button() == Qt.LeftButton and self._zoom > 1.0:
+            self._zoom = 1.0
+            self._pan_x = 0
+            self._pan_y = 0
+            self._calc_display()
+            self.update()
+            event.accept()
+
     def delete_selected(self):
         if 0 <= self._selected_idx < len(self._annotations):
             self._annotations.pop(self._selected_idx)
@@ -343,6 +409,9 @@ class AnnotationCanvas(QWidget):
     def clear_image(self):
         self._image = None
         self._pixmap = None
+        self._zoom = 1.0
+        self._pan_x = 0
+        self._pan_y = 0
         self._annotations.clear()
         self._selected_idx = -1
         self._drawing = False
@@ -585,6 +654,7 @@ class RelabelTab(QWidget):
         img_root = rsvc.dataset_images_root() / split
         self.srcPathLabel.setText(f" {img_root}")
         self._load_images(img_root)
+        self.studio.log_operation('Review', f'加载数据集 · {split}/{Path(img_root).name} · {len(self._image_paths)} 张图')
 
     # ═══════════════ IMAGE LOADING ═══════════════
 
@@ -707,6 +777,7 @@ class RelabelTab(QWidget):
                 self.annCountLabel.setText("0 boxes")
             self._update_counts()
             self._update_stats()
+            self.studio.log_operation('Review', f'删除图片 · {current_path.name}')
         except Exception as e:
             QMessageBox.critical(self, "Delete Error", f"Failed to delete image:\n{str(e)}")
 
@@ -744,6 +815,7 @@ class RelabelTab(QWidget):
             self.canvas.clear_image()
         self._update_counts()
         self.annotatedLabel.setText(f"{len(self._image_paths)} images")
+        self.studio.log_operation('Review', f'随机筛选 · {total}→{kept} 张 · 删除 {removed} 张')
 
     def keyPressEvent(self, event):
         if hasattr(self, 'deleteConfirm') and self.deleteConfirm.isVisible():
@@ -840,6 +912,7 @@ class RelabelTab(QWidget):
         self._refresh_source_folders()
         if self.srcCombo.count():
             self._on_folder_selected()
+        self.studio.log_operation('Review', f'导入数据集 · {copied} 张图')
 
     # ═══════════════ UI UPDATE ═══════════════
 

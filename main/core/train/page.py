@@ -6,11 +6,10 @@
 
 """训练标签页"""
 from main.core.base import *
-from main.config import ATTENTION_FILE, load_paths
+from main.config import load_paths
 from PyQt5 import uic
 from .service import Trainer
 from .service import build_train_config
-ATTENTION_DEFAULTS = {'type': 'none'}
 
 PROG_RE = re.compile(r'\d+%\s+\d+/\d+')
 HTML_RE = re.compile(r'<[^>]+>')
@@ -179,9 +178,47 @@ class TrainTab(QWidget):
         self.rightLo.insertWidget(lp_idx, row, 0)
         self.rightLo.addWidget(self.log_panel, 1)
 
-        # 调整初始比例：图表区 60%，日志区 35%，统计区自适应
-        self.rightLo.setStretch(0, 3)  # chartRow
-        self.rightLo.setStretch(2, 2)  # log
+        # 调整初始比例：图表区 80%，日志区 20%，统计区自适应
+        self.rightLo.setStretch(0, 4)  # chartRow
+        self.rightLo.setStretch(2, 1)  # log
+
+        # ── 添加 Precision/Recall + LR 图表 ──
+        from main.core.base import PrChart, LrChart
+        self._pc = PrChart()
+        self._lrc = LrChart()
+        # 创建容器
+        self.pcContainer = QGroupBox('● P/R')
+        pLo = QVBoxLayout(self.pcContainer)
+        pLo.setContentsMargins(8, 12, 8, 6); pLo.setSpacing(0)
+        pLo.addWidget(self._pc)
+        self.lrcContainer = QGroupBox('● LR')
+        lrLo = QVBoxLayout(self.lrcContainer)
+        lrLo.setContentsMargins(8, 12, 8, 6); lrLo.setSpacing(0)
+        lrLo.addWidget(self._lrc)
+        # 将 chartRow 从 2 列水平布局改为 2×2 网格
+        # 找到 chartRow 在 rightLo 中的索引
+        cr_idx = -1
+        for i in range(self.rightLo.count()):
+            item = self.rightLo.itemAt(i)
+            if item and item.layout() == self.chartRow:
+                cr_idx = i
+                break
+        if cr_idx >= 0:
+            self.rightLo.takeAt(cr_idx)  # 移除旧 chartRow，不删除 widget
+            self.chartRow.deleteLater()  # 只删 layout 对象，widget 保留
+        # 新建 2×2 容器
+        chart_widget = QWidget()
+        cl = QVBoxLayout(chart_widget)
+        cl.setContentsMargins(0, 0, 0, 0); cl.setSpacing(4)
+        r1 = QHBoxLayout(); r1.setSpacing(4)
+        r1.addWidget(self.lcContainer, 1)
+        r1.addWidget(self.pcContainer, 1)
+        cl.addLayout(r1, 1)
+        r2 = QHBoxLayout(); r2.setSpacing(4)
+        r2.addWidget(self.mcContainer, 1)
+        r2.addWidget(self.lrcContainer, 1)
+        cl.addLayout(r2, 1)
+        self.rightLo.insertWidget(cr_idx if cr_idx >= 0 else 0, chart_widget, 3)
 
     def _build_preset_ui(self):
         """在 configGroup 上方插入预设选择栏"""
@@ -234,6 +271,12 @@ class TrainTab(QWidget):
             self.presetCombo.setCurrentIndex(idx)
 
     # ── 预设读取 ──
+    def _on_load_click(self):
+        """Load 按钮: 先刷新列表再加载当前项"""
+        self._refresh_preset_list()
+        if self.presetCombo.currentIndex() > 0:
+            self._load_preset()
+
     def _load_preset(self):
         """将选中的预设值写入所有控件"""
         if self.presetCombo.currentIndex() <= 0:
@@ -309,6 +352,10 @@ class TrainTab(QWidget):
             self.algoGroup.setTitle(f'Algorithm  |  {tip}')
 
         QApplication.processEvents()
+
+        # 日志
+        preset_name = f.stem if f else 'Default'
+        self.studio.log_operation('Training', f'加载预设 · {preset_name}')
 
     def _load_from_cfg(self):
         """从 project.yaml 恢复默认值"""
@@ -389,6 +436,7 @@ class TrainTab(QWidget):
                     idx = self.presetCombo.findText(f'{data["name"]}  ({f.stem})')
                     if idx >= 0:
                         self.presetCombo.setCurrentIndex(idx)
+                    self.studio.log_operation('Training', f'保存预设 · {data["name"]}')
                     return
 
         # 另存为新预设
@@ -428,6 +476,7 @@ class TrainTab(QWidget):
         idx = self.presetCombo.findText(f'{name}  ({stem})')
         if idx >= 0:
             self.presetCombo.setCurrentIndex(idx)
+        self.studio.log_operation('Training', f'另存预设 · {name}')
 
     def _collect_ui_values(self):
         """读取当前所有控件值"""
@@ -503,6 +552,7 @@ class TrainTab(QWidget):
         if ret == QMessageBox.Yes:
             f.unlink()
             self._refresh_preset_list()
+            self.studio.log_operation('Training', f'删除预设 · {name}')
 
     def _init_widgets(self):
         t = cfg['training']
@@ -583,16 +633,6 @@ class TrainTab(QWidget):
         self._cache.setChecked(t.get('cache', False))
         self.loraSb.setValue(t.get('lora_rank', 0))
 
-        # 注意力模块配置
-        import json
-        attn_cfg = ATTENTION_DEFAULTS.copy()
-        if ATTENTION_FILE.exists():
-            try:
-                attn_cfg.update(json.loads(ATTENTION_FILE.read_text('utf-8')))
-            except: pass
-        idx = self.attn_type.findText(attn_cfg.get('type', 'none').upper() if attn_cfg.get('type') and attn_cfg['type'] != 'none' else 'None')
-        self.attn_type.setCurrentIndex(idx if idx >= 0 else 0)
-
         self._params = [self.m, self.ep, self.bs, self.sz, self.opt, self.dev,
             self.sch, self.pt, self.lr0, self.lrf, self.wu, self.wk,
             self.iou_thresh, self.cm, self.cp, self.dg, self.ms,
@@ -632,20 +672,12 @@ class TrainTab(QWidget):
         self.bs2.setObjectName('danger')
         self.bs2.setEnabled(False)
         self.bs2.clicked.connect(self._st)
-        self.attn_type.currentTextChanged.connect(self._save_attn_config)
 
         # 预设信号
-        self.loadBtn.clicked.connect(self._load_preset)
+        self.loadBtn.clicked.connect(self._on_load_click)
         self.saveBtn.clicked.connect(self._save_preset)
         self.delBtn.clicked.connect(self._delete_preset)
         self.presetCombo.currentIndexChanged.connect(self._load_preset)
-
-    def _save_attn_config(self):
-        """将注意力类型保存到 config/attention.json"""
-        import json
-        t = self.attn_type.currentText().lower()
-        ATTENTION_FILE.parent.mkdir(parents=True, exist_ok=True)
-        ATTENTION_FILE.write_text(json.dumps({'type': t}, ensure_ascii=False, indent=2), 'utf-8')
 
     def _config(self):
         _ts = lambda: __import__('datetime').datetime.now().strftime('%H:%M:%S.%f')
@@ -689,6 +721,14 @@ class TrainTab(QWidget):
             self._mc.upd({})
         except Exception as _e:
             print(f'[{_ts()}] _mc.upd error: {_e}', flush=True)
+        try:
+            self._pc.upd({})
+        except Exception as _e:
+            print(f'[{_ts()}] _pc.upd error: {_e}', flush=True)
+        try:
+            self._lrc.upd({})
+        except Exception as _e:
+            print(f'[{_ts()}] _lrc.upd error: {_e}', flush=True)
         print(f'[{_ts()}] building config...', flush=True)
         cfg = self._config()
         # 传递预设标识给训练服务，用于输出文件夹命名
@@ -702,20 +742,25 @@ class TrainTab(QWidget):
         self.trainer.log.connect(self._log)
         self.trainer.status.connect(self._update_stats)
         self.trainer.chart.connect(
-            lambda: (self.trainer and (self._lc.upd(self.trainer.history), self._mc.upd(self.trainer.history))))
+            lambda: (self.trainer and (self._lc.upd(self.trainer.history), self._mc.upd(self.trainer.history),
+                                       self._pc.upd(self.trainer.history), self._lrc.upd(self.trainer.history))))
         self.trainer.done.connect(self._dn)
         self.trainer.start()
+        self.studio.log_operation('Training', f'训练开始 · {cfg.get("model","?")} | {cfg.get("epochs","?")}ep | batch={cfg.get("batch","?")}')
 
     def _st(self):
         if self.trainer and self.trainer.isRunning():
             self.trainer.stop(); self.bs2.setEnabled(False); self.bs2.setText('Stopping…')
             self._log('  Stopping after current epoch…')
+            self.studio.log_operation('Training', '训练停止中（等待当前 epoch 完成）')
 
     def _dn(self, ok, msg):
         self._log(msg); self.bs1.setEnabled(True); self.bs2.setEnabled(True); self.bs2.setText('Stop')
         self._enable_params(True); self.trainer = None
         if ok:
-            print(f'[Trainer] done ok', flush=True)
+            self.studio.log_operation('Training', '训练完成 ✓')
+        else:
+            self.studio.log_operation('Training', f'训练结束 · {msg}')
 
     def _update_stats(self, t, p, b, c, loss):
         self._me.setText(f'Epoch: {t.split("/")[0].replace("Epoch ", "")}')

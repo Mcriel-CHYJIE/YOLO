@@ -15,9 +15,11 @@ project:
 training:
   model: yolo11n.pt                    # 预训练权重（ultralytics 自动下载）
   model_options:
+    - yolo11s.pt
     - yolo11n.pt
+    - yolov8s.pt
     - yolov8n.pt
-  epochs: 500                          # 充分收敛，高精度需更久训练
+  epochs: 300                          # 充分收敛，高精度需更久训练
   batch: 32                            # RTX 5070 Ti 16GB，大数据集 batch 64 易 OOM 降到 32
   imgsz: 640
   imgsz_options: [416, 512, 640, 720, 800]
@@ -26,43 +28,43 @@ training:
   device: auto
   scheduler: Cosine
   scheduler_options: [Cosine, Linear]
-  patience: 40                         # 100→40: 缩短早停耐心，epoch 100 左右最佳即停
-  lr0: 0.0005                          # CBAM 注入后 LR 减半防震荡
-  lrf: 0.01                            # 最终 LR = 5e-6
-  warmup_epochs: 10                    # CBAM 需要更长预热
+  patience: 30                         # 早停耐心，epoch 300 内 30 轮无提升即停
+  lr0: 0.0005                          # 降 LR 防 loss 震荡
+  lrf: 0.05                            # 最终 LR = lr0*0.05，温和衰减防止尾段震荡
+  warmup_epochs: 8                     # 长预热平滑启动
   workers: 12
-  momentum: 0.937
-  weight_decay: 0.0005
-  cls_pw: 0.7                          # 0.5→0.7: 提高分类权重，防止 val/cls 回升过拟合
-  iou: 0.8                             # 0.75→0.8: 更严格 NMS，减少重叠框降 FP
-  close_mosaic: 25                     # 15→25: 延迟关闭 Mosaic，增加样本多样性对抗过拟合
+  momentum: 0.95
+  weight_decay: 0.001
+  cls_pw: 0.92                         # 分类正样本权重，高精度低误报
+  iou: 0.8                             # 严格 NMS，减少重叠框降 FP
+  close_mosaic: 12                     # Mosaic 关闭时机，后续细粒度微调
   # ── Training hyperparams ──
-  dropout: 0.0                         # Dropout 正则化
-  warmup_momentum: 0.8                 # 预热期动量
+  dropout: 0.05                         # Dropout 正则化防过拟合
+  warmup_momentum: 0.85                 # 预热期动量平滑
   amp: true                            # 混合精度训练
   cache: false                         # 数据集缓存到内存
   lora_rank: 0                         # LoRA 低秩适配秩数（0=关闭）
   # ── Augmentation ──
-  copy_paste: 0.05                     # 0.15→0.05: 摔倒人体复制粘贴易产生不自然样本
-  degrees: 2.0                         # 5.0→2.0: 摔倒方向性极强，仅微小旋转防止假样本
+  copy_paste: 0.0                      # 摔倒人体复制粘贴易产生不自然样本，关闭
+  degrees: 2.0                         # 摔倒方向性极强，仅微小旋转防假样本
   multi_scale: false                    # 保持关闭（16GB 显存负担大）
   hsv_h: 0.01                          # 人类衣着颜色变化不大，减小色相漂移
-  hsv_s: 0.7
-  hsv_v: 0.4
+  hsv_s: 0.6
+  hsv_v: 0.35
   translate: 0.1
   scale: 0.3                           # 摔倒人体尺度较一致，减小缩放范围
   flip_lr: 0.3                         # 降低翻转率，摔倒有左右不对称
   flipud: 0.0                          # 摔倒有方向性，上下翻转有害
-  shear: 0.0                           # 剪切增强
+  shear: 1.0                           # 轻微剪切
   perspective: 0.0                     # 透视增强
-  mosaic: 1.0                          # Mosaic 增强概率
-  mixup: 0.2                           # MixUp 增强概率
+  mosaic: 0.9                          # Mosaic 增强概率
+  mixup: 0.08                          # MixUp 增强概率
 
 # ── Validation Defaults ──
 validation:
   imgsz: 640
   batch: 64
-  conf: 0.55                           # 0.45→0.55: 提高推理阈值，强力过滤误报
+  conf: 0.60                           # 0.60: 高推理阈值，强力过滤误报
   iou: 0.5                             # NMS 去重
 
 # ── Distillation Defaults ──
@@ -81,7 +83,7 @@ distill:
 
 # ── Prediction / Inference Defaults ──
 predict:
-  conf: 0.55                           # 推理 conf 0.55，强力过滤低分框
+  conf: 0.60                           # 推理 conf 0.60，强力过滤低分框
   iou: 0.5
   imgsz: 640
 

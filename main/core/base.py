@@ -11,13 +11,13 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-from main.config import cfg, THEME_FILE, DATA_YAML
+from main.config import cfg, SETTINGS_FILE, DATA_YAML
 
 # ── 主题加载（必须在颜色常量之前）──
 _IS_DARK = False
 try:
-    if THEME_FILE.exists():
-        _IS_DARK = bool(json.loads(THEME_FILE.read_text(encoding='utf-8')).get('dark', False))
+    if SETTINGS_FILE.exists():
+        _IS_DARK = bool(json.loads(SETTINGS_FILE.read_text(encoding='utf-8')).get('theme', {}).get('dark', False))
 except:
     pass
 
@@ -27,6 +27,7 @@ if _IS_DARK:
     TEXT, TEXT2, TEXT3 = '#e0e0e0', '#999999', '#666666'
     PRI, PRI_H = '#07C160', '#06ad56'
     GREEN, RED, AMBER = '#07C160', '#ef4444', '#f59e0b'
+    BLUE, PURPLE = '#3b82f6', '#8b5cf6'
     CON, CON_T = '#111111', '#d4d4d4'
     SIDE_BG, SIDE_HOVER, SIDE_ACTIVE = '#252526', '#333333', '#2d2d2d'
     TOP_BG, BOT_BG = '#2d2d2d', '#1a1a1a'
@@ -41,6 +42,7 @@ else:
     TEXT, TEXT2, TEXT3 = '#1a1a1a', '#7a7a7a', '#b0b0b0'
     PRI, PRI_H = '#07C160', '#06ad56'
     GREEN, RED, AMBER = '#07C160', '#ef4444', '#f59e0b'
+    BLUE, PURPLE = '#3b82f6', '#8b5cf6'
     CON, CON_T = '#1e1e1e', '#d4d4d4'
     SIDE_BG, SIDE_HOVER, SIDE_ACTIVE = '#f0f0f0', '#e5e5e5', '#ffffff'
     TOP_BG, BOT_BG = '#ffffff', '#2b2b2b'
@@ -68,7 +70,7 @@ QGroupBox{{font-weight:600;font-size:10px;color:{TEXT};border:1px solid {BORDER}
 QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
     background:{CARD};color:{TEXT3};}}
 QPushButton{{border-radius:4px;padding:4px 14px;border:1px solid {BORDER};
-    background:{CARD};color:{TEXT};min-height:22px;font-size:11px;}}
+    color:{TEXT};min-height:22px;font-size:11px;}}
 QPushButton:hover{{background:{BTN_HOVER};}}
 QPushButton#pri{{background:{PRI};color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}}
 QPushButton#pri:hover{{background:{PRI_H};}}
@@ -193,7 +195,7 @@ class LogPanel(QWidget):
 # ── 共享日志格式化 ──
 
 def format_log(ts, msg):
-    color = CON_T
+    color = TEXT2
     if ('Done' in msg or 'complete' in msg.lower() or 'exported' in msg
         or 'saved' in msg or 'New best' in msg or 'Best mAP' in msg):
         color = GREEN
@@ -294,6 +296,38 @@ class MapChart(Chart):
         except Exception as e:
             print(f'Failed to save mAP chart: {e}')
             return False
+
+
+class PrChart(Chart):
+    """Precision + Recall 双曲线"""
+    def upd(self, h):
+        self.clr()
+        if h.get('epoch') and len(h['epoch']):
+            if h.get('precision') and any(v>0 for v in h['precision']):
+                self.ax.plot(h['epoch'], h['precision'], color=GREEN, lw=1.5, label='Precision')
+            if h.get('recall') and any(v>0 for v in h['recall']):
+                self.ax.plot(h['epoch'], h['recall'], color=BLUE, lw=1.5, label='Recall')
+            if h.get('precision') and any(v>0 for v in h['precision']) or \
+               h.get('recall') and any(v>0 for v in h['recall']):
+                self.ax.legend(loc='lower right', fontsize=6, framealpha=0.8)
+            self.ax.set_title('Precision / Recall', fontsize=9, color=TEXT, fontweight='bold')
+            self.ax.set_xlabel('Epoch', fontsize=7, color=TEXT2)
+            self.ax.set_ylabel('Score', fontsize=7, color=TEXT2)
+        self.rf()
+
+
+class LrChart(Chart):
+    """Learning Rate 曲线"""
+    def upd(self, h):
+        self.clr()
+        if h.get('lr') and len(h['lr']) and any(v != 0 for v in h['lr']):
+            epochs = h.get('epoch', list(range(len(h['lr']))))
+            self.ax.plot(epochs, h['lr'], color=PURPLE, lw=1.5)
+            self.ax.fill_between(epochs, h['lr'], alpha=0.04, color=PURPLE)
+            self.ax.set_title('Learning Rate', fontsize=9, color=TEXT, fontweight='bold')
+            self.ax.set_xlabel('Epoch', fontsize=7, color=TEXT2)
+            self.ax.set_ylabel('LR', fontsize=7, color=TEXT2)
+        self.rf()
 
 
 def find_latest_best():

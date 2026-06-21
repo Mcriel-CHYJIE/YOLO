@@ -30,9 +30,7 @@ if getattr(sys, 'frozen', False):
     _CFG_DIR = Path(os.environ.get('APPDATA', ROOT)) / 'YOLO Training Studio'
 else:
     _CFG_DIR = Path(__file__).resolve().parent
-ATTENTION_FILE = _CFG_DIR / 'attention.json'
-THEME_FILE = _CFG_DIR / 'theme.json'
-SHORTCUTS_FILE = _CFG_DIR / 'shortcuts.json'
+SETTINGS_FILE = _CFG_DIR / 'settings.json'
 PATHS_FILE = _CFG_DIR / 'paths.json'
 
 # ── 工作目录路径配置 ──

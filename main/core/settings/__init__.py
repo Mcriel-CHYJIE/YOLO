@@ -1,1 +1,1 @@
-from .page import SettingsTab, THEME_FILE, DARK_QSS
+from .page import SettingsTab, DARK_QSS

@@ -8,7 +8,7 @@
 
 from PyQt5 import uic
 from main.core.base import *
-from main.config import cfg, THEME_FILE, SHORTCUTS_FILE, load_paths, get_data_yaml
+from main.config import cfg, SETTINGS_FILE, load_paths, get_data_yaml
 from main.core.settings import service as svc
 
 # ── 路径常量 ──
@@ -33,7 +33,7 @@ QGroupBox{font-weight:600;font-size:10px;color:#e0e0e0;border:1px solid #3d3d3d;
 QGroupBox::title{subcontrol-origin:margin;left:8px;padding:0 5px;
     background:#2d2d2d;color:#666;}
 QPushButton{border-radius:4px;padding:4px 14px;border:1px solid #3d3d3d;
-    background:#2d2d2d;color:#e0e0e0;min-height:22px;font-size:11px;}
+    color:#e0e0e0;min-height:22px;font-size:11px;}
 QPushButton:hover{background:#383838;}
 QPushButton#pri{background:#07C160;color:#fff;border:none;padding:5px 18px;min-height:26px;font-size:12px;font-weight:600;border-radius:4px;}
 QPushButton#pri:hover{background:#06ad56;}
@@ -170,9 +170,18 @@ class SettingsTab(QWidget):
         self.colsLo.setStretch(2, 1)
         for g in (self.classGroup, self.shortcutGroup, self.toggleGroup, self.initGroup, self.dirGroup):
             g.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.col3Lo.setStretch(0, 0)   # toggleGroup — 紧凑两行
-        self.col3Lo.setStretch(1, 0)   # initGroup — 紧凑
-        self.col3Lo.setStretch(2, 1)   # dirGroup — 占满剩余空间
+
+        # ── 把 Other (toggleGroup) 移到 col3 最底下 ──
+        i_tg = self.col3Lo.indexOf(self.toggleGroup)
+        i_ig = self.col3Lo.indexOf(self.initGroup)
+        if i_tg >= 0 and i_ig >= 0:
+            # 把 toggleGroup 移到末尾
+            w = self.col3Lo.takeAt(i_tg)
+            if w:
+                self.col3Lo.addItem(w)
+        self.col3Lo.setStretch(0, 0)   # initGroup — 自然高度
+        self.col3Lo.setStretch(1, 0)   # dirGroup — 自然高度
+        self.col3Lo.setStretch(2, 1)   # toggleGroup — 占满剩余高度
 
         # ── 创建类快捷键容器（占满剩余空间） ──
         self.classShortcutsContainer = QWidget()
@@ -180,6 +189,75 @@ class SettingsTab(QWidget):
 
         # ── 构建目录配置行 ──
         self._build_path_rows()
+
+        # ── 交换 Column 1 (classGroup) ↔ Column 3 (col3Lo) 位置 ──
+        i1 = self.colsLo.indexOf(self.classGroup)
+        i3 = self.colsLo.indexOf(self.col3Lo)
+        if i1 >= 0 and i3 >= 0:
+            item1 = self.colsLo.takeAt(i1)
+            if i3 > i1:
+                i3 -= 1
+            item3 = self.colsLo.takeAt(i3)
+            self.colsLo.insertItem(0, item3)        # col3Lo → 第一列
+            self.colsLo.insertItem(2, item1)        # classGroup → 第三列
+        self.colsLo.setStretch(0, 1)
+        self.colsLo.setStretch(1, 1)
+        self.colsLo.setStretch(2, 1)
+
+        # ── 把 classGroup 移到第二列与 shortcutGroup 平分高度 ──
+        i_sg = self.colsLo.indexOf(self.shortcutGroup)
+        i_cg = self.colsLo.indexOf(self.classGroup)
+        if i_sg >= 0 and i_cg >= 0:
+            item_sg = self.colsLo.takeAt(i_sg)
+            if i_cg > i_sg:
+                i_cg -= 1
+            item_cg = self.colsLo.takeAt(i_cg)
+            col2_lo = QVBoxLayout()
+            col2_lo.setSpacing(8)
+            col2_lo.addItem(item_cg)   # classGroup 放上面
+            col2_lo.addItem(item_sg)   # shortcutGroup 放下面
+            col2_lo.setStretch(0, 1)
+            col2_lo.setStretch(1, 1)
+            self.colsLo.insertItem(1, col2_lo)
+        self.colsLo.setStretch(0, 1)
+        self.colsLo.setStretch(1, 1)
+        self.colsLo.setStretch(2, 0)  # 第三列收起
+
+        # ── Column 3: 简洁版使用指引 ──
+        self.col3Placeholder = QGroupBox('📖 Guide')
+        self.col3Placeholder.setStyleSheet(f'''
+            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
+                border:1px solid {BORDER};border-radius:6px;
+                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
+            QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
+                background:{CARD};color:{TEXT2};}}
+        ''')
+        lo = QVBoxLayout(self.col3Placeholder)
+        lo.setContentsMargins(6, 4, 6, 4)
+        lo.setSpacing(4)
+
+        modules = [
+            '🎯 Training', '👁️ Predict', '🎞️ Preproc',
+            '🏷️ Label', '🔁 Review', '🤖 MIRO',
+            '🛠 Tools', '⚙️ Settings'
+        ]
+        for m in modules:
+            lbl = QLabel(m)
+            lbl.setStyleSheet(f'font-size:9px;color:{TEXT2};padding:1px 4px;'
+                              f'background:{BG};border-radius:3px;')
+            lo.addWidget(lbl)
+
+        lo.addStretch()
+        info = QLabel('基于 YOLOv8/YOLO11 的桌面端训练与部署工作室')
+        info.setWordWrap(True)
+        info.setStyleSheet(f'font-size:8px;color:{TEXT3};padding:2px 4px;')
+        lo.addWidget(info)
+
+        self.col3Placeholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.colsLo.insertWidget(2, self.col3Placeholder)
+        self.colsLo.setStretch(0, 1)
+        self.colsLo.setStretch(1, 1)
+        self.colsLo.setStretch(2, 1)
 
     def _replace_widget_with_toggle(self, host_name):
         """将 .ui 中的占位 QWidget 替换为 _ToggleSwitch，保持在其原始布局行内"""
@@ -268,6 +346,7 @@ class SettingsTab(QWidget):
 
             self.statusLabel.setStyleSheet(f'font-size:10px;color:{GREEN};')
             self.statusLabel.setText(f'Saved — {len(names)} categories (data.yaml)')
+            self.studio.log_operation('Settings', f'类别已保存 · {len(names)} 类')
         except Exception as e:
             self.statusLabel.setStyleSheet(f'font-size:10px;color:{RED};')
             self.statusLabel.setText(f'Save failed: {e}')
@@ -283,10 +362,11 @@ class SettingsTab(QWidget):
             if not checked and hasattr(self.studio, '_ss_active'):
                 self.studio._ss_active = False
                 self.studio._ss_overlay.hide_overlay()
+        self.studio.log_operation('Settings', f'屏保 {"开启" if checked else "关闭"}')
 
     def _on_theme_toggle(self, checked):
         """切换黑白主题 —— 持久化委托 service，样式刷新为 UI 操作"""
-        svc.save_theme_dark(THEME_FILE, checked)
+        svc.save_theme_dark(checked)
 
         import importlib
         import main.core.base as base_mod
@@ -305,6 +385,7 @@ class SettingsTab(QWidget):
         self.shortcutStatus.setStyleSheet(f'font-size:9px;color:{c};')
         self.shortcutStatus.setText('需重启应用以完全应用深色主题' if checked else '需重启应用以完全恢复浅色主题')
         QTimer.singleShot(5000, lambda: self.shortcutStatus.setText(''))
+        self.studio.log_operation('Settings', f'主题切换 → {"深色" if checked else "浅色"}')
 
     # ═══════════════════════════════════════════
     # 样式刷新（纯 UI）
@@ -406,14 +487,13 @@ class SettingsTab(QWidget):
 
     def _load_shortcuts(self):
         """从 service 层读取快捷键映射，填充 UI"""
-        data = svc.load_shortcuts(SHORTCUTS_FILE)
+        data = svc.load_shortcuts()
         for key, value in data.items():
             if key in self._shortcut_widgets:
                 self._shortcut_widgets[key].setText(value)
 
     def _load_theme(self):
-        """从 service 层读取主题状态，恢复 UI toggle"""
-        dark = svc.load_theme_dark(THEME_FILE)
+        dark = svc.load_theme_dark()
         self._theme_toggle.setChecked(dark)
 
     def _init_project(self):
@@ -441,9 +521,11 @@ class SettingsTab(QWidget):
         if created:
             self.initStatus.setStyleSheet(f'font-size:10px;color:{GREEN};padding:0;')
             self.initStatus.setText(f'Created ({len(created)}): ' + ', '.join(created))
+            self.studio.log_operation('Settings', f'项目初始化 · {folder} · 创建 {len(created)} 个目录')
         else:
             self.initStatus.setStyleSheet(f'font-size:10px;color:{TEXT2};padding:0;')
             self.initStatus.setText('All directories already exist.')
+            self.studio.log_operation('Settings', f'项目目录已存在 · {folder}')
         QTimer.singleShot(5000, lambda: self.initStatus.setText(''))
 
     def _build_path_rows(self):
@@ -494,6 +576,7 @@ class SettingsTab(QWidget):
         self.pathsStatus.setStyleSheet(f'font-size:9px;color:{GREEN};')
         self.pathsStatus.setText('Directories saved')
         QTimer.singleShot(2000, lambda: self.pathsStatus.setText(''))
+        self.studio.log_operation('Settings', '目录配置已保存')
 
     def _browse_path(self, key):
         """弹出目录选择器"""
@@ -509,12 +592,13 @@ class SettingsTab(QWidget):
             for key, w in self._shortcut_widgets.items():
                 data[key] = w.text()
 
-            svc.save_shortcuts(SHORTCUTS_FILE, data)
+            svc.save_shortcuts(data)
             svc.notify_label_tab_shortcuts(self.studio, data)
 
             self.shortcutStatus.setStyleSheet(f'font-size:9px;color:{GREEN};')
             self.shortcutStatus.setText('Shortcuts saved')
             QTimer.singleShot(2000, lambda: self.shortcutStatus.setText(''))
+            self.studio.log_operation('Settings', '快捷键已保存')
         except Exception as e:
             self.shortcutStatus.setStyleSheet(f'font-size:9px;color:{RED};')
             self.shortcutStatus.setText(f'Save failed: {e}')

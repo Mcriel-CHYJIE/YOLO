@@ -171,6 +171,7 @@ class AgentTab(QWidget):
         self._set_controls_enabled(True)
         self.chatView.clear()
         self._show_welcome()
+        self.studio.log_operation('Agent', '对话已清空')
 
     def _build_context(self):
         """构建设备信息+项目环境上下文"""
@@ -236,6 +237,7 @@ class AgentTab(QWidget):
         self._messages.append({'role': 'user', 'content': text})
         self._loading = True
         self._set_controls_enabled(False)
+        self.studio.log_operation('Agent', f'提问 · {text.strip()[:60]}')
         self._call_api()
 
     def _call_api(self):
@@ -261,8 +263,10 @@ class AgentTab(QWidget):
         if typ == 'reply':
             self._messages.append({'role': 'assistant', 'content': text})
             self._add_bubble('assistant', text)
+            self.studio.log_operation('Agent', f'回复完成 · {len(text)} 字符')
         else:
             self._add_bubble('assistant', f'❌ {text}')
+            self.studio.log_operation('Agent', f'API 请求失败 · {text[:60]}')
         self._loading = False
         self._set_controls_enabled(True)
 
@@ -302,6 +306,7 @@ class AgentTab(QWidget):
     def _show_config(self):
         """弹出大模型接口配置对话框"""
         cfg = svc.load_config()
+        self.studio.log_operation('Agent', '打开配置对话框')
 
         dialog = QDialog(self)
         dialog.setWindowTitle('AI Agent 接口配置')
@@ -365,14 +370,17 @@ class AgentTab(QWidget):
                 return
             test_btn.setEnabled(False)
             test_btn.setText('测试中...')
+            self.studio.log_operation('Agent', f'测试连接 · {mdl} @ {url[:40]}...')
 
             def _done(ok, msg=''):
                 test_btn.setEnabled(True)
                 test_btn.setText('测试连接')
                 if ok:
                     QMessageBox.information(dialog, '测试连接', '✅ 连接成功')
+                    self.studio.log_operation('Agent', '连接测试成功 ✓')
                 else:
                     QMessageBox.warning(dialog, '测试连接', f'❌ {msg}')
+                    self.studio.log_operation('Agent', f'连接测试失败 · {msg}')
 
             import threading
             def _test():
@@ -432,3 +440,4 @@ class AgentTab(QWidget):
         }
         svc.save_config(cfg)
         dialog.accept()
+        self.studio.log_operation('Agent', f'配置已保存 · {cfg["model"]}')

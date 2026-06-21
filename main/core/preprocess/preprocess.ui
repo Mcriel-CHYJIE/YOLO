@@ -130,6 +130,37 @@
        </layout>
       </widget></item>
 
+      <item><widget class="QGroupBox" name="sliceGroup">
+       <property name="title"><string>Slicing</string></property>
+       <layout class="QVBoxLayout" name="sliceLo">
+        <property name="leftMargin"><number>10</number></property>
+        <property name="topMargin"><number>14</number></property>
+        <property name="rightMargin"><number>10</number></property>
+        <property name="bottomMargin"><number>10</number></property>
+        <property name="spacing"><number>6</number></property>
+        <item><layout class="QHBoxLayout" name="sizeRow">
+         <item><widget class="QLabel" name="sizeLabel">
+          <property name="text"><string>Size</string></property>
+          <property name="styleSheet"><string>font-size:10px;color:#78716c;font-weight:500;min-width:40px;</string></property>
+         </widget></item>
+         <item><widget class="QSpinBox" name="sizeSpin">
+          <property name="minimumSize"><size><width>60</width><height>24</height></size></property>
+          <property name="minimum"><number>0</number></property>
+          <property name="maximum"><number>4096</number></property>
+          <property name="value"><number>640</number></property>
+          <property name="suffix"><string>×</string></property>
+         </widget></item>
+         <item><widget class="QComboBox" name="sizeCombo">
+          <property name="minimumSize"><size><width>0</width><height>24</height></size></property>
+          <item><property name="text"><string>Original</string></property></item>
+          <item><property name="text"><string>640×</string></property></item>
+          <item><property name="text"><string>720×</string></property></item>
+          <item><property name="text"><string>Custom</string></property></item>
+         </widget></item>
+        </layout></item>
+       </layout>
+      </widget></item>
+
       <item><widget class="QGroupBox" name="controlGroupPP">
        <property name="title"><string>Control</string></property>
        <layout class="QVBoxLayout" name="controlLoPP">
@@ -146,6 +177,16 @@
         <property name="spacing">
        <number>6</number>
       </property>
+        <item><layout class="QHBoxLayout" name="statsRow">
+         <item><widget class="QLabel" name="videoStats">
+          <property name="text"><string>video:—</string></property>
+          <property name="styleSheet"><string>font-size:11px;color:#a8a29e;padding:2px 0;</string></property>
+         </widget></item>
+         <item><widget class="QLabel" name="frameStats">
+          <property name="text"><string>frame:—</string></property>
+          <property name="styleSheet"><string>font-size:11px;color:#a8a29e;padding:2px 0;</string></property>
+         </widget></item>
+        </layout></item>
         <item><layout class="QHBoxLayout" name="ctrlBtnRow">
          <item><widget class="QPushButton" name="start_btn">
           <property name="text"><string>▶ Start</string></property>
@@ -161,10 +202,6 @@
          <property name="minimumSize"><size><width>0</width><height>6</height></size></property>
          <property name="textVisible"><bool>false</bool></property>
         </widget></item>
-        <item><layout class="QHBoxLayout" name="metricRowPP">
-         <item><widget class="QWidget" name="videoMetricCard" native="true"/></item>
-         <item><widget class="QWidget" name="frameMetricCard" native="true"/></item>
-        </layout></item>
         <item><widget class="QLabel" name="status_label">
          <property name="text"><string>Ready</string></property>
          <property name="styleSheet"><string>font-size:10px;color:#78716c;padding:3px 0;</string></property>

@@ -1,0 +1,15 @@
+{
+  "theme": {
+    "dark": false
+  },
+  "shortcuts": {
+    "prev": "A",
+    "next": "D",
+    "delete_box": "W",
+    "delete_img": "S",
+    "cls_0": "1",
+    "cls_1": "2",
+    "cls_2": "3",
+    "cls_3": "4"
+  }
+}

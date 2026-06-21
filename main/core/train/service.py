@@ -1,11 +1,14 @@
 """训练业务逻辑 — 配置构建 + 训练工作线程"""
+# ⚠️ 必须在 import torch 之前设置，防止 CUDA 碎片化 OOM
+import os
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')
 from pathlib import Path
 from main.core.base import ROOT, cfg, DATA_YAML, StreamEmitter
 from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
 import json, torch, threading
 from ultralytics import YOLO
-from main.config import ATTENTION_FILE, load_paths
+from main.config import load_paths
 
 
 # ══════════════════════════════════════════════════════════════
@@ -90,7 +93,7 @@ class Trainer(QObject):
         self.cfg = cfg
         self._stop_event = threading.Event()
         self._thread = None
-        self.history = {'epoch':[],'train_loss':[],'mAP50':[],'mAP50_95':[],'precision':[],'recall':[]}
+        self.history = {'epoch':[],'train_loss':[],'mAP50':[],'mAP50_95':[],'precision':[],'recall':[],'lr':[]}
         self.best_map = 0.0
         self.stdout_emitter = StreamEmitter(self.log)
         self.stderr_emitter = StreamEmitter(self.log)
@@ -113,9 +116,12 @@ class Trainer(QObject):
         if not torch.cuda.is_available(): return None
         try:
             total_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            # 使用 mem_get_info 获取驱动级真实空闲（含其他进程占用）
+            free_bytes, total_bytes = torch.cuda.mem_get_info(0)
+            free_mem = free_bytes / (1024**3)
             allocated_mem = torch.cuda.memory_allocated(0) / (1024**3)
-            free_mem = total_mem - allocated_mem
-            return {'total': total_mem, 'allocated': allocated_mem, 'free': free_mem}
+            return {'total': total_mem, 'allocated': allocated_mem, 'free': free_mem,
+                    'used_by_all': (total_bytes - free_bytes) / (1024**3)}
         except: return None
 
     def _save_log(self, ok, error=''):
@@ -142,6 +148,40 @@ class Trainer(QObject):
             self.log.emit(f' Log saved: {ts}.json')
         except: pass
 
+    def _generate_partial_charts(self, cfg):
+        """OOM 后在 CPU 上生成缺失的验证图表(confusion matrix, PR curves, val_batch)"""
+        try:
+            if not hasattr(self, '_exp_dir') or not self._exp_dir:
+                return
+            best = self._exp_dir / 'weights' / 'best.pt'
+            if not best.exists():
+                best = self._exp_dir / 'weights' / 'last.pt'
+            if not best.exists():
+                self.log.emit(' [Chart] No weights found, skipping charts')
+                return
+            torch.cuda.empty_cache()
+            self.log.emit(f' [Chart] Loading {best.name} on CPU...')
+            m = YOLO(str(best))
+            self.log.emit(f' [Chart] Generating validation plots (CPU, batch=1)...')
+            m.val(
+                data=str(DATA_YAML),
+                imgsz=cfg['imgsz'],
+                batch=1,
+                device='cpu',
+                plots=True,
+                project=str(self._exp_dir),
+                name='.',
+                exist_ok=True,
+            )
+            torch.cuda.empty_cache()
+            # 列出生成的文件
+            for f in self._exp_dir.glob('*.png'):
+                self.log.emit(f' [Chart]   {f.name}')
+            self.log.emit(f' [Chart] Done')
+        except Exception as e:
+            self.log.emit(f' [Chart] Failed (non-critical): {e}')
+            torch.cuda.empty_cache()
+
     def _run(self):
         import sys
         import matplotlib
@@ -164,10 +204,8 @@ class Trainer(QObject):
             
             # ── 注入注意力模块 ──
             try:
-                import json
-                if ATTENTION_FILE.exists():
-                    attn = json.loads(ATTENTION_FILE.read_text('utf-8')).get('type', 'none')
-                    if attn != 'none':
+                attn = cfg.get('attention', 'none')
+                if attn and attn.lower() != 'none':
                         from main.core.train.attention import inject_attention
                         replaced = inject_attention(m.model, attn)
                         self.log.emit(f' [{attn.upper()}] Injected attention into {replaced} C2f blocks')
@@ -191,16 +229,27 @@ class Trainer(QObject):
             # 输出目录命名：{日期}_{预设} 或 {日期}_{模型}
             preset = cfg.get('preset_name', '')
             if not preset:
-                # 从模型路径提取主干名
                 m_path = cfg.get('model', '')
                 preset = Path(m_path).stem if m_path else ROOT.name
             exp = f'{datetime.now().strftime("%m%d_%H%M")}_{preset}'
-            model_name = cfg['model'] if cfg['model'] else 'Scratch'
-            self.log.emit(f' {model_name} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
+            exp_dir = Path(self._train_dir) / exp
+            weights_dir = exp_dir / 'weights'
+            self._exp_dir = exp_dir  # 保存以便 OOM 时告知路径
+            self.log.emit(f' ────────────────────────────────────────────')
+            self.log.emit(f' Output: {exp_dir}')
+            self.log.emit(f' Weights: {weights_dir / "best.pt"}')
+            self.log.emit(f' ────────────────────────────────────────────')
+            self.log.emit(f' {cfg["model"] if cfg["model"] else "Scratch"} | {cfg["epochs"]}ep | batch={cfg["batch"]}')
             if cfg.get('lr0', 0) <= 0: cfg['lr0'] = 0.001; self.log.emit(f'  LR0 was 0, reset to 0.001')
             if torch.cuda.is_available() and cfg['device'] != 'cpu':
                 gi = self._check_gpu_memory()
-                if gi: self.log.emit(f' GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free')
+                if gi:
+                    self.log.emit(f' GPU Memory: {gi["total"]:.1f}GB total, {gi["free"]:.1f}GB free (其他进程占用 {gi.get("used_by_all", 0):.1f}GB)')
+                    if gi['free'] < 10.0:
+                        self.log.emit(f' ⚠️  空闲显存不足 ({gi["free"]:.1f}GB)，训练可能 OOM')
+                        self.log.emit(f'  请关闭占用 GPU 的其他程序（浏览器/游戏/串流等）后重试')
+                    elif gi['free'] < 12.0:
+                        self.log.emit(f' ⚠️  空闲显存偏低 ({gi["free"]:.1f}GB)，建议关闭其他 GPU 程序')
             # ── 自动检测 batch 是否可能爆显存 ──
             if torch.cuda.is_available() and cfg['device'] != 'cpu':
                 try:
@@ -208,12 +257,19 @@ class Trainer(QObject):
                     bs = cfg['batch']
                     extra = cfg.get('lora_rank', 0) > 0 or cfg.get('attention', 'None') != 'None'
                     # 根据模型规模估算安全 batch
-                    if 'yolo11n' in model_name or 'yolov8n' in model_name:
-                        safe_max = 24 if extra else 32
-                    elif 'yolo11s' in model_name or 'yolov8s' in model_name:
-                        safe_max = 12 if extra else 24
+                    # Per-model calibrated values (RTX 5070 Ti 16GB, anti-FP augs)
+                    imgsz = cfg.get('imgsz', 640)
+                    is_hd = imgsz >= 720
+                    if 'yolo11n' in model_name:
+                        safe_max = 14 if is_hd else (36 if extra else 36)
+                    elif 'yolov8n' in model_name:
+                        safe_max = 14 if is_hd else (32 if extra else 40)
+                    elif 'yolo11s' in model_name:
+                        safe_max = 10 if is_hd else (22 if extra else 28)
+                    elif 'yolov8s' in model_name:
+                        safe_max = 8 if is_hd else (20 if extra else 24)
                     elif 'yolo11m' in model_name or 'yolov8m' in model_name:
-                        safe_max = 8 if extra else 16
+                        safe_max = 6 if is_hd else (12 if extra else 16)
                     else:
                         safe_max = 24
                     if bs > safe_max:
@@ -236,16 +292,27 @@ class Trainer(QObject):
                             try: m95 = float(v); break
                             except: pass
                     p = float(mt.get('metrics/precision(B)',0)); r = float(mt.get('metrics/recall(B)',0))
+                    lr_val = float(t.lr[0]) if hasattr(t, 'lr') and isinstance(getattr(t, 'lr', None), (list, tuple)) and len(t.lr) > 0 else (
+                        float(t.optimizer.param_groups[0]['lr']) if hasattr(t, 'optimizer') and t.optimizer else 0.0
+                    )
                     self.history['epoch'].append(ep); self.history['train_loss'].append(loss)
                     self.history['mAP50'].append(m50); self.history['mAP50_95'].append(m95)
                     self.history['precision'].append(p); self.history['recall'].append(r)
+                    self.history['lr'].append(lr_val)
                     if m50 > self.best_map: self.best_map = m50
                     self.status.emit(f'Epoch {ep}/{cfg["epochs"]}', min(ep/max(cfg['epochs'],1),1.0), self.best_map, m50, loss)
+                    if torch.cuda.is_available():
+                        peak = torch.cuda.max_memory_allocated() / 1e9
+                        reserved = torch.cuda.memory_reserved() / 1e9
+                        self.log.emit(f'  [Epoch {ep}] GPU peak alloc={peak:.1f}G reserved={reserved:.1f}G')
+                        torch.cuda.reset_peak_memory_stats()
                     self.chart.emit()
                 except: pass
             m.add_callback('on_train_start', lambda t: self.log.emit(' Training started (first epoch may take a while to initialize)'))
-            # ── 每个 batch 处理完后发射进度（每 10% 报一次） ──
+            # ── 每个 batch 处理完后发射进度（每 10% 报一次，含真实显存） ──
             _last_batch_pct = [0]
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
             def on_batch(t):
                 try:
                     ni = t.ni if hasattr(t, 'ni') else 0
@@ -253,7 +320,13 @@ class Trainer(QObject):
                     pct = int(ni / max(nf, 1) * 100)
                     if pct >= _last_batch_pct[0] + 10:
                         _last_batch_pct[0] = pct
-                        self.log.emit(f'  Epoch progress: {pct}% ({ni}/{nf} batches)')
+                        mem_line = f'  Epoch progress: {pct}% ({ni}/{nf} batches)'
+                        if torch.cuda.is_available():
+                            alloc = torch.cuda.memory_allocated() / 1e9
+                            reserved = torch.cuda.memory_reserved() / 1e9
+                            peak = torch.cuda.max_memory_allocated() / 1e9
+                            mem_line += f' | GPU alloc={alloc:.1f}G reserved={reserved:.1f}G peak={peak:.1f}G'
+                        self.log.emit(mem_line)
                 except:
                     pass
             m.add_callback('on_train_batch_end', on_batch)
@@ -284,7 +357,24 @@ class Trainer(QObject):
             try: m.train(**train_args)
             except RuntimeError as e:
                 if 'CUDA out of memory' in str(e):
-                    self.log.emit(' Reduce batch size or image size'); raise
+                    self.log.emit(f'')
+                    self.log.emit(f' ╔══════════════════════════════════════════╗')
+                    self.log.emit(f' ║  CUDA Out of Memory                     ║')
+                    self.log.emit(f' ╚══════════════════════════════════════════╝')
+                    self.log.emit(f'  已完成 {len(self.history["epoch"])} 个 epoch')
+                    if torch.cuda.is_available():
+                        peak = torch.cuda.max_memory_allocated() / 1e9
+                        reserved = torch.cuda.memory_reserved() / 1e9
+                        self.log.emit(f'  OOM 时峰值: alloc={peak:.1f}G reserved={reserved:.1f}G')
+                    if hasattr(self, '_exp_dir') and self._exp_dir:
+                        wd = self._exp_dir / 'weights'
+                        self.log.emit(f'  部分权重已保存到:')
+                        self.log.emit(f'    {wd / "last.pt"}')
+                        self.log.emit(f'    {wd / "best.pt"}')
+                        self.log.emit(f'  可将 last.pt 作为预训练恢复训练')
+                    self.log.emit(f'  降低 batch 或 imgsz 后重试')
+                    self._generate_partial_charts(cfg)
+                    raise
                 raise
             stopped = self._stop_event.is_set()
             self._save_log(ok=not stopped, error='Stopped by user' if stopped else '')

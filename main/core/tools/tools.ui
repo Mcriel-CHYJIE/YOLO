@@ -52,14 +52,6 @@
        </widget></item>
       </layout></item>
 
-      <item><widget class="QProgressBar" name="importProgress">
-       <property name="maximum"><number>100</number></property>
-       <property name="value"><number>0</number></property>
-       <property name="textVisible"><bool>false</bool></property>
-       <property name="fixedHeight"><number>3</number></property>
-       <property name="styleSheet"><string>QProgressBar{border:none;border-radius:1px;height:3px;background:#e5e5e5;text-align:center;}QProgressBar::chunk{background:#07C160;border-radius:1px;}</string></property>
-      </widget></item>
-
       <item><widget class="QLabel" name="dataStatus">
        <property name="text"><string></string></property>
        <property name="minimumHeight"><number>13</number></property>
@@ -87,13 +79,18 @@
          <property name="fixedWidth"><number>28</number></property>
          <property name="fixedHeight"><number>22</number></property>
         </widget></item>
+        <item><widget class="QPushButton" name="exportBtn">
+         <property name="text"><string>Export</string></property>
+         <property name="fixedWidth"><number>70</number></property>
+         <property name="minimumHeight"><number>22</number></property>
+        </widget></item>
        </layout></item>
 
        <item><layout class="QHBoxLayout" name="exportFmtRow">
-        <property name="spacing"><number>6</number></property>
+        <property name="spacing"><number>4</number></property>
         <item><widget class="QLabel" name="exportFmtLabel">
          <property name="text"><string>Format</string></property>
-         <property name="fixedWidth"><number>50</number></property>
+         <property name="fixedWidth"><number>44</number></property>
         </widget></item>
         <item><widget class="QComboBox" name="exportFmt"/></item>
         <item><widget class="QLabel" name="exportSzLabel">
@@ -101,10 +98,6 @@
          <property name="fixedWidth"><number>30</number></property>
         </widget></item>
         <item><widget class="QComboBox" name="exportSz"/></item>
-       </layout></item>
-
-       <item><layout class="QHBoxLayout" name="exportOptRow">
-        <property name="spacing"><number>6</number></property>
         <item><widget class="QCheckBox" name="exportHalf">
          <property name="text"><string>FP16</string></property>
         </widget></item>
@@ -113,11 +106,6 @@
         </widget></item>
         <item><widget class="QCheckBox" name="exportNms">
          <property name="text"><string>NMS</string></property>
-        </widget></item>
-        <item><spacer><property name="orientation"><enum>Horizontal</enum></property></spacer></item>
-        <item><widget class="QPushButton" name="exportBtn">
-         <property name="text"><string>Export</string></property>
-         <property name="fixedWidth"><number>70</number></property>
         </widget></item>
        </layout></item>
 
@@ -210,10 +198,28 @@
         </widget></item>
        </layout></item>
 
-       <item><widget class="QPushButton" name="crawlerStartBtn">
-        <property name="text"><string>▶ Start</string></property>
-        <property name="minimumHeight"><number>26</number></property>
-       </widget></item>
+       <item><layout class="QHBoxLayout" name="crawlerStartRow">
+        <property name="spacing"><number>6</number></property>
+        <item><widget class="QLabel" name="crawlerCountLabel">
+         <property name="text"><string>Count</string></property>
+         <property name="fixedWidth"><number>36</number></property>
+         <property name="minimumHeight"><number>14</number></property>
+         <property name="maximumHeight"><number>14</number></property>
+         <property name="styleSheet"><string>font-size:10px;font-weight:600;color:#999;padding:0;margin:0;</string></property>
+         <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+        </widget></item>
+        <item><widget class="QSpinBox" name="crawlerCount">
+         <property name="minimum"><number>1</number></property>
+         <property name="maximum"><number>9999</number></property>
+         <property name="value"><number>100</number></property>
+         <property name="minimumHeight"><number>24</number></property>
+         <property name="styleSheet"><string>QSpinBox{border:1px solid #e5e5e5;border-radius:4px;padding:2px 6px;background:#fff;font-size:10px;}QSpinBox:focus{border-color:#07C160;}</string></property>
+        </widget></item>
+        <item><widget class="QPushButton" name="crawlerStartBtn">
+         <property name="text"><string>▶ Start</string></property>
+         <property name="minimumHeight"><number>26</number></property>
+        </widget></item>
+       </layout></item>
 
        <item><widget class="QProgressBar" name="crawlerProgress">
         <property name="maximum"><number>100</number></property>
@@ -248,8 +254,17 @@
      </widget></item>
 
      <item><widget class="QGroupBox" name="col2Other">
-      <property name="title"><string>... Other</string></property>
+      <property name="title"><string>🎬 Video Downloader</string></property>
       <layout class="QVBoxLayout" name="col2OtherLo">
+       <property name="leftMargin"><number>8</number></property>
+       <property name="rightMargin"><number>8</number></property>
+       <property name="spacing"><number>6</number></property>
+      </layout>
+     </widget></item>
+
+     <item><widget class="QGroupBox" name="col2Other2">
+      <property name="title"><string>... Other</string></property>
+      <layout class="QVBoxLayout" name="col2Other2Lo">
        <property name="leftMargin"><number>8</number></property>
        <property name="rightMargin"><number>8</number></property>
        <property name="spacing"><number>6</number></property>

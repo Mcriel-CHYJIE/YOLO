@@ -304,7 +304,10 @@ class PredictTab(QWidget):
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         p, _ = QFileDialog.getOpenFileName(self, 'Select Model', 'runs', MODEL_FILTER, options=opts)
-        if p: self._model_path = Path(p); self.lbl_model.setText(f'[{self._model_path.name}]')
+        if p:
+            self._model_path = Path(p)
+            self.lbl_model.setText(f'[{self._model_path.name}]')
+            self.studio.log_operation('Predict', f'选择模型 · {self._model_path.name}')
 
     def _browse_src(self):
         menu = QMenu(self)
@@ -312,13 +315,13 @@ class PredictTab(QWidget):
         act = menu.exec_(QCursor.pos())
         if act == va:
             p, _ = QFileDialog.getOpenFileName(self, 'Select Video', '', 'Video Files (*.mp4 *.avi *.mov *.mkv)')
-            if p: self.lbl_src.setText(p); self._set_mode(p)
+            if p: self.lbl_src.setText(p); self._set_mode(p); self.studio.log_operation('Predict', f'选择源 · 视频 {Path(p).name}')
         elif act == ia:
             p, _ = QFileDialog.getOpenFileName(self, 'Select Image', '', 'Image Files (*.jpg *.png *.jpeg)')
-            if p: self.lbl_src.setText(p); self._set_mode(p)
+            if p: self.lbl_src.setText(p); self._set_mode(p); self.studio.log_operation('Predict', f'选择源 · 图片 {Path(p).name}')
         elif act == fa:
             d = QFileDialog.getExistingDirectory(self, 'Select Image Folder')
-            if d: self.lbl_src.setText(d); self._set_mode(d)
+            if d: self.lbl_src.setText(d); self._set_mode(d); self.studio.log_operation('Predict', f'选择源 · 文件夹 {Path(d).name}')
 
     def _set_mode(self, p):
         if not p: return
@@ -376,18 +379,25 @@ class PredictTab(QWidget):
         self._cumulative_stats.clear()
         self.lbl_cls.setText('Detecting...'); self._worker.export_path = export_path
         self._worker.start()
+        self.studio.log_operation('Predict', f'视频检测开始 · {self._source_path.name}')
 
     def _toggle_pause(self):
         if self._worker and self._worker.isRunning():
-            self._worker.toggle_pause(); self.btn_pause.setText('Resume' if self._worker._pause_event.is_set() else 'Pause')
+            paused = self._worker._pause_event.is_set()
+            self._worker.toggle_pause()
+            self.btn_pause.setText('Resume' if paused else 'Pause')
+            self.studio.log_operation('Predict', f'视频检测已{"暂停" if paused else "恢复"}')
 
     def _toggle_hm(self, on):
         """视频运行时切换热力图"""
         if self._worker and self._worker.isRunning():
             self._worker.set_heatmap(on)
+            self.studio.log_operation('Predict', f'热力图 {"ON" if on else "OFF"}')
 
     def _stop_run(self):
-        if self._worker and self._worker.isRunning(): self._worker.stop(); self.log.setText('Stopped')
+        if self._worker and self._worker.isRunning():
+            self._worker.stop(); self.log.setText('Stopped')
+            self.studio.log_operation('Predict', '视频检测已停止')
 
     def _on_frame(self, frame, idx, total):
         h, w = frame.shape[:2]
@@ -448,6 +458,7 @@ class PredictTab(QWidget):
             return
         self.btn_start.setEnabled(True); self.btn_stop.setEnabled(False); self.btn_pause.setEnabled(False)
         self.btn_start.setText('Restart'); self._worker = None
+        self.studio.log_operation('Predict', '视频检测完成 ✓')
 
     def _run_batch(self):
         w = self._model_path; src = self._source_path
@@ -455,6 +466,7 @@ class PredictTab(QWidget):
         if not src or not src.exists(): QMessageBox.warning(self, 'Warning', 'Please select images/folder first'); return
         self.log_view.clear(); self.btn_run.setEnabled(False)
         self.log_view.append('Running batch inference...'); QApplication.processEvents()
+        self.studio.log_operation('Predict', f'批量检测开始 · {src.name if src.is_file() else src.stem}')
 
         try:
             result = run_batch_inference(
@@ -486,8 +498,10 @@ class PredictTab(QWidget):
             if sv:
                 self.log_view.append(f'   4-views: {sv}')
             if result['total_imgs'] > 0: self._show_image_preview(0)
+            self.studio.log_operation('Predict', f'批量检测完成 · {result["total_imgs"]} 源, {result["total_dets"]} 检测')
         except Exception as e:
             import traceback; traceback.print_exc(); self.log_view.append(f'Error: {e}')
+            self.studio.log_operation('Predict', f'批量检测失败 · {e}')
         finally: self.btn_run.setEnabled(True)
 
     def _show_image_preview(self, idx):

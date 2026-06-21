@@ -9,7 +9,7 @@
 import json
 from pathlib import Path
 from PyQt5.QtCore import QThread, pyqtSignal
-from main.core.settings.service import resolve_shortcuts_file, load_shortcuts as _load_shortcuts
+from main.core.settings.service import load_shortcuts as _load_shortcuts
 from main.config import load_paths
 
 
@@ -212,17 +212,15 @@ def generate_export_yaml(out_root: Path, project_root: Path,
 
 def load_shortcut_keys() -> dict:
     """从 shortcuts.json 加载快捷键映射。"""
-    sf = resolve_shortcuts_file()
-    return _load_shortcuts(sf)
+    return _load_shortcuts()
 
 
 def get_cls_shortcuts() -> dict[str, int]:
     """
-    从 shortcuts.json 加载类别快捷键映射 {键名: class_id}。
+    从 settings.json 加载类别快捷键映射 {键名: class_id}。
     无配置时返回默认值 {'1': 0, '2': 1, '3': 2, '4': 3}。
     """
-    sf = resolve_shortcuts_file()
-    data = _load_shortcuts(sf)
+    data = _load_shortcuts()
     result = {}
     for k, v in data.items():
         if k.startswith('cls_'):
@@ -307,14 +305,14 @@ class ExportWorker(QThread):
         self._project_root = project_root
 
     def run(self):
-        import hashlib, shutil, cv2
+        import hashlib, shutil
         try:
             items = list(self._annotations.items())
             items.sort(key=lambda x: hashlib.md5(x[0].encode("utf-8")).hexdigest())
             split_idx = max(1, int(len(items) * self._train_ratio / 100.0))
             train_items = items[:split_idx]
             val_items = items[split_idx:]
-            for sub in ["images/train", "images/val", "labels/train", "labels/val", "visualize"]:
+            for sub in ["images/train", "images/val", "labels/train", "labels/val"]:
                 (self._out_root / sub).mkdir(parents=True, exist_ok=True)
 
             total = len(items)
@@ -329,7 +327,6 @@ class ExportWorker(QThread):
                     base_name = src.stem
                     dst_img = self._out_root / "images" / split_name / f"{base_name}.jpg"
                     dst_lbl = self._out_root / "labels" / split_name / f"{base_name}.txt"
-                    dst_viz = self._out_root / "visualize" / f"{base_name}.jpg"
 
                     if dst_img.exists() or dst_lbl.exists():
                         skipped_count += 1
@@ -338,21 +335,6 @@ class ExportWorker(QThread):
                     shutil.copy2(str(src), str(dst_img))
                     lines = [a.to_yolo() for a in anns]
                     dst_lbl.write_text("\n".join(lines) + "\n", "utf-8")
-
-                    # 生成可视化预览
-                    img = cv2.imread(str(src))
-                    if img is not None:
-                        h, w = img.shape[:2]
-                        for a in anns:
-                            x1 = int((a.xc - a.w / 2) * w)
-                            y1 = int((a.yc - a.h / 2) * h)
-                            x2 = int((a.xc + a.w / 2) * w)
-                            y2 = int((a.yc + a.h / 2) * h)
-                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            label = f"{a.class_id}"
-                            cv2.putText(img, label, (x1, y1 - 5),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                        cv2.imwrite(str(dst_viz), img, [cv2.IMWRITE_JPEG_QUALITY, 90])
 
                     exported_count += 1
                     self.progress.emit(int(exported_count / total * 100))

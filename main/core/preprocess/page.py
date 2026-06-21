@@ -39,6 +39,11 @@ class PreprocessTab(QWidget):
         self.titleLabel.setFixedHeight(24)
 
     def _init_widgets(self):
+        # 切片尺寸双向联动
+        self.sizeCombo.currentIndexChanged.connect(self._on_combo_changed)
+        self.sizeSpin.valueChanged.connect(self._on_spin_changed)
+        self.sizeSpin.setSpecialValueText("--")
+        self._on_combo_changed(0)
         # 浏览按钮加文件夹图标
         for btn in [self.srcBrowseBtn, self.outBrowseBtn]:
             btn.setText('')
@@ -49,19 +54,32 @@ class PreprocessTab(QWidget):
                 font-size:11px;color:{TEXT};padding:3px;}}
             QListWidget::item {{padding:4px 6px;border-radius:3px;}}
             QListWidget::item:selected {{background:{PRI};color:#fff;}}''')
-        for placeholder, label, color, attr_v, attr_c in [
-            (self.videoMetricCard, 'Video', TEXT, '_pv', '_pv_card'),
-            (self.frameMetricCard, 'Frame', GREEN, '_pf', '_pf_card'),
-        ]:
-            card = MetricCard(label, color, '—')
-            idx = self.metricRowPP.indexOf(placeholder)
-            self.metricRowPP.removeWidget(placeholder)
-            placeholder.deleteLater()
-            self.metricRowPP.insertWidget(idx, card, 1)
-            setattr(self, attr_v, card.value_label)
-            setattr(self, attr_c, card)
-            card.value_label.setStyleSheet(
-                f'font-size:16px;font-weight:700;color:{color};qproperty-alignment:AlignCenter;')
+
+    def _update_stats(self, video="—", frame="—"):
+        self.videoStats.setText(f'video:{video}')
+        self.frameStats.setText(f'frame:{frame}')
+
+    def _on_combo_changed(self, idx):
+        """预设选择 → 更新数值框"""
+        presets = {0: 0, 1: 640, 2: 720}
+        if idx in presets:
+            self.sizeSpin.setValue(presets[idx])
+
+    def _on_spin_changed(self, val):
+        """数值框手动改 → 切换 Combo 到 Custom"""
+        presets = {0: 0, 640: 1, 720: 2}
+        if val in presets:
+            self.sizeCombo.blockSignals(True)
+            self.sizeCombo.setCurrentIndex(presets[val])
+            self.sizeCombo.blockSignals(False)
+        else:
+            self.sizeCombo.blockSignals(True)
+            self.sizeCombo.setCurrentIndex(3)
+            self.sizeCombo.blockSignals(False)
+
+    def _target_size(self) -> int:
+        """获取当前目标尺寸（0=原图）"""
+        return self.sizeSpin.value()
 
     # ═══════════════════════════════════════════
     # Signal Wiring
@@ -112,21 +130,28 @@ class PreprocessTab(QWidget):
         if not videos: QMessageBox.warning(self, 'Warning', '未找到视频文件'); return
         self.start_btn.setEnabled(False); self.stop_btn.setEnabled(True)
         self.src_input.setEnabled(False); self.out_input.setEnabled(False)
-        self.progress_bar.setValue(0); self._pv.setText('—'); self._pf.setText('—')
+        self.progress_bar.setValue(0)
         self.log_panel.clear()
+        self._update_stats(video="0/0", frame="0")
         self._log(f'▶ 开始预处理: {Path(s).name}')
-        self._worker = VideoPreprocessWorker(src_folder=s, out_folder=o)
+        ts = self._target_size()
+        size_label = self.sizeCombo.currentText()
+        self._log(f'  切片尺寸: {size_label}' + (f' ({ts}×)' if ts > 0 else ''))
+        self._worker = VideoPreprocessWorker(src_folder=s, out_folder=o, target_size=ts)
         self._worker.log.connect(self._log)
         self._worker.progress.connect(lambda c, t: (
-            self.progress_bar.setValue(int(c / t * 100)), self._pv.setText(f'{c}/{t}')))
-        self._worker.video_progress.connect(lambda c, t: self._pf.setText(f'{c}'))
+            self.progress_bar.setValue(int(c / t * 100)),
+            self._update_stats(video=f'{c}/{t}')))
+        self._worker.video_progress.connect(lambda c, t: self._update_stats(frame=str(c)))
         self._worker.image_saved.connect(self._on_image_saved)
         self._worker.done.connect(self._on_done)
         self._worker.start()
+        self.studio.log_operation('Preprocess', f'预处理开始 · {Path(s).name} → {size_label}')
 
     def _stop(self):
         if self._worker and self._worker.isRunning():
             self._worker.stop(); self.stop_btn.setEnabled(False); self._log(' 停止中...')
+            self.studio.log_operation('Preprocess', '预处理已停止')
 
     def _on_image_saved(self, image_path: str):
         try:
@@ -147,6 +172,10 @@ class PreprocessTab(QWidget):
         self.progress_bar.setValue(100 if ok else 0)
         self._log(f'{"" if ok else ""} {msg}')
         self.status_label.setText(msg); self._worker = None
+        if ok:
+            self.studio.log_operation('Preprocess', '预处理完成 ✓')
+        else:
+            self.studio.log_operation('Preprocess', f'预处理失败 · {msg}')
 
     def _log(self, msg):
         self.log_panel.append(format_log(datetime.now().strftime('%H:%M:%S'), msg))

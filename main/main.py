@@ -26,12 +26,10 @@ if sys.platform == 'win32':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from main.core.train import TrainTab
-from main.core.distill import DistillTab
 from main.core.predict import PredictTab
 from main.core.preprocess import PreprocessTab
 from main.core.label import LabelTab
 from main.core.review import RelabelTab
-from main.core.guide import GuideTab
 from main.core.settings import SettingsTab
 from main.core.agent import AgentTab
 from main.core.tools import ToolsTab
@@ -45,15 +43,16 @@ NAV_ITEMS = [
     ('🎞️  Preproc',    'preprocess'),
     ('🏷️  Label',      'label'),
     ('🔁  Review',     'review'),
-    ('🔬  Distill',    'distill'),
     ('🤖  MIRO',       'agent'),
     ('🛠  Tools',      'tools'),
     ('⚙️  Settings',   'settings'),
-    ('📖  Guide',      'guide'),
 ]
 
 
 class Studio(QMainWindow):
+    # 系统操作日志信号： (source_tab, message)
+    operation_logged = pyqtSignal(str, str)
+
     def __init__(self):
         super().__init__()
         self.validator = None
@@ -65,6 +64,13 @@ class Studio(QMainWindow):
         self._start_sys_monitor()
         self._start_ss_monitor()
         self._ref_w = 1400  # 参考宽度
+
+    def log_operation(self, source, message):
+        """向全局操作日志发送一条消息。其他标签页通过操作日志区展示。"""
+        try:
+            self.operation_logged.emit(source, message)
+        except Exception:
+            pass
 
     def resizeEvent(self, event):
         """窗口缩放时等比例调整字体"""
@@ -162,6 +168,20 @@ class Studio(QMainWindow):
         self._refresh_btn.clicked.connect(self.refresh_all)
         lo.addWidget(self._refresh_btn)
 
+        # 打开项目目录按钮
+        self._folder_btn = QPushButton('📂')
+        self._folder_btn.setToolTip('Open project folder in Explorer')
+        self._folder_btn.setFixedSize(32, 28)
+        self._folder_btn.setCursor(Qt.PointingHandCursor)
+        self._folder_btn.setFont(QFont('Segoe UI Symbol', 12))
+        self._folder_btn.setStyleSheet(f'''
+            QPushButton{{background:{BG};border:1px solid {BORDER};
+                border-radius:4px;color:{TEXT2};padding:0;}}
+            QPushButton:hover{{background:{BTN_HOVER};color:{TEXT};}}
+        ''')
+        self._folder_btn.clicked.connect(self._open_project_dir)
+        lo.addWidget(self._folder_btn)
+
         # 细底部分隔线
         w.setStyleSheet(f'background:{TOP_BG};border-bottom:1px solid {BORDER};')
         self._top_bar = w
@@ -181,7 +201,7 @@ class Studio(QMainWindow):
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(f'''
                 QPushButton{{
-                    background:transparent;border:none;border-radius:0;
+                    background:{SIDE_BG};border:none;border-radius:0;
                     text-align:left;padding:0 14px;
                     font-size:14px;font-weight:500;color:{TEXT2};
                     min-height:42px;max-height:42px;
@@ -254,7 +274,9 @@ class Studio(QMainWindow):
         # 更新顶栏标签页名称
         name_map = dict((k, l) for l, k in NAV_ITEMS)
         self._current_tab_name = key
-        self._tab_label.setText(name_map.get(key, key))
+        name = name_map.get(key, key)
+        self._tab_label.setText(name)
+        self.log_operation('导航', f'切换到 {name}')
 
     # ── 主题刷新 ──
     def refresh_theme(self):
@@ -275,7 +297,7 @@ class Studio(QMainWindow):
         if hasattr(self, '_nav_btns'):
             for btn, _ in self._nav_btns:
                 btn.setStyleSheet(f'''
-                    QPushButton{{background:transparent;border:none;border-radius:0;
+                    QPushButton{{background:{base_mod.SIDE_BG};border:none;border-radius:0;
                         text-align:left;padding:0 14px;font-size:14px;font-weight:500;
                         color:{base_mod.TEXT2};min-height:42px;max-height:42px;
                     }}
@@ -294,6 +316,7 @@ class Studio(QMainWindow):
                     tab.on_theme_changed()
                 except Exception as e:
                     print(f'Theme refresh error in {key}: {e}')
+        self.log_operation('主题', '主题已刷新')
 
     def refresh_all(self):
         """刷新所有标签页的文件读取与状态"""
@@ -317,12 +340,42 @@ class Studio(QMainWindow):
             except Exception as e:
                 print(f'Refresh error in {key}: {e}')
         self._tab_label.setText('Refreshed')
+        self.log_operation('系统', '所有标签页已刷新')
         # 2秒后恢复
         from PyQt5.QtCore import QTimer
         name_map = dict((k, l) for l, k in NAV_ITEMS)
         original = name_map.get(self._current_tab_name, '')
         if original:
             QTimer.singleShot(2000, lambda o=original: self._tab_label.setText(o))
+
+    def _open_project_dir(self):
+        """在资源管理器中打开项目工作目录（paths.json 配置的根目录）"""
+        import subprocess, os
+        from main.config import load_paths
+        from pathlib import Path
+        from main.core.base import ROOT
+
+        # 尝试从 paths.json 提取项目根目录
+        paths = load_paths()
+        target = None
+        for key in ('dataset_dir', 'train_output', 'preproc_before',
+                     'label_dir', 'predict_output', 'export_dir', 'models_dir'):
+            p = paths.get(key, '')
+            if p:
+                candidate = Path(p).resolve().parent
+                if candidate.exists():
+                    target = candidate
+                    break
+
+        if target is None:
+            target = ROOT
+
+        path = str(target)
+        if os.name == 'nt':
+            subprocess.Popen(['explorer', path], creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            subprocess.Popen(['xdg-open', path])
+        self.log_operation('系统', f'打开项目目录 {path}')
 
     # ── 创建各标签页 ──
     def _create_tabs(self):
@@ -334,11 +387,9 @@ class Studio(QMainWindow):
             ('preprocess', PreprocessTab(self)),
             ('label',      LabelTab(self)),
             ('review',    RelabelTab(self)),
-            ('distill',    DistillTab(self)),
             ('agent',      AgentTab(self)),
             ('tools',      ToolsTab(self)),
             ('settings',   SettingsTab(self)),
-            ('guide',      GuideTab(self)),
         ]
         for key, tab in pages:
             self._tabs[key] = tab
@@ -348,6 +399,7 @@ class Studio(QMainWindow):
         if self._nav_btns:
             self._nav_btns[0][0].setChecked(True)
             self._switch('training')
+        self.log_operation('系统', f'程序启动 · {len(self._tabs)} 个功能模块已加载')
 
     # ── 关闭窗口确认 ──
     def closeEvent(self, event):
@@ -540,10 +592,11 @@ def main():
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('YOLOTrainingStudio')
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
-    from main.core.settings import THEME_FILE, DARK_QSS
+    from main.config import SETTINGS_FILE
+    from main.core.settings import DARK_QSS
     try:
-        if THEME_FILE.exists():
-            dark = json.loads(THEME_FILE.read_text(encoding='utf-8')).get('dark', False)
+        if SETTINGS_FILE.exists():
+            dark = json.loads(SETTINGS_FILE.read_text(encoding='utf-8')).get('theme', {}).get('dark', False)
             if dark:
                 app.setStyleSheet(DARK_QSS)
     except:

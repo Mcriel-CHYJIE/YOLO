@@ -114,15 +114,13 @@ def save_labels_for_image(img_path: Path, split: str, anns: list[Annotation]):
 # ══════════════════════════════════════════════════════════════
 
 def load_shortcut_keys() -> dict:
-    from main.core.settings.service import resolve_shortcuts_file, load_shortcuts as _load_shortcuts
-    sf = resolve_shortcuts_file()
-    return _load_shortcuts(sf)
+    from main.core.settings.service import load_shortcuts as _load_shortcuts
+    return _load_shortcuts()
 
 
 def get_cls_shortcuts() -> dict[str, int]:
-    from main.core.settings.service import resolve_shortcuts_file, load_shortcuts as _load_shortcuts
-    sf = resolve_shortcuts_file()
-    data = _load_shortcuts(sf)
+    from main.core.settings.service import load_shortcuts as _load_shortcuts
+    data = _load_shortcuts()
     result = {}
     for k, v in data.items():
         if k.startswith('cls_'):
