@@ -183,6 +183,9 @@ class SettingsTab(QWidget):
         self.col3Lo.setStretch(1, 0)   # dirGroup — 自然高度
         self.col3Lo.setStretch(2, 1)   # toggleGroup — 占满剩余高度
 
+        # ── Other (toggleGroup) 内向上对齐 ──
+        self.toggleGroupLo.addStretch()
+
         # ── 创建类快捷键容器（占满剩余空间） ──
         self.classShortcutsContainer = QWidget()
         self.shortcutGroupLo.insertWidget(3, self.classShortcutsContainer, 1)
@@ -223,35 +226,106 @@ class SettingsTab(QWidget):
         self.colsLo.setStretch(1, 1)
         self.colsLo.setStretch(2, 0)  # 第三列收起
 
-        # ── Column 3: 简洁版使用指引 ──
+        # ── Column 3: 使用指引（可选择当前标签页） ──
+        from PyQt5.QtWidgets import QScrollArea
+
         self.col3Placeholder = QGroupBox('📖 Guide')
         self.col3Placeholder.setStyleSheet(f'''
-            QGroupBox{{font-weight:600;font-size:10px;color:{TEXT2};
+            QGroupBox{{font-weight:600;font-size:12px;color:{TEXT2};
                 border:1px solid {BORDER};border-radius:6px;
-                margin-top:8px;padding:10px 8px 8px;background:{CARD};}}
+                margin-top:8px;padding:0;background:{CARD};}}
             QGroupBox::title{{subcontrol-origin:margin;left:8px;padding:0 5px;
                 background:{CARD};color:{TEXT2};}}
         ''')
-        lo = QVBoxLayout(self.col3Placeholder)
-        lo.setContentsMargins(6, 4, 6, 4)
-        lo.setSpacing(4)
+        outer_lo = QVBoxLayout(self.col3Placeholder)
+        outer_lo.setContentsMargins(0, 0, 0, 0)
 
-        modules = [
-            '🎯 Training', '👁️ Predict', '🎞️ Preproc',
-            '🏷️ Label', '🔁 Review', '🤖 MIRO',
-            '🛠 Tools', '⚙️ Settings'
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(0)  # 无边框
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f'QScrollArea{{background:transparent;border:none;}}'
+                             f'QScrollBar:vertical{{width:4px;background:transparent;}}'
+                             f'QScrollBar::handle:vertical{{background:{BORDER};border-radius:2px;min-height:20px;}}'
+                             f'QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{{height:0;}}')
+
+        content = QWidget()
+        content.setStyleSheet(f'background:transparent;')
+        lo = QVBoxLayout(content)
+        lo.setContentsMargins(8, 4, 8, 4)
+        lo.setSpacing(3)
+
+        guides = [
+            ('🎯  Training',
+             '模型训练核心页。支持 YOLO 8/11/12 系列的 Detect（目标检测）和 Segment（实例分割）任务。\n'
+             '• 模型选择：nano/small/medium/large 不同规模，可加载预训练权重继续训练\n'
+             '• 数据集管理：自动读取 data.yaml 类别，支持 COCO 格式 / 自定义数据集\n'
+             '• 超参数调节：Epochs / Batch Size / Learning Rate / Optimizer / Image Size\n'
+             '• 增强策略：Mosaic / MixUp / Copy-Paste / HSV 扰动 / 随机擦除等\n'
+             '• 预设管理：保存多组训练配置为预设文件，随时切换对比\n'
+             '• 训练监控：实时 loss / mAP 曲线、GPU 显存使用、进度条\n'
+             '• 自动保存：每 epoch 保存权重，best.pt / last.pt 自动管理'),
+            ('👁️  Predict',
+             '推理预测页——对图片、文件夹或视频运行训练好的模型。\n'
+             '• 输入来源：单张图片 / 批量文件夹 / 视频文件 / 摄像头实时流\n'
+             '• 模型加载：选择 .pt 权重，支持任何 YOLO 系列模型\n'
+             '• 参数调节：Confidence 阈值 / IoU NMS 阈值 / 最大检测数\n'
+             '• 输出选项：保存标注图片 / 裁剪目标 / JSON 结果导出\n'
+             '• 可视化：推理结果实时预览，标注框 / 类别 / 置信度叠加\n'
+             '• 批量处理：支持多图片自动批量推理，结果汇总统计'),
+            ('🎞️  Preproc',
+             '预处理页——训练前的数据准备流水线。\n'
+             '• 输入/输出目录：指定原始图像目录（before）和输出目录（after）\n'
+             '• 批量转换：统一格式、尺寸缩放、自动旋转校正\n'
+             '• 数据清洗：剔除损坏图片、去重、文件名规范化\n'
+             '• 增强导出：可选翻转 / 旋转 / 色调调整等增强，扩充数据集规模'),
+            ('🏷️  Label',
+             '标注工作台——支持 BBox（矩形框）和 Polygon（多边形）两种标注方式。\n'
+             '• 标注方式：绘制新框 / 多边形 / 编辑 / 移动 / 缩放 / 删除\n'
+             '• 类别切换：快捷键 1-9 / QWERTY 快速切换，支持自定义绑定\n'
+             '• 自动保存：标注即保存，防丢数据\n'
+             '• 辅助功能：自动保存 / 删除模式 / 快捷调整框大小\n'
+             '• 图片导航：上/下一张、跳转、批量标注流程'),
+            ('🔁  Review',
+             '审核页——对已标注数据集进行质量审查和修正。\n'
+             '• 逐张复核：遍历标注图片，检查标注框准确性\n'
+             '• 快捷修正：修改类别、调整框位置、删除错误标注\n'
+             '• 标注统计：各类别数量、平均框大小、分布统计\n'
+             '• 导出审核结果：通过审核的数据进入训练集'),
+            ('🤖  MIRO',
+             'MIRO 边缘检测代理——连接 Android 手机实时推理。\n'
+             '• 设备连接：通过 TCP 连接运行 MIRO App 的 Android 设备\n'
+             '• 实时画面：手机摄像头画面实时预览，检测结果叠加\n'
+             '• 结果管理：接收设备推送的检测快照，历史记录查看\n'
+             '• 参数同步：远程调节置信度阈值、模型切换等'),
+            ('🛠  Tools',
+             '辅助工具箱——日常数据处理和模型运维工具。\n'
+             '• Video Downloader：下载在线视频用于数据集构建\n'
+             '• 视频裁剪/抽帧：从视频中截取片段或按帧提取图片\n'
+             '• 数据集浏览：统计类别分布、图片尺寸分布等\n'
+             '• 格式转换：YOLO ↔ COCO ↔ VOC 标注格式互转\n'
+             '• 模型导出：YOLO .pt → ONNX / TFLite / RKNN\n'
+             '• 数据校验：检查数据集完整性、标注合法性'),
+            ('⚙️  Settings',
+             '全局设置——管理整个工作室的配置项。\n'
+             '• 类别管理：编辑 data.yaml 的类别名称（顺序决定索引 0,1,2…）\n'
+             '• 快捷键绑定：标注页导航和类别切换的自定义快捷键\n'
+             '• 目录配置：训练 / 预测 / 数据集 / 预处理 / 标注 / 导出 / 模型路径\n'
+             '• 深色主题：一键切换黑白主题\n'
+             '• 屏保：闲置时自动启动屏保保护显示器\n'
+             '• 项目初始化：一键创建标准项目目录结构'),
         ]
-        for m in modules:
-            lbl = QLabel(m)
-            lbl.setStyleSheet(f'font-size:9px;color:{TEXT2};padding:1px 4px;'
-                              f'background:{BG};border-radius:3px;')
+        for icon_name, desc in guides:
+            lbl = QLabel(f'<b>{icon_name}</b><br><span style="font-size:11px;color:{TEXT2};">{desc}</span>')
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet(f'font-size:12px;color:{TEXT};padding:5px 8px;'
+                              f'background:{BG};border-radius:4px;')
             lo.addWidget(lbl)
 
         lo.addStretch()
-        info = QLabel('基于 YOLOv8/YOLO11 的桌面端训练与部署工作室')
-        info.setWordWrap(True)
-        info.setStyleSheet(f'font-size:8px;color:{TEXT3};padding:2px 4px;')
-        lo.addWidget(info)
+
+        scroll.setWidget(content)
+        outer_lo.addWidget(scroll)
 
         self.col3Placeholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         self.colsLo.insertWidget(2, self.col3Placeholder)
@@ -540,7 +614,6 @@ class SettingsTab(QWidget):
             inp = QLineEdit()
             inp.setReadOnly(True)
             inp.setMinimumHeight(22)
-            inp.setMaximumWidth(220)
             inp.setStyleSheet(
                 f'QLineEdit{{background:{BG};border:1px solid {BORDER};'
                 f'border-radius:3px;padding:1px 6px;font-size:10px;color:{TEXT3};}}'
