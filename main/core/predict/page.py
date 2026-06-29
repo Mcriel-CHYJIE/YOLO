@@ -122,7 +122,7 @@ class PredictTab(QWidget):
             f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:4px;'
             f'padding:2px 6px;font-family:Consolas;font-size:12px;}}')
         self._details_log.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self._details_log.document().setMaximumBlockCount(2000)
+        self._details_log.document().setMaximumBlockCount(0)
         stats_lo.addWidget(self._details_log, 1)
 
         self.cb_export = ToggleSwitch(checked=True)
