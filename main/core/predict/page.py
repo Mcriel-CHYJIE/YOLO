@@ -108,7 +108,7 @@ class PredictTab(QWidget):
             f'border:none;border-radius:2px;}}'
             f'QPushButton:hover{{background:{PRI_H};}}')
         self._btn_frame_go.clicked.connect(self._on_frame_go)
-        self._spin_frame.editingFinished.connect(self._on_frame_go)
+        # 注意：不连 editingFinished，避免焦点丢失时误触发 seek 到 frame 0
         jl.addWidget(self._btn_frame_go)
         stats_lo.addWidget(jump_row)
 
@@ -165,7 +165,19 @@ class PredictTab(QWidget):
             rl.addWidget(self.btn_run)
             ctrl_lo.insertWidget(min(pause_idx, run_idx), row)
 
-        # ── 右侧：QStackedWidget（视频 / 单图预览+选项卡 / 日志）──
+        # ── 循环播放开关 ──
+        loop_row = QWidget()
+        lr_lo = QHBoxLayout(loop_row)
+        lr_lo.setContentsMargins(0, 0, 0, 0); lr_lo.setSpacing(4)
+        loop_lbl = QLabel('Loop')
+        loop_lbl.setStyleSheet(f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
+        self.cb_loop = ToggleSwitch(checked=False)
+        lr_lo.addWidget(loop_lbl)
+        lr_lo.addStretch()
+        lr_lo.addWidget(self.cb_loop)
+        ctrl_lo.addWidget(loop_row)
+
+        # ── 右侧
         self._stack_layout_idx = None
         main_lo = self.layout()
         # stack 现在在 contentLo 嵌套布局中（titleLabel 添加后）
@@ -417,7 +429,7 @@ class PredictTab(QWidget):
         if not self._source_path or not self._source_path.exists():
             QMessageBox.warning(self, 'Warning', 'Please select a video first'); return
         if self._worker and self._worker.isRunning():
-            self._worker.toggle_pause(); self.btn_pause.setText('Resume' if self._worker._pause.is_set() else 'Pause'); return
+            self._worker.toggle_pause(); self.btn_pause.setText('Resume' if self._worker._pause_event.is_set() else 'Pause'); return
         export_path = None
         if self.cb_export.isChecked():
             d = Path(load_paths().get('predict_output', '')); d.mkdir(parents=True, exist_ok=True) if d else None
@@ -431,7 +443,8 @@ class PredictTab(QWidget):
         self._worker = Detector(
             self._model_path, self._source_path,
             self.sp_conf.value(), self.sp_iou.value(),
-            show_heatmap=self.btn_hm.isChecked())
+            show_heatmap=self.btn_hm.isChecked(),
+            loop=self.cb_loop.isChecked())
         self._worker_run_id += 1
         _rid = self._worker_run_id
         self._worker.frame_ready.connect(self._on_frame)
@@ -445,6 +458,7 @@ class PredictTab(QWidget):
         self._cumulative_stats.clear()
         self.lbl_cls.setText('Detecting...'); self._details_log.clear()
         self._sb_fps.setText('FPS: 0'); self._sb_dets.setText('Detections: 0'); self._sb_curr.setText('Current: 0')
+        self._spin_frame.setValue(0)
         self._worker.export_path = export_path
         self._worker.start()
         self.studio.log_operation('Predict', f'视频检测开始 · {self._source_path.name}')
@@ -465,6 +479,7 @@ class PredictTab(QWidget):
     def _stop_run(self):
         if self._worker and self._worker.isRunning():
             self._worker.stop(); self.log.setText('Stopped')
+            self.progress_bar_p.setValue(0)
             self.studio.log_operation('Predict', '视频检测已停止')
 
     def _on_seek_start(self):

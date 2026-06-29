@@ -139,7 +139,7 @@ class Detector(QObject):
     log_signal = pyqtSignal(str); finished = pyqtSignal()
 
     def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None,
-                 show_heatmap=False):
+                 show_heatmap=False, loop=False):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
         self.conf = conf; self.iou = iou
@@ -147,6 +147,7 @@ class Detector(QObject):
         self._stop_event = threading.Event()
         self.export_path = None; self.target_fps = target_fps
         self._show_heatmap = show_heatmap
+        self._loop = loop
         self._seek_target = -1
         self._thread = None
 
@@ -204,7 +205,13 @@ class Detector(QObject):
                     idx = target
                     continue
                 ret, frame = cap.read()
-                if not ret: break
+                if not ret:
+                    if self._loop and not self._stop_event.is_set():
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        idx = 0
+                        self.log_signal.emit(' 🔄 循环播放')
+                        continue
+                    break
                 idx += 1
                 results = model(frame, conf=self.conf, iou=self.iou, verbose=False)[0]
                 annotated = results.plot(line_width=2, font_size=8)
