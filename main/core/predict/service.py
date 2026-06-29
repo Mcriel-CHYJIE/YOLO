@@ -135,6 +135,7 @@ class Detector(QObject):
     """视频推理管理器 — 非 QThread，用 threading.Thread 获得完整原生栈"""
     frame_ready = pyqtSignal(np.ndarray, int, int)
     fps_updated = pyqtSignal(float); stats_updated = pyqtSignal(dict)
+    details_ready = pyqtSignal(list)
     log_signal = pyqtSignal(str); finished = pyqtSignal()
 
     def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None,
@@ -146,6 +147,7 @@ class Detector(QObject):
         self._stop_event = threading.Event()
         self.export_path = None; self.target_fps = target_fps
         self._show_heatmap = show_heatmap
+        self._seek_target = -1
         self._thread = None
 
     def stop(self):
@@ -165,6 +167,10 @@ class Detector(QObject):
         """运行时切换热力图"""
         self._show_heatmap = enabled
 
+    def seek(self, frame_pos: int):
+        """拖拽进度条跳转"""
+        self._seek_target = frame_pos
+
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -176,6 +182,7 @@ class Detector(QObject):
             cap = cv2.VideoCapture(str(self.video_path))
             if not cap.isOpened(): self.log_signal.emit('Failed to open video'); self.finished.emit(); return
             total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self._total_frames = total
             self.log_signal.emit(f' {self.video_path.name}  {total}帧')
             writer = None
             if self.export_path:
@@ -189,6 +196,12 @@ class Detector(QObject):
             while not self._stop_event.is_set() and cap.isOpened():
                 if self._pause_event.is_set():
                     self._pause_event.wait(0.05)
+                    continue
+                if self._seek_target >= 0:
+                    target = self._seek_target
+                    self._seek_target = -1
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, target)
+                    idx = target
                     continue
                 ret, frame = cap.read()
                 if not ret: break
@@ -209,12 +222,20 @@ class Detector(QObject):
                     writer.write(annotated if not self._show_heatmap else display_frame)
                 now = datetime.now(); fps_val = 1.0 / max((now - t_prev).total_seconds(), 0.001); t_prev = now
                 stats = {}
+                dets = []
                 if results.boxes is not None:
-                    for cls_id in results.boxes.cls:
+                    for cls_id, conf in zip(results.boxes.cls, results.boxes.conf):
                         name = model.names.get(int(cls_id), f'cls_{int(cls_id)}')
                         stats[name] = stats.get(name, 0) + 1
+                        dets.append(f'{name} {conf:.2f}')
+                line = f'[{idx}/{total}]'
+                if dets:
+                    line += '  ' + ' | '.join(dets)
+                else:
+                    line += '  —'
                 self.frame_ready.emit(display_frame, idx, total)
                 self.fps_updated.emit(fps_val); self.stats_updated.emit(stats)
+                self.details_ready.emit([line])
             if writer is not None: writer.release(); self.log_signal.emit(f' Video saved: {Path(self.export_path).name}')
             cap.release()
         except Exception as e:

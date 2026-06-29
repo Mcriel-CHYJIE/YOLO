@@ -10,6 +10,7 @@ from main.config import load_paths
 from PyQt5 import uic
 from PyQt5.QtCore import QPoint
 from PyQt5.QtGui import QCursor
+from PyQt5.QtWidgets import QTextEdit
 from .service import Detector
 from .service import run_batch_inference
 
@@ -29,6 +30,7 @@ class PredictTab(QWidget):
         self._fm_layers_all = []
         self._current_image_idx = 0
         self._cumulative_stats = {}
+        self._seeking = False
         self._build_ui()
         self._init_widgets()
         self._connect()
@@ -49,23 +51,10 @@ class PredictTab(QWidget):
         self.btn_stop.setEnabled(False)
 
     def _init_widgets(self):
-        for placeholder, label, color, attr_card in [
-            (self.imgCardP, 'FPS', '#8b5cf6', '_fps_card'),
-            (self.detCardP, 'Detections', GREEN, '_det_card'),
-        ]:
-            card = MetricCard(label, color, '0')
-            idx = self.statsRowP.indexOf(placeholder)
-            self.statsRowP.removeWidget(placeholder)
-            placeholder.deleteLater()
-            self.statsRowP.insertWidget(idx, card, 1)
-            setattr(self, attr_card, card)
-        self._st_fps = self._fps_card.value_label
-        self._st_dets = self._det_card.value_label
-
-        # ── 当前帧统计卡片 ──
-        self._current_card = MetricCard('Current', '#f59e0b', '0')
-        self.statsRowP.addWidget(self._current_card, 1)
-        self._st_current = self._current_card.value_label
+        # 移除 statsRowP 中的空占位控件
+        for w in [self.imgCardP, self.detCardP]:
+            self.statsRowP.removeWidget(w)
+            w.deleteLater()
 
         # ── 热力图开关（预先创建，供 Export 行和 Control 共用）──
         self.btn_hm = ToggleSwitch(checked=True)
@@ -94,6 +83,47 @@ class PredictTab(QWidget):
             f'background:{BG};border-radius:3px;')
         cl_lo.addWidget(self._frame_cls_label, 1)
         stats_lo.addLayout(cl_lo)
+
+        # ── 帧跳转输入 ──
+        jump_row = QWidget()
+        jump_row.setFixedHeight(22)
+        jl = QHBoxLayout(jump_row)
+        jl.setContentsMargins(0, 0, 0, 0); jl.setSpacing(4)
+        jlbl = QLabel('Frame:')
+        jlbl.setStyleSheet(f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
+        jlbl.setFixedWidth(36)
+        jl.addWidget(jlbl)
+        self._spin_frame = QSpinBox()
+        self._spin_frame.setRange(0, 999999)
+        self._spin_frame.setFixedHeight(18)
+        self._spin_frame.setStyleSheet(
+            f'QSpinBox{{font-size:9px;padding:0 2px;border:1px solid {BORDER};border-radius:2px;'
+            f'background:{CARD};color:{TEXT};}}'
+            f'QSpinBox::up-button,QSpinBox::down-button{{width:0px;}}')
+        jl.addWidget(self._spin_frame, 1)
+        self._btn_frame_go = QPushButton('Go')
+        self._btn_frame_go.setFixedHeight(18)
+        self._btn_frame_go.setStyleSheet(
+            f'QPushButton{{font-size:9px;padding:0 6px;background:{PRI};color:#fff;'
+            f'border:none;border-radius:2px;}}'
+            f'QPushButton:hover{{background:{PRI_H};}}')
+        self._btn_frame_go.clicked.connect(self._on_frame_go)
+        self._spin_frame.editingFinished.connect(self._on_frame_go)
+        jl.addWidget(self._btn_frame_go)
+        stats_lo.addWidget(jump_row)
+
+        # 让 statistics 组件撑满左侧剩余高度
+        self.leftPanel.layout().setStretchFactor(self.statsGroupP, 1)
+
+        # ── 每帧检测详情日志（类 + 置信度）──
+        self._details_log = QTextEdit()
+        self._details_log.setReadOnly(True)
+        self._details_log.setStyleSheet(
+            f'QTextEdit{{background:{CON};color:{CON_T};border:none;border-radius:4px;'
+            f'padding:2px 6px;font-family:Consolas;font-size:12px;}}')
+        self._details_log.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._details_log.document().setMaximumBlockCount(2000)
+        stats_lo.addWidget(self._details_log, 1)
 
         self.cb_export = ToggleSwitch(checked=True)
         idx = self.exportRowLo.indexOf(self.exportToggleHolder)
@@ -161,7 +191,7 @@ class PredictTab(QWidget):
         pc_lo.addWidget(self.stack, 1)
         content_lo.insertWidget(self._stack_layout_idx, self.preview_container, 1)
 
-        # ── 日志移到预览区下方 ──
+        # ── 日志移到预览区下方，右侧加 FPS/Detections/Current ──
         left_lo = self.leftPanel.layout()
         for i in range(left_lo.count()):
             w = left_lo.itemAt(i).widget()
@@ -169,16 +199,52 @@ class PredictTab(QWidget):
                 left_lo.removeWidget(self.log)
                 self.log.setParent(None)
                 break
-        self.log.setStyleSheet(
+        self._status_bar = QWidget()
+        self._status_bar.setStyleSheet(
             f'background:{CON};color:{CON_T};border:none;border-radius:5px;'
-            f'padding:4px 8px;font-family:Consolas;font-size:11px;min-height:20px;max-height:28px;')
-        pc_lo.addWidget(self.log)
+            f'font-family:Consolas;font-size:11px;')
+        self._status_bar.setFixedHeight(24)
+        sb_lo = QHBoxLayout(self._status_bar)
+        sb_lo.setContentsMargins(8, 0, 8, 0); sb_lo.setSpacing(12)
+        self.log.setStyleSheet('background:transparent;color:' + CON_T + ';border:none;padding:0;')
+        self.log.setFixedHeight(24)
+        sb_lo.addWidget(self.log, 1)
+
+        sb_lo.addStretch()
+
+        self._sb_fps = QLabel('FPS: 0')
+        self._sb_fps.setStyleSheet('background:transparent;color:' + CON_T + ';border:none;padding:0;font-weight:600;')
+        sb_lo.addWidget(self._sb_fps)
+
+        self._sb_dets = QLabel('Detections: 0')
+        self._sb_dets.setStyleSheet('background:transparent;color:' + CON_T + ';border:none;padding:0;font-weight:600;')
+        sb_lo.addWidget(self._sb_dets)
+
+        self._sb_curr = QLabel('Current: 0')
+        self._sb_curr.setStyleSheet('background:transparent;color:' + CON_T + ';border:none;padding:0;font-weight:600;')
+        sb_lo.addWidget(self._sb_curr)
+
+        self._progress_preview = QSlider(Qt.Horizontal)
+        self._progress_preview.setFixedHeight(20)
+        self._progress_preview.setRange(0, 100)
+        self._progress_preview.setValue(0)
+        self._progress_preview.setStyleSheet(
+            'QSlider{background:transparent;}'
+            'QSlider::groove{background:%s;height:6px;border-radius:3px;}'
+            'QSlider::handle{background:%s;width:20px;height:20px;margin:-7px 0;border-radius:10px;}'
+            'QSlider::sub-page{background:%s;border-radius:3px;}' % (BORDER, PRI, PRI))
+        self._progress_preview.sliderPressed.connect(self._on_seek_start)
+        self._progress_preview.sliderReleased.connect(self._on_seek_end)
+        self._progress_preview.sliderMoved.connect(self._on_seek_moved)
+        pc_lo.addWidget(self._progress_preview)
+
+        pc_lo.addWidget(self._status_bar)
 
         # ── 0: 视频视图 ──
         self.video_view = QLabel('Load model & source then start')
         self.video_view.setAlignment(Qt.AlignCenter)
+        self.video_view.setScaledContents(True)
         self.video_view.setStyleSheet(f'background:{CON};color:{TEXT3};border-radius:7px;font-size:14px;')
-        self.video_view.setMinimumHeight(400)
         self.stack.addWidget(self.video_view)
 
         # ── 1: 单图预览 + 选项卡 ──
@@ -365,19 +431,21 @@ class PredictTab(QWidget):
         self._worker = Detector(
             self._model_path, self._source_path,
             self.sp_conf.value(), self.sp_iou.value(),
-            show_heatmap=True)
+            show_heatmap=self.btn_hm.isChecked())
         self._worker_run_id += 1
         _rid = self._worker_run_id
         self._worker.frame_ready.connect(self._on_frame)
-        self._worker.fps_updated.connect(lambda v: self._st_fps.setText(f'{v:.0f}'))
+        self._worker.fps_updated.connect(lambda v: self._sb_fps.setText(f'FPS: {v:.0f}'))
         self._worker.stats_updated.connect(self._on_stats)
+        self._worker.details_ready.connect(self._on_details)
         self._worker.finished.connect(lambda rid=_rid: self._on_finish(rid))
         self._worker.log_signal.connect(lambda m: self.log.setText(m))
         self.btn_start.setEnabled(False); self.btn_stop.setEnabled(True); self.btn_pause.setEnabled(True)
         self.btn_pause.setText('Pause')
-        self._st_fps.setText('0'); self._st_dets.setText('0')
         self._cumulative_stats.clear()
-        self.lbl_cls.setText('Detecting...'); self._worker.export_path = export_path
+        self.lbl_cls.setText('Detecting...'); self._details_log.clear()
+        self._sb_fps.setText('FPS: 0'); self._sb_dets.setText('Detections: 0'); self._sb_curr.setText('Current: 0')
+        self._worker.export_path = export_path
         self._worker.start()
         self.studio.log_operation('Predict', f'视频检测开始 · {self._source_path.name}')
 
@@ -399,14 +467,35 @@ class PredictTab(QWidget):
             self._worker.stop(); self.log.setText('Stopped')
             self.studio.log_operation('Predict', '视频检测已停止')
 
+    def _on_seek_start(self):
+        """开始拖拽进度条 — 标记 seeking 屏蔽 _on_frame 覆盖"""
+        if self._worker and self._worker.isRunning():
+            self._seeking = True
+
+    def _on_seek_moved(self, pct):
+        """用户拖拽/点击凹槽时跳转（sliderMoved 仅用户操作触发，不响应 setValue）"""
+        if self._worker and self._worker.isRunning() and hasattr(self._worker, 'seek'):
+            total = self._worker._total_frames if hasattr(self._worker, '_total_frames') else 0
+            if total > 0:
+                target = int(pct / 100 * total)
+                self._worker.seek(target)
+
+    def _on_seek_end(self):
+        """释放进度条 — 结束 seeking"""
+        self._seeking = False
+
+    def _on_frame_go(self):
+        """输入帧数跳转 — 仅跳转不播放"""
+        if self._worker and self._worker.isRunning() and hasattr(self._worker, 'seek'):
+            target = self._spin_frame.value()
+            if target < 0:
+                return
+            self._worker.seek(target)
+            total = self._worker._total_frames if hasattr(self._worker, '_total_frames') else 0
+            if total > 0:
+                self._progress_preview.setValue(int(target / total * 100))
+
     def _on_frame(self, frame, idx, total):
-        h, w = frame.shape[:2]
-        mw = self.video_view.width() - 10; mh = self.video_view.height() - 10
-        if mw > 10 and mh > 10:
-            sc = min(mw / max(w, 1), mh / max(h, 1))
-            nw = max(1, int(w * sc)); nh = max(1, int(h * sc))
-            if nw != w or nh != h:
-                frame = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LINEAR)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         qi = QImage(rgb.data, frame.shape[1], frame.shape[0],
                     frame.strides[0], QImage.Format_RGB888)
@@ -415,15 +504,18 @@ class PredictTab(QWidget):
         if total > 0:
             pct = int(idx / total * 100)
             self.progress_bar_p.setValue(pct)
+            if not self._seeking:
+                self._progress_preview.setValue(pct)
 
     def _on_stats(self, stats):
         for k, v in stats.items():
             self._cumulative_stats[k] = self._cumulative_stats.get(k, 0) + v
-        t = sum(self._cumulative_stats.values()); self._st_dets.setText(str(t))
+        t = sum(self._cumulative_stats.values())
+        self._sb_dets.setText(f'Detections: {t}')
         # 当前帧检测标签
         if stats:
-            self._st_current.setText(str(sum(stats.values())))
             t_f = sum(stats.values())
+            self._sb_curr.setText(f'Current: {t_f}')
             fm_rows = []
             for name, count in sorted(stats.items(), key=lambda x: -x[1]):
                 pct = count / t_f * 100
@@ -435,7 +527,6 @@ class PredictTab(QWidget):
                 '<table style="width:100%%;font-size:9px;color:%s;border-collapse:collapse;">'
                 % TEXT + ''.join(fm_rows) + '</table>')
         else:
-            self._st_current.setText('0')
             self._frame_cls_label.setText('—')
         # 累计统计明细
         if not self._cumulative_stats:
@@ -452,6 +543,13 @@ class PredictTab(QWidget):
         self.lbl_cls.setText(
             '<table style="width:100%;font-size:9px;color:#1c1917;border-collapse:collapse;">'
             + ''.join(rows) + '</table>')
+
+    def _on_details(self, details):
+        if details:
+            for line in details:
+                self._details_log.append(line)
+            self._details_log.verticalScrollBar().setValue(
+                self._details_log.verticalScrollBar().maximum())
 
     def _on_finish(self, rid):
         if rid != self._worker_run_id:
@@ -477,7 +575,7 @@ class PredictTab(QWidget):
             self._featuremaps = result.get('featuremaps', [])
             self._fm_layers_all = result.get('fm_layers_all', [])
             self._current_image_idx = 0
-            self._st_fps.setText(str(result['total_imgs'])); self._st_dets.setText(str(result['total_dets']))
+            
             if result['cls_counts']:
                 t = sum(result['cls_counts'].values())
                 rows = []
@@ -516,7 +614,6 @@ class PredictTab(QWidget):
                 nm = r.names.get(int(cid), f'cls_{int(cid)}')
                 cnt[nm] += 1
             t_f = sum(cnt.values())
-            self._st_current.setText(str(t_f))
             fm_rows = []
             for name, count in sorted(cnt.items(), key=lambda x: -x[1]):
                 pct = count / t_f * 100
@@ -528,7 +625,6 @@ class PredictTab(QWidget):
                 '<table style="width:100%%;font-size:9px;color:%s;border-collapse:collapse;">'
                 % TEXT + ''.join(fm_rows) + '</table>')
         else:
-            self._st_current.setText('0')
             self._frame_cls_label.setText('—')
         self._render_current_tab()
 
