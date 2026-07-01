@@ -33,8 +33,8 @@
 
     <item>
      <widget class="QWidget" name="leftPanel" native="true">
-     <property name="minimumSize"><size><width>380</width><height>0</height></size></property>
-     <property name="maximumSize"><size><width>380</width><height>16777215</height></size></property>
+     <property name="minimumSize"><size><width>460</width><height>0</height></size></property>
+     <property name="maximumSize"><size><width>460</width><height>16777215</height></size></property>
      <layout class="QVBoxLayout" name="leftLo">
       <property name="leftMargin">
        <number>0</number>
@@ -60,179 +60,254 @@
         <property name="bottomMargin"><number>6</number></property>
         <property name="horizontalSpacing"><number>3</number></property>
         <property name="verticalSpacing"><number>3</number></property>
-
-        <!-- Row 0: Model | Epochs | Batch -->
-        <item row="0" column="0"><widget class="QLabel" name="modelLabel">
-         <property name="text"><string>Model</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="1"><widget class="QComboBox" name="m"/></item>
-        <item row="0" column="2"><widget class="QLabel" name="epLabel">
-         <property name="text"><string>Epochs</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="3"><widget class="QSpinBox" name="ep">
-         <property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property>
-         <property name="value"><number>300</number></property>
-        </widget></item>
-        <item row="0" column="4"><widget class="QLabel" name="batchLabel">
-         <property name="text"><string>Batch</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="5"><widget class="QSpinBox" name="bs">
-         <property name="minimum"><number>1</number></property><property name="maximum"><number>256</number></property>
-         <property name="value"><number>32</number></property>
-        </widget></item>
-
-        <!-- Row 1: ImgSz | Workers | Optimizer -->
-        <item row="1" column="0"><widget class="QLabel" name="szLabel">
-         <property name="text"><string>ImgSz</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="1" column="1"><widget class="QComboBox" name="sz"/></item>
-        <item row="1" column="2"><widget class="QLabel" name="wkLabel">
-         <property name="text"><string>Workers</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="1" column="3"><widget class="QSpinBox" name="wk">
-         <property name="minimum"><number>1</number></property><property name="maximum"><number>32</number></property>
-         <property name="value"><number>4</number></property>
-        </widget></item>
-        <item row="1" column="4"><widget class="QLabel" name="optLabel">
-         <property name="text"><string>Optimizer</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="1" column="5"><widget class="QComboBox" name="opt"/></item>
-
-        <!-- Row 2: Schedule | Device | LR -->
-        <item row="2" column="0"><widget class="QLabel" name="schLabel">
-         <property name="text"><string>Schedule</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="1"><widget class="QComboBox" name="sch"/></item>
-        <item row="2" column="2"><widget class="QLabel" name="devLabel">
-         <property name="text"><string>Device</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="3"><widget class="QComboBox" name="dev"/></item>
-        <item row="2" column="4"><widget class="QLabel" name="lrLabel">
-         <property name="text"><string>LR</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="5"><widget class="QDoubleSpinBox" name="lr0">
-         <property name="decimals"><number>6</number></property>
-         <property name="minimum"><double>0.000001</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="value"><double>0.001</double></property>
-        </widget></item>
-
-        <!-- Row 3: LR Final | Warmup | Patience -->
-        <item row="3" column="0"><widget class="QLabel" name="lrfLabel">
-         <property name="text"><string>LR Final</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="3" column="1"><widget class="QDoubleSpinBox" name="lrf">
-         <property name="decimals"><number>6</number></property>
-         <property name="minimum"><double>0.000001</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="value"><double>0.01</double></property>
-        </widget></item>
-        <item row="3" column="2"><widget class="QLabel" name="wuLabel">
-         <property name="text"><string>Warmup</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="3" column="3"><widget class="QSpinBox" name="wu">
-         <property name="minimum"><number>0</number></property><property name="maximum"><number>50</number></property>
-         <property name="value"><number>3</number></property>
-        </widget></item>
-        <item row="3" column="4"><widget class="QLabel" name="ptLabel">
-         <property name="text"><string>Patience</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="3" column="5"><widget class="QSpinBox" name="pt">
-         <property name="minimum"><number>5</number></property><property name="maximum"><number>500</number></property>
-         <property name="value"><number>50</number></property>
-        </widget></item>
-
-        <!-- Row 4: WarmM | Momentum | Weight Decay -->
-        <item row="4" column="0"><widget class="QLabel" name="wmomLabel">
-         <property name="text"><string>WarmM</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="1"><widget class="QDoubleSpinBox" name="_wmom">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.5</double></property><property name="maximum"><double>0.99</double></property>
-         <property name="singleStep"><double>0.01</double></property><property name="value"><double>0.8</double></property>
-        </widget></item>
-        <item row="4" column="2"><widget class="QLabel" name="momentumLabel">
-         <property name="text"><string>Momentum</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="3"><widget class="QDoubleSpinBox" name="momentum">
-         <property name="decimals"><number>3</number></property>
-         <property name="minimum"><double>0.1</double></property><property name="maximum"><double>0.999</double></property>
-         <property name="singleStep"><double>0.01</double></property><property name="value"><double>0.937</double></property>
-        </widget></item>
-        <item row="4" column="4"><widget class="QLabel" name="wdLabel">
-         <property name="text"><string>Weight Decay</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="5"><widget class="QDoubleSpinBox" name="wd">
-         <property name="decimals"><number>6</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.1</double></property>
-         <property name="singleStep"><double>0.0001</double></property><property name="value"><double>0.0005</double></property>
-        </widget></item>
-
-        <!-- Row 5: Dropout | cls_pw | IoU -->
-        <item row="5" column="0"><widget class="QLabel" name="dropoutLabel">
-         <property name="text"><string>Dropout</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="5" column="1"><widget class="QDoubleSpinBox" name="_dropout">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.9</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-        <item row="5" column="2"><widget class="QLabel" name="cls_pwLabel">
-         <property name="text"><string>cls_pw</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="5" column="3"><widget class="QDoubleSpinBox" name="cls_pw">
-         <property name="decimals"><number>1</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.75</double></property>
-        </widget></item>
-        <item row="5" column="4"><widget class="QLabel" name="iouLabel">
-         <property name="text"><string>IoU</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="5" column="5"><widget class="QDoubleSpinBox" name="iou_thresh">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.1</double></property><property name="maximum"><double>0.9</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.7</double></property>
-        </widget></item>
-
-        <!-- Row 6: Close Mosaic -->
-        <item row="6" column="0"><widget class="QLabel" name="cmLabel">
-         <property name="text"><string>Close Mosaic</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="6" column="1"><widget class="QSpinBox" name="cm">
-         <property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property>
-         <property name="value"><number>15</number></property>
-        </widget></item>
-        <!-- Row 7: AMP | Cache | Multi-Scale -->
-        <item row="7" column="0"><widget class="QLabel" name="ampLabel">
-         <property name="text"><string>AMP</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="7" column="2"><widget class="QLabel" name="cacheLabel">
-         <property name="text"><string>Cache</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="7" column="4"><widget class="QLabel" name="msLabel">
-         <property name="text"><string>Multi-Scale</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-       </layout>
+        <item row="0" column="0"><widget class="QWidget" name="cfg0" native="true">
+         <layout class="QHBoxLayout" name="cfg0_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg0_lbl">
+           <property name="text"><string>Model</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="m"/></item>
+         </layout>
+        </widget></item>        <item row="0" column="1"><widget class="QWidget" name="cfg1" native="true">
+         <layout class="QHBoxLayout" name="cfg1_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg1_lbl">
+           <property name="text"><string>Epochs</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="ep"><property name="minimum"><number>1</number></property><property name="maximum"><number>300</number></property><property name="value"><number>300</number></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="2"><widget class="QWidget" name="cfg2" native="true">
+         <layout class="QHBoxLayout" name="cfg2_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg2_lbl">
+           <property name="text"><string>Batch</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="bs"><property name="minimum"><number>1</number></property><property name="maximum"><number>256</number></property><property name="value"><number>32</number></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="3"><widget class="QWidget" name="cfg3" native="true">
+         <layout class="QHBoxLayout" name="cfg3_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg3_lbl">
+           <property name="text"><string>ImgSz</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="sz"/></item>
+         </layout>
+        </widget></item>        <item row="1" column="0"><widget class="QWidget" name="cfg4" native="true">
+         <layout class="QHBoxLayout" name="cfg4_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg4_lbl">
+           <property name="text"><string>Workers</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="wk"><property name="minimum"><number>1</number></property><property name="maximum"><number>32</number></property><property name="value"><number>4</number></property></widget></item>
+         </layout>
+        </widget></item>        <item row="1" column="1"><widget class="QWidget" name="cfg5" native="true">
+         <layout class="QHBoxLayout" name="cfg5_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg5_lbl">
+           <property name="text"><string>Optimizer</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="opt"/></item>
+         </layout>
+        </widget></item>        <item row="1" column="2"><widget class="QWidget" name="cfg6" native="true">
+         <layout class="QHBoxLayout" name="cfg6_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg6_lbl">
+           <property name="text"><string>Schedule</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="sch"/></item>
+         </layout>
+        </widget></item>        <item row="1" column="3"><widget class="QWidget" name="cfg7" native="true">
+         <layout class="QHBoxLayout" name="cfg7_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg7_lbl">
+           <property name="text"><string>Device</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="dev"/></item>
+         </layout>
+        </widget></item>        <item row="2" column="0"><widget class="QWidget" name="cfg8" native="true">
+         <layout class="QHBoxLayout" name="cfg8_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg8_lbl">
+           <property name="text"><string>LR</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="lr0"><property name="decimals"><number>6</number></property><property name="minimum"><double>1e-06</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.001</double></property><property name="value"><double>0.001</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="1"><widget class="QWidget" name="cfg9" native="true">
+         <layout class="QHBoxLayout" name="cfg9_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg9_lbl">
+           <property name="text"><string>LR Final</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="lrf"><property name="decimals"><number>6</number></property><property name="minimum"><double>1e-06</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.01</double></property><property name="value"><double>0.01</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="2"><widget class="QWidget" name="cfg10" native="true">
+         <layout class="QHBoxLayout" name="cfg10_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg10_lbl">
+           <property name="text"><string>Warmup</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="wu"><property name="minimum"><number>0</number></property><property name="maximum"><number>50</number></property><property name="value"><number>3</number></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="3"><widget class="QWidget" name="cfg11" native="true">
+         <layout class="QHBoxLayout" name="cfg11_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg11_lbl">
+           <property name="text"><string>Patience</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="pt"><property name="minimum"><number>5</number></property><property name="maximum"><number>500</number></property><property name="value"><number>50</number></property></widget></item>
+         </layout>
+        </widget></item>        <item row="3" column="0"><widget class="QWidget" name="cfg12" native="true">
+         <layout class="QHBoxLayout" name="cfg12_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg12_lbl">
+           <property name="text"><string>WarmM</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_wmom"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.5</double></property><property name="maximum"><double>0.99</double></property><property name="singleStep"><double>0.01</double></property><property name="value"><double>0.8</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="3" column="1"><widget class="QWidget" name="cfg13" native="true">
+         <layout class="QHBoxLayout" name="cfg13_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg13_lbl">
+           <property name="text"><string>Momentum</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="momentum"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.1</double></property><property name="maximum"><double>0.999</double></property><property name="singleStep"><double>0.01</double></property><property name="value"><double>0.937</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="3" column="2"><widget class="QWidget" name="cfg14" native="true">
+         <layout class="QHBoxLayout" name="cfg14_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg14_lbl">
+           <property name="text"><string>Weight Decay</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="wd"><property name="decimals"><number>6</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.1</double></property><property name="singleStep"><double>0.0001</double></property><property name="value"><double>0.0005</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="3" column="3"><widget class="QWidget" name="cfg15" native="true">
+         <layout class="QHBoxLayout" name="cfg15_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg15_lbl">
+           <property name="text"><string>Dropout</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_dropout"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.9</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="4" column="0"><widget class="QWidget" name="cfg16" native="true">
+         <layout class="QHBoxLayout" name="cfg16_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg16_lbl">
+           <property name="text"><string>cls_pw</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="cls_pw"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.75</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="4" column="1"><widget class="QWidget" name="cfg17" native="true">
+         <layout class="QHBoxLayout" name="cfg17_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg17_lbl">
+           <property name="text"><string>IoU</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="iou_thresh"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.1</double></property><property name="maximum"><double>0.9</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.7</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="4" column="2"><widget class="QWidget" name="cfg18" native="true">
+         <layout class="QHBoxLayout" name="cfg18_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="cfg18_lbl">
+           <property name="text"><string>Close Mosaic</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QSpinBox" name="cm"><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>15</number></property></widget></item>
+         </layout>
+        </widget></item>      </layout>
       </widget></item>
 
       <!-- Augmentation -->
@@ -245,134 +320,241 @@
         <property name="bottomMargin"><number>6</number></property>
         <property name="horizontalSpacing"><number>3</number></property>
         <property name="verticalSpacing"><number>3</number></property>
+        <item row="0" column="0"><widget class="QWidget" name="algo0" native="true">
+         <layout class="QHBoxLayout" name="algo0_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo0_lbl">
+           <property name="text"><string>Rotation</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="dg"><property name="decimals"><number>1</number></property><property name="minimum"><double>0</double></property><property name="maximum"><double>45</double></property><property name="singleStep"><double>5</double></property><property name="value"><double>15.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="1"><widget class="QWidget" name="algo1" native="true">
+         <layout class="QHBoxLayout" name="algo1_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo1_lbl">
+           <property name="text"><string>Scale</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="scale"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>2.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>0.6</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="2"><widget class="QWidget" name="algo2" native="true">
+         <layout class="QHBoxLayout" name="algo2_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo2_lbl">
+           <property name="text"><string>Translate</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="translate"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.15</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="3"><widget class="QWidget" name="algo3" native="true">
+         <layout class="QHBoxLayout" name="algo3_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo3_lbl">
+           <property name="text"><string>Shear</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_shear"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>45.0</double></property><property name="singleStep"><double>1.0</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="1" column="0"><widget class="QWidget" name="algo4" native="true">
+         <layout class="QHBoxLayout" name="algo4_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo4_lbl">
+           <property name="text"><string>Persp</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_persp"><property name="decimals"><number>4</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.01</double></property><property name="singleStep"><double>0.0001</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="1" column="1"><widget class="QWidget" name="algo5" native="true">
+         <layout class="QHBoxLayout" name="algo5_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo5_lbl">
+           <property name="text"><string>Mosaic</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="mosaic_sb"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>1.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="1" column="2"><widget class="QWidget" name="algo6" native="true">
+         <layout class="QHBoxLayout" name="algo6_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo6_lbl">
+           <property name="text"><string>MixUp</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="mixup_sb"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="1" column="3"><widget class="QWidget" name="algo7" native="true">
+         <layout class="QHBoxLayout" name="algo7_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo7_lbl">
+           <property name="text"><string>Copy-Paste</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="cp"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="0"><widget class="QWidget" name="algo8" native="true">
+         <layout class="QHBoxLayout" name="algo8_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo8_lbl">
+           <property name="text"><string>flip_lr</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_flip_lr"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>0.5</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="1"><widget class="QWidget" name="algo9" native="true">
+         <layout class="QHBoxLayout" name="algo9_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo9_lbl">
+           <property name="text"><string>flipud</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="_flipud"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="2"><widget class="QWidget" name="algo10" native="true">
+         <layout class="QHBoxLayout" name="algo10_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo10_lbl">
+           <property name="text"><string>HSV_H</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="hsv_h"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.005</double></property><property name="value"><double>0.015</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="2" column="3"><widget class="QWidget" name="algo11" native="true">
+         <layout class="QHBoxLayout" name="algo11_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo11_lbl">
+           <property name="text"><string>HSV_S</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="hsv_s"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.7</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="3" column="0"><widget class="QWidget" name="algo12" native="true">
+         <layout class="QHBoxLayout" name="algo12_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="algo12_lbl">
+           <property name="text"><string>HSV_V</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="hsv_v"><property name="decimals"><number>3</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.4</double></property></widget></item>
+         </layout>
+        </widget></item>      </layout>
+      </widget></item>
 
-        <!-- Row 0: Geometric — Rotation | Scale | Translate -->
-        <item row="0" column="0"><widget class="QLabel" name="dgLabel">
-         <property name="text"><string>Rotation</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="1"><widget class="QDoubleSpinBox" name="dg">
-         <property name="decimals"><number>1</number></property>
-         <property name="minimum"><double>0</double></property><property name="maximum"><double>45</double></property>
-         <property name="singleStep"><number>5</number></property><property name="value"><double>15.0</double></property>
-        </widget></item>
-        <item row="0" column="2"><widget class="QLabel" name="scaleLabel">
-         <property name="text"><string>Scale</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="3"><widget class="QDoubleSpinBox" name="scale">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>2.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>0.6</double></property>
-        </widget></item>
-        <item row="0" column="4"><widget class="QLabel" name="translateLabel">
-         <property name="text"><string>Translate</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="0" column="5"><widget class="QDoubleSpinBox" name="translate">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.15</double></property>
-        </widget></item>
-
-        <!-- Row 1: Geometric cont. — Shear | Perspective -->
-        <item row="1" column="0"><widget class="QLabel" name="shearLabel">
-         <property name="text"><string>Shear</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="1" column="1"><widget class="QDoubleSpinBox" name="_shear">
-         <property name="decimals"><number>1</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>45.0</double></property>
-         <property name="singleStep"><double>1.0</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-        <item row="1" column="2"><widget class="QLabel" name="perspLabel">
-         <property name="text"><string>Persp</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="1" column="3"><widget class="QDoubleSpinBox" name="_persp">
-         <property name="decimals"><number>4</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.01</double></property>
-         <property name="singleStep"><double>0.0001</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-
-        <!-- Row 2: Mix — Mosaic | MixUp | Copy-Paste -->
-        <item row="2" column="0"><widget class="QLabel" name="mosaicLabel">
-         <property name="text"><string>Mosaic</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="1"><widget class="QDoubleSpinBox" name="mosaic_sb">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>1.0</double></property>
-        </widget></item>
-        <item row="2" column="2"><widget class="QLabel" name="mixupLabel">
-         <property name="text"><string>MixUp</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="3"><widget class="QDoubleSpinBox" name="mixup_sb">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-        <item row="2" column="4"><widget class="QLabel" name="cpLabel">
-         <property name="text"><string>Copy-Paste</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="2" column="5"><widget class="QDoubleSpinBox" name="cp">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-
-        <!-- Row 3: Flip — flip_lr | flipud -->
-        <item row="3" column="0"><widget class="QLabel" name="flipLrLabel">
-         <property name="text"><string>flip_lr</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="3" column="1"><widget class="QDoubleSpinBox" name="_flip_lr">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>0.5</double></property>
-        </widget></item>
-        <item row="3" column="2"><widget class="QLabel" name="flipudLabel">
-         <property name="text"><string>flipud</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="3" column="3"><widget class="QDoubleSpinBox" name="_flipud">
-         <property name="decimals"><number>2</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.1</double></property><property name="value"><double>0.0</double></property>
-        </widget></item>
-
-        <!-- Row 4: Color — HSV_H | HSV_S | HSV_V -->
-        <item row="4" column="0"><widget class="QLabel" name="hsv_hLabel">
-         <property name="text"><string>HSV_H</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="1"><widget class="QDoubleSpinBox" name="hsv_h">
-         <property name="decimals"><number>3</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.005</double></property><property name="value"><double>0.015</double></property>
-        </widget></item>
-        <item row="4" column="2"><widget class="QLabel" name="hsv_sLabel">
-         <property name="text"><string>HSV_S</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="3"><widget class="QDoubleSpinBox" name="hsv_s">
-         <property name="decimals"><number>3</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.7</double></property>
-        </widget></item>
-        <item row="4" column="4"><widget class="QLabel" name="hsv_vLabel">
-         <property name="text"><string>HSV_V</string></property>
-         <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
-        </widget></item>
-        <item row="4" column="5"><widget class="QDoubleSpinBox" name="hsv_v">
-         <property name="decimals"><number>3</number></property>
-         <property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property>
-         <property name="singleStep"><double>0.05</double></property><property name="value"><double>0.4</double></property>
-        </widget></item>
-       </layout>
+      <!-- Loss -->
+      <item><widget class="QGroupBox" name="lossGroup">
+       <property name="title"><string>Loss</string></property>
+       <layout class="QGridLayout" name="lossGrid">
+        <property name="leftMargin"><number>6</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>6</number></property>
+        <property name="bottomMargin"><number>6</number></property>
+        <property name="horizontalSpacing"><number>3</number></property>
+        <property name="verticalSpacing"><number>3</number></property>
+        <item row="0" column="0"><widget class="QWidget" name="loss0" native="true">
+         <layout class="QHBoxLayout" name="loss0_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="loss0_lbl">
+           <property name="text"><string>Cls</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="clsLossCb"/></item>
+         </layout>
+        </widget></item>        <item row="0" column="1"><widget class="QWidget" name="loss1" native="true">
+         <layout class="QHBoxLayout" name="loss1_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="loss1_lbl">
+           <property name="text"><string>γ</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="focalGammaSb"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>10.0</double></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>2.0</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="2"><widget class="QWidget" name="loss2" native="true">
+         <layout class="QHBoxLayout" name="loss2_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="loss2_lbl">
+           <property name="text"><string>α</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QDoubleSpinBox" name="focalAlphaSb"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.75</double></property></widget></item>
+         </layout>
+        </widget></item>        <item row="0" column="3"><widget class="QWidget" name="loss3" native="true">
+         <layout class="QHBoxLayout" name="loss3_lo">
+          <property name="leftMargin"><number>0</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>0</number></property>
+          <property name="bottomMargin"><number>0</number></property>
+          <property name="spacing"><number>2</number></property>
+          <item><widget class="QLabel" name="loss3_lbl">
+           <property name="text"><string>IoU</string></property>
+           <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
+          </widget></item>
+          <item><widget class="QComboBox" name="iouLossCb"/></item>
+         </layout>
+        </widget></item>      </layout>
       </widget></item>
 
       <!-- Attention -->

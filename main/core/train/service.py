@@ -28,6 +28,9 @@ def build_train_config(
     dropout_val=0.0, warmup_momentum_val=0.8,
     amp_val=True, cache_val=False,
     lora_rank=0,
+    cls_loss_val='bce', focal_gamma_val=2.0, focal_alpha_val=0.75,
+    asl_gamma_pos_val=0.0, asl_gamma_neg_val=4.0, iou_loss_val='ciou',
+    fusion_type_val='none',
 ) -> dict:
     """从 UI 控件值构建训练参数字典"""
     print(f'[build_train_config] entered', flush=True)
@@ -74,6 +77,12 @@ def build_train_config(
         dropout=dropout_val, warmup_momentum=warmup_momentum_val,
         amp=amp_val, cache=cache_val,
         lora_rank=lora_rank,
+        # custom loss config
+        cls_loss=cls_loss_val,
+        focal_gamma=focal_gamma_val, focal_alpha=focal_alpha_val,
+        asl_gamma_pos=asl_gamma_pos_val, asl_gamma_neg=asl_gamma_neg_val,
+        iou_loss=iou_loss_val,
+        fusion=fusion_type_val,
     )
     _mdl = result.get('model', '?')
     print(f'[build_train_config] done, model={_mdl}', flush=True)
@@ -226,6 +235,35 @@ class Trainer(QObject):
                 except Exception as e:
                     self.log.emit(f' [WARN] LoRA injection failed: {e}')
             
+                                    # Multi-scale feature fusion
+            fusion_type = cfg.get('fusion', 'none')
+            if fusion_type and fusion_type != 'none':
+                try:
+                    from main.core.train.neck import inject_multiscale_fusion
+                    result = inject_multiscale_fusion(m, fusion_type)
+                    if result:
+                        self.log.emit(f' [Neck] Multi-scale fusion: {result}')
+                except Exception as e:
+                        self.log.emit(f' [WARN] Fusion injection failed: {e}')
+
+            # ── Loss function patching ──
+            try:
+                from main.core.train.loss import patch_yolo_loss, restore_original_loss
+                loss_cfg_dict = {
+                    'cls_loss': cfg.get('cls_loss', 'bce'),
+                    'focal_gamma': cfg.get('focal_gamma', 2.0),
+                    'focal_alpha': cfg.get('focal_alpha', 0.75),
+                    'asl_gamma_pos': cfg.get('asl_gamma_pos', 0.0),
+                    'asl_gamma_neg': cfg.get('asl_gamma_neg', 4.0),
+                    'iou_loss': cfg.get('iou_loss', 'ciou'),
+                }
+                patched = patch_yolo_loss(m, loss_cfg_dict)
+                if patched:
+                    self.log.emit(f' [Loss] Custom loss: ' + ', '.join(patched))
+                self._restore_loss = restore_original_loss
+            except Exception as e:
+                self.log.emit(f' [WARN] Loss patch failed: ' + str(e))
+
             # 输出目录命名：{日期}_{预设} 或 {日期}_{模型}
             preset = cfg.get('preset_name', '')
             if not preset:
@@ -386,3 +424,9 @@ class Trainer(QObject):
             self.done.emit(False, f'Failed: {e}')
         finally:
             sys.stdout = original_stdout; sys.stderr = original_stderr
+        # Restore original loss function
+        if hasattr(self, '_restore_loss'):
+            try:
+                self._restore_loss()
+            except Exception:
+                pass

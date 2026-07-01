@@ -46,45 +46,78 @@ class TrainTab(QWidget):
             "QPushButton{background:#ef4444;color:#fff;border:none;padding:3px 6px;min-height:16px;font-size:10px;border-radius:3px;}QPushButton:hover{background:#dc2626;}QPushButton:disabled{background:#fca5a5;}"
         )
         self.bs2.setEnabled(False)
-        if hasattr(self, 'ampLabel') and not hasattr(self, '_amp'):
+        if not hasattr(self, '_amp'):
             from main.core.base import ToggleSwitch
             self._amp = ToggleSwitch(checked=True)
             self._amp.setFixedWidth(50)
-            self.configGrid.addWidget(self._amp, 7, 1, alignment=Qt.AlignCenter)
-        if hasattr(self, 'cacheLabel') and not hasattr(self, '_cache'):
+        if not hasattr(self, '_cache'):
             from main.core.base import ToggleSwitch
             self._cache = ToggleSwitch(checked=False)
             self._cache.setFixedWidth(50)
-            self.configGrid.addWidget(self._cache, 7, 3, alignment=Qt.AlignCenter)
-        if hasattr(self, 'msLabel') and not hasattr(self, 'ms'):
+        if not hasattr(self, 'ms'):
             from main.core.base import ToggleSwitch
             self.ms = ToggleSwitch(checked=True)
             self.ms.setFixedWidth(50)
-            self.configGrid.addWidget(self.ms, 7, 5, alignment=Qt.AlignCenter)
-        if hasattr(self, 'configGrid'):
-            self.configGrid.setColumnStretch(0, 0)
-            self.configGrid.setColumnStretch(1, 0)
-            self.configGrid.setColumnStretch(2, 0)
-            self.configGrid.setColumnStretch(3, 0)
-            self.configGrid.setColumnStretch(4, 0)
-            self.configGrid.setColumnStretch(5, 0)
-        if hasattr(self, 'algoGrid'):
-            self.algoGrid.setColumnStretch(0, 0)
-            self.algoGrid.setColumnStretch(1, 0)
-            self.algoGrid.setColumnStretch(2, 0)
-            self.algoGrid.setColumnStretch(3, 0)
-            self.algoGrid.setColumnStretch(4, 0)
-            self.algoGrid.setColumnStretch(5, 0)
+
+        # ── Loss: configure items/range (widgets from .ui) ──
+        self.clsLossCb.addItems(['BCE', 'Focal', 'ASL'])
+        self.clsLossCb.setToolTip('Classification loss function')
+        self.focalGammaSb.setRange(0.0, 10.0)
+        self.focalGammaSb.setSingleStep(0.1)
+        self.focalGammaSb.setValue(2.0)
+        self.focalGammaSb.setToolTip('Focal γ / ASL γ- (higher = fewer FNs)')
+        self.focalAlphaSb.setRange(0.0, 1.0)
+        self.focalAlphaSb.setSingleStep(0.05)
+        self.focalAlphaSb.setDecimals(2)
+        self.focalAlphaSb.setValue(0.75)
+        self.focalAlphaSb.setToolTip('Focal α / ASL γ+ (balance pos/neg)')
+        self.iouLossCb.addItems(['CIoU', 'WIoU', 'Focal-EIoU'])
+        self.iouLossCb.setToolTip('Box regression IoU loss function')
+
+        # ── Add toggle pairs at row 5 of configGrid ──
+        _ls_t = 'font-size:9px;color:#78716c;font-weight:500;'
+        def _tog_pair(lbl, w):
+            c = QWidget()
+            lo = QHBoxLayout(c)
+            lo.setContentsMargins(0,0,0,0); lo.setSpacing(2)
+            l = QLabel(lbl); l.setStyleSheet(_ls_t)
+            lo.addWidget(l); lo.addWidget(w, 1)
+            return c
+        if hasattr(self, '_amp'):
+            self.configGrid.addWidget(_tog_pair('AMP', self._amp), 5, 0)
+        if hasattr(self, '_cache'):
+            self.configGrid.addWidget(_tog_pair('Cache', self._cache), 5, 1)
+        if hasattr(self, 'ms'):
+            self.configGrid.addWidget(_tog_pair('Multi-Scale', self.ms), 5, 2)
+
+        # ── Column stretch: 4 equal columns ──
+        for g in ('configGrid', 'algoGrid', 'lossGrid'):
+            if hasattr(self, g):
+                grid = getattr(self, g)
+                for col in range(4):
+                    grid.setColumnMinimumWidth(col, 0)
+                    grid.setColumnStretch(col, 1)
+                # Force all pair containers to expand to fill cells
+                for i in range(grid.count()):
+                    item = grid.itemAt(i)
+                    if item and item.widget():
+                        c = item.widget()
+                        c.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                        # Unify label and widget widths inside each container
+                        lo = c.layout()
+                        if lo:
+                            for j in range(lo.count()):
+                                li = lo.itemAt(j)
+                                if li and li.widget():
+                                    w = li.widget()
+                                    if isinstance(w, QLabel):
+                                        w.setFixedWidth(45)
+                                    elif isinstance(w, (QComboBox, QDoubleSpinBox, QSpinBox)):
+                                        w.setMinimumWidth(50)
         # ── 将 attnGroup 与 LoRA GroupBox 放在同一行 ──
         if hasattr(self, 'attnGroup'):
             idx = self.leftLo.indexOf(self.attnGroup)
             self.leftLo.removeWidget(self.attnGroup)
-            row = QWidget()
-            row_lo = QHBoxLayout(row)
-            row_lo.setContentsMargins(0, 0, 0, 0)
-            row_lo.setSpacing(4)
-            row_lo.addWidget(self.attnGroup, 1)
-
             self.otherGroup = QGroupBox('LoRA')
             other_lo = QHBoxLayout(self.otherGroup)
             other_lo.setContentsMargins(6, 2, 6, 2)
@@ -98,9 +131,36 @@ class TrainTab(QWidget):
             self.loraSb.setToolTip('0 = disable LoRA')
             other_lo.addWidget(self.loraLabel)
             other_lo.addWidget(self.loraSb, 1)
+
+            row = QWidget()
+            row_lo = QHBoxLayout(row)
+            row_lo.setContentsMargins(0, 0, 0, 0)
+            row_lo.setSpacing(4)
+            row_lo.addWidget(self.attnGroup, 1)
+            row_lo.addWidget(self.otherGroup, 1)
+
             row_lo.addWidget(self.otherGroup, 1)
 
             self.leftLo.insertWidget(idx, row)
+            self.attnRow = row
+            idx_after = self.leftLo.indexOf(row) if hasattr(self, 'leftLo') else self.leftLo.count() - 1
+
+
+        self.fusionGroup = QGroupBox('Fusion')
+        fusion_lo = QHBoxLayout(self.fusionGroup)
+        self.fusionGrid = fusion_lo
+        fusion_lo.setContentsMargins(6, 2, 6, 2)
+        fusion_lo.setSpacing(4)
+
+        self.fusionCb = QComboBox()
+        self.fusionCb.addItems(['None', 'ASFF', 'BiFPN'])
+        self.fusionCb.setToolTip('Multi-scale feature fusion')
+        lbl_fusion = QLabel('Neck')
+        lbl_fusion.setStyleSheet(_ls)
+        fusion_lo.addWidget(lbl_fusion)
+        fusion_lo.addWidget(self.fusionCb, 1)
+        self.attnRow.layout().addWidget(self.fusionGroup, 1)
+
 
         # ── 将指标从左侧 controlGroup 移到右侧日志旁 ──
         # 1. 移除 controlGroup 中的 metricRow
@@ -337,6 +397,29 @@ class TrainTab(QWidget):
         self._cache.setChecked(bool(t.get('cache', False)))
         self.loraSb.setValue(int(t.get('lora_rank', 0)))
 
+        # ??????
+        cls_loss_val = t.get('cls_loss', 'bce').lower()
+        cb_idx = self.clsLossCb.findText(cls_loss_val.upper() if cls_loss_val != 'bce' else 'BCE')
+        if cb_idx >= 0: self.clsLossCb.setCurrentIndex(cb_idx)
+        self.focalGammaSb.setValue(float(t.get('focal_gamma', 2.0)))
+        self.focalAlphaSb.setValue(float(t.get('focal_alpha', 0.75)))
+        iou_loss_val = t.get('iou_loss', 'ciou').lower()
+        iou_cb_idx = self.iouLossCb.findText(iou_loss_val.upper() if iou_loss_val == 'wiou' else 'CIoU' if iou_loss_val == 'ciou' else 'Focal-EIoU')
+        if iou_cb_idx >= 0: self.iouLossCb.setCurrentIndex(iou_cb_idx)
+        fusion_val = t.get('fusion', 'none').lower()
+        if fusion_val == 'asff' or fusion_val == 'bifpn':
+            self.fusionCb.setCurrentIndex(1)
+        else:
+            self.fusionCb.setCurrentIndex(0)
+
+        # ASL specific params (from preset if available)
+        asl_gp = t.get('asl_gamma_pos', None)
+        asl_gn = t.get('asl_gamma_neg', None)
+        if asl_gp is not None and self.clsLossCb.currentText() == 'ASL':
+            self.focalAlphaSb.setValue(float(asl_gp))
+        if asl_gn is not None and self.clsLossCb.currentText() == 'ASL':
+            self.focalGammaSb.setValue(float(asl_gn))
+
         # 注意力模块
         attn = t.get('attention', 'none')
         if attn and attn.lower() != 'none':
@@ -345,7 +428,6 @@ class TrainTab(QWidget):
                 self.attn_type.setCurrentIndex(idx)
         else:
             self.attn_type.setCurrentIndex(0)
-
         # 更新 algoGroup 的 tip（如果有）
         tip = data.get('tip', '')
         if tip and hasattr(self, 'algoGroup'):
@@ -396,6 +478,18 @@ class TrainTab(QWidget):
         self._amp.setChecked(t.get('amp', True))
         self._cache.setChecked(t.get('cache', False))
         self.loraSb.setValue(t.get('lora_rank', 0))
+
+        # ???????
+        self.clsLossCb.setCurrentText(t.get('cls_loss', 'BCE').capitalize())
+        self.focalGammaSb.setValue(float(t.get('focal_gamma', 2.0)))
+        self.focalAlphaSb.setValue(float(t.get('focal_alpha', 0.75)))
+        iou_default = t.get('iou_loss', 'CIoU').capitalize()
+        self.iouLossCb.setCurrentText(iou_default)
+        fusion_default = t.get('fusion', 'none').lower()
+        if fusion_default == 'asff' or fusion_default == 'bifpn':
+            self.fusionCb.setCurrentIndex(1)
+        else:
+            self.fusionCb.setCurrentIndex(0)
 
         # 注意力模块重置为 None
         self.attn_type.setCurrentIndex(0)
@@ -517,6 +611,11 @@ class TrainTab(QWidget):
             'amp': self._amp.isChecked(),
             'cache': self._cache.isChecked(),
             'lora_rank': self.loraSb.value(),
+            'cls_loss': self.clsLossCb.currentText().lower(),
+            'focal_gamma': self.focalGammaSb.value(),
+            'focal_alpha': self.focalAlphaSb.value(),
+            'iou_loss': self.iouLossCb.currentText().lower(),
+            'fusion': self.fusionCb.currentText().lower(),
             'attention': self.attn_type.currentText(),
         }
         return {'name': '', 'tip': '', 'training': t}
@@ -556,10 +655,6 @@ class TrainTab(QWidget):
 
     def _init_widgets(self):
         t = cfg['training']
-        self.configGrid.setColumnStretch(0, 0)
-        self.configGrid.setColumnStretch(1, 1)
-        self.configGrid.setColumnStretch(2, 0)
-        self.configGrid.setColumnStretch(3, 1)
 
         # 模型下拉框：已下载的 .pt + 可选下载列表 + .yaml 架构（从零训练）
         models_dir = Path(load_paths().get('models_dir', str(ROOT / 'models')))
@@ -641,29 +736,11 @@ class TrainTab(QWidget):
             self.mosaic_sb, self.mixup_sb,
             self._flip_lr, self._flipud, self._shear, self._persp,
             self._dropout, self._wmom, self._amp, self._cache,
-            self.attn_type, self.loraSb]
+            self.attn_type, self.loraSb,
+            self.clsLossCb, self.focalGammaSb, self.focalAlphaSb,
+            self.iouLossCb, self.fusionCb]
 
-        # 统一输入框宽度（在 combo 填充后执行）
-        _fw = 60
-        for grid in (self.configGrid, self.algoGrid):
-            for i in range(grid.count()):
-                item = grid.itemAt(i)
-                if item and item.widget():
-                    w = item.widget()
-                    if isinstance(w, (QComboBox)):
-                        w.setFixedWidth(_fw)
-                        w.setToolTip(w.currentText())
-                        w.currentTextChanged.connect(
-                            lambda t, cb=w: cb.setToolTip(t))
-                    elif isinstance(w, (QSpinBox, QDoubleSpinBox)):
-                        w.setFixedWidth(_fw)
-                        w.setToolTip(str(w.value()))
-                        w.valueChanged.connect(
-                            lambda v, sb=w: sb.setToolTip(str(v)))
-                    elif isinstance(w, QLabel):
-                        w.setFixedWidth(50)
 
-    # ═══════════════════════════════════════════
     # Signal Wiring
     # ═══════════════════════════════════════════
     def _connect(self):
@@ -678,6 +755,23 @@ class TrainTab(QWidget):
         self.saveBtn.clicked.connect(self._save_preset)
         self.delBtn.clicked.connect(self._delete_preset)
         self.presetCombo.currentIndexChanged.connect(self._load_preset)
+
+        # Loss selection tooltip update
+        self.clsLossCb.currentTextChanged.connect(self._update_loss_tooltips)
+
+
+
+    def _update_loss_tooltips(self, text):
+        """Update gamma/alpha tooltips based on loss type."""
+        if text == 'Focal':
+            self.focalGammaSb.setToolTip("Focal gamma (higher = focus on hard examples)")
+            self.focalAlphaSb.setToolTip("Focal alpha (0.25-0.75, balance pos/neg)")
+        elif text == 'ASL':
+            self.focalGammaSb.setToolTip("ASL gamma- (higher = fewer FNs)")
+            self.focalAlphaSb.setToolTip("ASL gamma+ (higher = fewer FPs)")
+        else:
+            self.focalGammaSb.setToolTip("Not used for BCE")
+            self.focalAlphaSb.setToolTip("Not used for BCE")
 
     def _config(self):
         _ts = lambda: __import__('datetime').datetime.now().strftime('%H:%M:%S.%f')
@@ -696,7 +790,15 @@ class TrainTab(QWidget):
             self._flip_lr.value(), self._flipud.value(), self._shear.value(), self._persp.value(),
             self._dropout.value(), self._wmom.value(),
             self._amp.isChecked(), self._cache.isChecked(),
-            self.loraSb.value())
+            self.loraSb.value(),
+            self.clsLossCb.currentText().lower(),
+            self.focalGammaSb.value(), self.focalAlphaSb.value(),
+            # ASL gamma_pos: maps from alpha when ASL, else 0
+            self.focalAlphaSb.value() if self.clsLossCb.currentText() == 'ASL' else 0.0,
+            # ASL gamma_neg: maps from gamma when ASL, else 4
+            self.focalGammaSb.value() if self.clsLossCb.currentText() == 'ASL' else 4.0,
+            self.iouLossCb.currentText().lower(),
+            self.fusionCb.currentText().lower())
         print(f'[{_ts()}] _config done', flush=True)
         return r
 
