@@ -41,7 +41,10 @@ def build_train_config(
     print(f'[build_train_config] model_name={model_current_text}', flush=True)
     model_name = model_current_text
     if model_name.endswith('.yaml'):
-        model_path = model_name
+        # Resolve .yaml path against models_dir (same as .pt resolution)
+        _md = load_paths().get('models_dir', str(ROOT / 'models'))
+        local = Path(_md) / model_name
+        model_path = str(local) if local.exists() else model_name
     else:
         print(f'[build_train_config] resolving model path...', flush=True)
         _p = load_paths()
@@ -211,58 +214,70 @@ class Trainer(QObject):
             else:
                 m = YOLO(cfg['model'])
             
-            # ── 注入注意力模块 ──
-            try:
-                attn = cfg.get('attention', 'none')
+            # ── 注入移动到 on_train_start 回调（在 trainer 创建好模型后执行）──
+            cfg_for_cb = {
+                'attention': cfg.get('attention', 'none'),
+                'lora_rank': cfg.get('lora_rank', 0),
+                'fusion': cfg.get('fusion', 'none'),
+                'cls_loss': cfg.get('cls_loss', 'bce'),
+                'focal_gamma': cfg.get('focal_gamma', 2.0),
+                'focal_alpha': cfg.get('focal_alpha', 0.75),
+                'asl_gamma_pos': cfg.get('asl_gamma_pos', 0.0),
+                'asl_gamma_neg': cfg.get('asl_gamma_neg', 4.0),
+                'iou_loss': cfg.get('iou_loss', 'ciou'),
+            }
+            log_emit = self.log.emit
+
+            def _on_train_start(trainer):
+                """Inject modules after trainer creates the model."""
+                model = trainer.model
+                # Save trainer ref for loss restore later
+                self._ultra_trainer = trainer
+                # ── Attention ──
+                attn = cfg_for_cb.get('attention', 'none')
                 if attn and attn.lower() != 'none':
+                    try:
                         from main.core.train.attention import inject_attention
-                        replaced = inject_attention(m.model, attn)
-                        self.log.emit(f' [{attn.upper()}] Injected attention into {replaced} C2f blocks')
-            except Exception as e:
-                self.log.emit(f' [WARN] Attention injection failed: {e}')
-
-            # ── LoRA 注入 ──
-            lora_r = cfg.get('lora_rank', 0)
-            if lora_r > 0:
+                        replaced = inject_attention(model, attn)
+                        log_emit(f' [{attn.upper()}] Injected attention into {replaced} C2f blocks')
+                    except Exception as e:
+                        log_emit(f' [WARN] Attention injection failed: {e}')
+                # ── LoRA ──
+                lora_r = cfg_for_cb.get('lora_rank', 0)
+                if lora_r > 0:
+                    try:
+                        from main.core.train.attention import inject_lora
+                        replaced = inject_lora(model, lora_r)
+                        log_emit(f' [LoRA] Injected LoRA (rank={lora_r}) into {replaced} Conv2d layers')
+                        total = sum(p.numel() for p in model.parameters())
+                        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+                        log_emit(f'  Parameters: {trainable/1e6:.2f}M trainable / {total/1e6:.2f}M total')
+                    except Exception as e:
+                        log_emit(f' [WARN] LoRA injection failed: {e}')
+                # ── Multi-scale fusion ──
+                fusion_type = cfg_for_cb.get('fusion', 'none')
+                if fusion_type and fusion_type != 'none':
+                    try:
+                        from main.core.train.neck import inject_multiscale_fusion
+                        # inject_multiscale_fusion takes the Trainer's model (DetectionModel)
+                        result = inject_multiscale_fusion(model, fusion_type)
+                        if result:
+                            log_emit(f' [Neck] Multi-scale fusion: {result}')
+                    except Exception as e:
+                        log_emit(f' [WARN] Fusion injection failed: {e}')
+                # ── Loss function patching ──
                 try:
-                    from main.core.train.attention import inject_lora
-                    replaced = inject_lora(m.model, lora_r)
-                    self.log.emit(f' [LoRA] Injected LoRA (rank={lora_r}) into {replaced} Conv2d layers')
-                    # 统计可训练参数量
-                    total = sum(p.numel() for p in m.model.parameters())
-                    trainable = sum(p.numel() for p in m.model.parameters() if p.requires_grad)
-                    self.log.emit(f'  Parameters: {trainable/1e6:.2f}M trainable / {total/1e6:.2f}M total')
+                    from main.core.train.loss import patch_yolo_loss, restore_original_loss
+                    loss_cfg_dict = {k: cfg_for_cb[k] for k in
+                        ['cls_loss','focal_gamma','focal_alpha','asl_gamma_pos','asl_gamma_neg','iou_loss']}
+                    patched = patch_yolo_loss(model, loss_cfg_dict)
+                    if patched:
+                        log_emit(f' [Loss] Custom loss: ' + ', '.join(patched))
+                    trainer._restore_loss = restore_original_loss
                 except Exception as e:
-                    self.log.emit(f' [WARN] LoRA injection failed: {e}')
-            
-                                    # Multi-scale feature fusion
-            fusion_type = cfg.get('fusion', 'none')
-            if fusion_type and fusion_type != 'none':
-                try:
-                    from main.core.train.neck import inject_multiscale_fusion
-                    result = inject_multiscale_fusion(m, fusion_type)
-                    if result:
-                        self.log.emit(f' [Neck] Multi-scale fusion: {result}')
-                except Exception as e:
-                        self.log.emit(f' [WARN] Fusion injection failed: {e}')
+                    log_emit(f' [WARN] Loss patch failed: ' + str(e))
 
-            # ── Loss function patching ──
-            try:
-                from main.core.train.loss import patch_yolo_loss, restore_original_loss
-                loss_cfg_dict = {
-                    'cls_loss': cfg.get('cls_loss', 'bce'),
-                    'focal_gamma': cfg.get('focal_gamma', 2.0),
-                    'focal_alpha': cfg.get('focal_alpha', 0.75),
-                    'asl_gamma_pos': cfg.get('asl_gamma_pos', 0.0),
-                    'asl_gamma_neg': cfg.get('asl_gamma_neg', 4.0),
-                    'iou_loss': cfg.get('iou_loss', 'ciou'),
-                }
-                patched = patch_yolo_loss(m, loss_cfg_dict)
-                if patched:
-                    self.log.emit(f' [Loss] Custom loss: ' + ', '.join(patched))
-                self._restore_loss = restore_original_loss
-            except Exception as e:
-                self.log.emit(f' [WARN] Loss patch failed: ' + str(e))
+            m.add_callback('on_train_start', _on_train_start)
 
             # 输出目录命名：{日期}_{预设} 或 {日期}_{模型}
             preset = cfg.get('preset_name', '')
@@ -293,26 +308,41 @@ class Trainer(QObject):
                 try:
                     model_name = str(cfg.get('model', '')).lower()
                     bs = cfg['batch']
-                    extra = cfg.get('lora_rank', 0) > 0 or cfg.get('attention', 'None') != 'None'
-                    # 根据模型规模估算安全 batch
-                    # Per-model calibrated values (RTX 5070 Ti 16GB, anti-FP augs)
+                    # 额外模块等级: 0=none, 1=attention/LoRA, 2=+fusion, 3=+P2+fusion
+                    extra_level = 0
+                    if cfg.get('lora_rank', 0) > 0 or cfg.get('attention', 'None') != 'None':
+                        extra_level = 1
+                    if cfg.get('fusion', 'none') != 'none':
+                        extra_level = 2
+                    if '-p2' in model_name or model_name.startswith('yolo') and '-p2' in model_name:
+                        extra_level = 3
                     imgsz = cfg.get('imgsz', 640)
                     is_hd = imgsz >= 720
+                    # Per-model baseline batch (RTX 5070 Ti 16GB, no extras)
+                    # Scale: base → +attention ×0.95 → +fusion ×0.85 → +P2 ×0.55
+                    hd_scale = 0.42  # 960 versus 640: ×(640/960)² ≈ 0.44, rounded for safety
                     if 'yolo11n' in model_name:
-                        safe_max = 14 if is_hd else (36 if extra else 36)
+                        base = 36
                     elif 'yolov8n' in model_name:
-                        safe_max = 14 if is_hd else (32 if extra else 40)
+                        base = 40
                     elif 'yolo11s' in model_name:
-                        safe_max = 10 if is_hd else (22 if extra else 28)
+                        base = 28
                     elif 'yolov8s' in model_name:
-                        safe_max = 8 if is_hd else (20 if extra else 24)
+                        base = 24
                     elif 'yolo11m' in model_name or 'yolov8m' in model_name:
-                        safe_max = 6 if is_hd else (12 if extra else 16)
+                        base = 16
+                    elif 'yolo11x' in model_name or 'yolov8x' in model_name:
+                        base = 8
                     else:
-                        safe_max = 24
+                        base = 24
+                    multipliers = {0: 1.0, 1: 0.95, 2: 0.85, 3: 0.55}
+                    mult = multipliers.get(extra_level, 1.0)
+                    safe_max = int(base * mult) if not is_hd else max(int(base * mult * hd_scale), 2)
+                    extra_label = {0:'标准',1:'+注意力/LoRA',2:'+注意力+融合',3:'+P2+注意力+融合'}
                     if bs > safe_max:
-                        self.log.emit(f' ⚠️  batch={bs} 在当前模型配置下可能爆显存')
-                        self.log.emit(f'  建议: batch ≤ {safe_max}（含额外模块={extra}）')
+                        self.log.emit(f' ⚠️  batch={bs} 在当前配置下可能爆显存')
+                        self.log.emit(f'  识别: {extra_label.get(extra_level, "自定义")}')
+                        self.log.emit(f'  建议: batch ≤ {safe_max}')
                         self.log.emit(f'  仍将使用 batch={bs} 启动，OOM 时请降低 batch')
                 except Exception as _e:
                     pass
@@ -425,8 +455,9 @@ class Trainer(QObject):
         finally:
             sys.stdout = original_stdout; sys.stderr = original_stderr
         # Restore original loss function
-        if hasattr(self, '_restore_loss'):
+        restore_src = getattr(self, '_ultra_trainer', None)
+        if restore_src and hasattr(restore_src, '_restore_loss'):
             try:
-                self._restore_loss()
+                restore_src._restore_loss()
             except Exception:
                 pass

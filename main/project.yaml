@@ -1,89 +1,100 @@
 # =============================================================================
 # Project Configuration — defines project identity & UI defaults
 # All tabs (Training, Validate, Distill, Predict, Export, Dataset) read from here.
-# Make a copy for a new project (e.g. fire detection) and just swap the file.
+# Make a copy for a new project and just swap the file.
 # =============================================================================
 
 # ── Project Identity ──
 project:
-  name: YOLO Training Studio         # Window title
-  task: detect                         # YOLO task (detect / segment / classify)
-  data_yaml: datasets/data.yaml         # Relative to project root
-  tip: "yolo11n-CBAM-PW0.5-IoU0.8-conf0.55"    # Shown in Algorithm group box
+  name: YOLO Training Studio
+  task: detect
+  data_yaml: datasets/data.yaml
+  tip: "yolo11n-CA-PW0.9-IoU0.85-conf0.60"
 
 # ── Training Defaults ──
 training:
-  model: yolo11n.pt                    # 预训练权重（ultralytics 自动下载）
+  model: yolo11n.pt
   model_options:
     - yolo11s.pt
     - yolo11n.pt
+    - yolo11n-p2.yaml
+    - yolo11s-p2.yaml
     - yolov8s.pt
     - yolov8n.pt
-  epochs: 300                          # 充分收敛，高精度需更久训练
-  batch: 32                            # RTX 5070 Ti 16GB，大数据集 batch 64 易 OOM 降到 32
+    - yolov8n-p2.yaml
+    - yolov8s-p2.yaml
+  epochs: 300
+  batch: 32
   imgsz: 640
-  imgsz_options: [416, 512, 640, 720, 800]
+  imgsz_options: [416, 512, 640, 720, 960]
   optimizer: AdamW
   optimizer_options: [AdamW, Adam, SGD]
   device: auto
   scheduler: Cosine
   scheduler_options: [Cosine, Linear]
-  patience: 30                         # 早停耐心，epoch 300 内 30 轮无提升即停
-  lr0: 0.0005                          # 降 LR 防 loss 震荡
-  lrf: 0.05                            # 最终 LR = lr0*0.05，温和衰减防止尾段震荡
-  warmup_epochs: 8                     # 长预热平滑启动
-  workers: 12
-  momentum: 0.95
-  weight_decay: 0.001
-  cls_pw: 0.92                         # 分类正样本权重，高精度低误报
-  iou: 0.8                             # 严格 NMS，减少重叠框降 FP
-  close_mosaic: 12                     # Mosaic 关闭时机，后续细粒度微调
+  patience: 30
+  lr0: 0.001
+  lrf: 0.01
+  warmup_epochs: 3
+  workers: 8
+  momentum: 0.937
+  weight_decay: 0.0005
+  cls_pw: 0.90
+  iou: 0.85
+  close_mosaic: 10
   # ── Training hyperparams ──
-  dropout: 0.05                         # Dropout 正则化防过拟合
-  warmup_momentum: 0.85                 # 预热期动量平滑
-  amp: true                            # 混合精度训练
-  cache: false                         # 数据集缓存到内存
-  lora_rank: 0                         # LoRA 低秩适配秩数（0=关闭）
+  dropout: 0.0
+  warmup_momentum: 0.8
+  amp: true
+  cache: false
+  lora_rank: 0
   # ── Augmentation ──
-  copy_paste: 0.0                      # 摔倒人体复制粘贴易产生不自然样本，关闭
-  degrees: 2.0                         # 摔倒方向性极强，仅微小旋转防假样本
-  multi_scale: false                    # 保持关闭（16GB 显存负担大）
-  hsv_h: 0.01                          # 人类衣着颜色变化不大，减小色相漂移
-  hsv_s: 0.6
-  hsv_v: 0.35
+  copy_paste: 0.0
+  degrees: 0.0
+  multi_scale: false
+  hsv_h: 0.015
+  hsv_s: 0.5
+  hsv_v: 0.3
   translate: 0.1
-  scale: 0.3                           # 摔倒人体尺度较一致，减小缩放范围
-  flip_lr: 0.3                         # 降低翻转率，摔倒有左右不对称
-  flipud: 0.0                          # 摔倒有方向性，上下翻转有害
-  shear: 1.0                           # 轻微剪切
-  perspective: 0.0                     # 透视增强
-  mosaic: 0.9                          # Mosaic 增强概率
-  mixup: 0.08                          # MixUp 增强概率
+  scale: 0.5
+  flip_lr: 0.5
+  flipud: 0.0
+  shear: 0.0
+  perspective: 0.0
+  mosaic: 1.0
+  mixup: 0.1
+  # ── Network modules ──
+  attention: CA
+  cls_loss: focal
+  focal_gamma: 2.0
+  focal_alpha: 0.75
+  iou_loss: ciou
+  fusion: asff
 
 # ── Validation Defaults ──
 validation:
   imgsz: 640
   batch: 64
-  conf: 0.60                           # 0.60: 高推理阈值，强力过滤误报
-  iou: 0.5                             # NMS 去重
+  conf: 0.60
+  iou: 0.5
 
 # ── Distillation Defaults ──
 distill:
-  teacher: ''                          # Empty = auto-find latest runs/*/weights/best*.pt
-  student: models/yolo11n.pt           # Student model (smaller than teacher)
-  epochs: 150                          # Extended epochs for better knowledge transfer
-  batch: 24                            # Optimized batch size for distillation (teacher frozen, less memory)
-  lr0: 0.002                           # Higher LR for faster convergence in distillation
-  alpha: 0.5                           # Balanced weight: 50% detection loss + 50% distillation loss
-  patience: 40                         # Extended patience for thorough search
-  imgsz: 640                           # Same as training for consistency
-  warmup_epochs: 5                     # Shorter warmup for distillation
-  weight_decay: 0.0005                 # L2 regularization
-  momentum: 0.937                      # Optimizer momentum
+  teacher: ''
+  student: models/yolo11n.pt
+  epochs: 150
+  batch: 24
+  lr0: 0.002
+  alpha: 0.5
+  patience: 40
+  imgsz: 640
+  warmup_epochs: 5
+  weight_decay: 0.0005
+  momentum: 0.937
 
 # ── Prediction / Inference Defaults ──
 predict:
-  conf: 0.60                           # 推理 conf 0.60，强力过滤低分框
+  conf: 0.60
   iou: 0.5
   imgsz: 640
 

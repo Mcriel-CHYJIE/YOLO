@@ -397,20 +397,18 @@ class TrainTab(QWidget):
         self._cache.setChecked(bool(t.get('cache', False)))
         self.loraSb.setValue(int(t.get('lora_rank', 0)))
 
-        # ??????
+        # ── Loss: map to combo items ──
         cls_loss_val = t.get('cls_loss', 'bce').lower()
-        cb_idx = self.clsLossCb.findText(cls_loss_val.upper() if cls_loss_val != 'bce' else 'BCE')
-        if cb_idx >= 0: self.clsLossCb.setCurrentIndex(cb_idx)
+        cls_map = {'bce': 'BCE', 'focal': 'Focal', 'asl': 'ASL'}
+        self.clsLossCb.setCurrentText(cls_map.get(cls_loss_val, 'BCE'))
         self.focalGammaSb.setValue(float(t.get('focal_gamma', 2.0)))
         self.focalAlphaSb.setValue(float(t.get('focal_alpha', 0.75)))
         iou_loss_val = t.get('iou_loss', 'ciou').lower()
-        iou_cb_idx = self.iouLossCb.findText(iou_loss_val.upper() if iou_loss_val == 'wiou' else 'CIoU' if iou_loss_val == 'ciou' else 'Focal-EIoU')
-        if iou_cb_idx >= 0: self.iouLossCb.setCurrentIndex(iou_cb_idx)
+        iou_map = {'ciou': 'CIoU', 'wiou': 'WIoU', 'focaleiou': 'Focal-EIoU'}
+        self.iouLossCb.setCurrentText(iou_map.get(iou_loss_val, 'CIoU'))
         fusion_val = t.get('fusion', 'none').lower()
-        if fusion_val == 'asff' or fusion_val == 'bifpn':
-            self.fusionCb.setCurrentIndex(1)
-        else:
-            self.fusionCb.setCurrentIndex(0)
+        fusion_map = {'none': 'None', 'asff': 'ASFF', 'bifpn': 'BiFPN'}
+        self.fusionCb.setCurrentText(fusion_map.get(fusion_val, 'None'))
 
         # ASL specific params (from preset if available)
         asl_gp = t.get('asl_gamma_pos', None)
@@ -422,12 +420,9 @@ class TrainTab(QWidget):
 
         # 注意力模块
         attn = t.get('attention', 'none')
-        if attn and attn.lower() != 'none':
-            idx = self.attn_type.findText(attn.upper())
-            if idx >= 0:
-                self.attn_type.setCurrentIndex(idx)
-        else:
-            self.attn_type.setCurrentIndex(0)
+        attn_map = {'none': 'None', 'se': 'SE', 'cbam': 'CBAM', 'ca': 'CA',
+                    'eca': 'ECA', 'simam': 'SimAM', 'ema': 'EMA', 'gam': 'GAM'}
+        self.attn_type.setCurrentText(attn_map.get(attn.lower(), 'None'))
         # 更新 algoGroup 的 tip（如果有）
         tip = data.get('tip', '')
         if tip and hasattr(self, 'algoGroup'):
@@ -479,17 +474,15 @@ class TrainTab(QWidget):
         self._cache.setChecked(t.get('cache', False))
         self.loraSb.setValue(t.get('lora_rank', 0))
 
-        # ???????
-        self.clsLossCb.setCurrentText(t.get('cls_loss', 'BCE').capitalize())
+        # ── Loss: map to combo items ──
+        cls_map = {'bce': 'BCE', 'focal': 'Focal', 'asl': 'ASL'}
+        self.clsLossCb.setCurrentText(cls_map.get(t.get('cls_loss', 'bce').lower(), 'BCE'))
         self.focalGammaSb.setValue(float(t.get('focal_gamma', 2.0)))
         self.focalAlphaSb.setValue(float(t.get('focal_alpha', 0.75)))
-        iou_default = t.get('iou_loss', 'CIoU').capitalize()
-        self.iouLossCb.setCurrentText(iou_default)
-        fusion_default = t.get('fusion', 'none').lower()
-        if fusion_default == 'asff' or fusion_default == 'bifpn':
-            self.fusionCb.setCurrentIndex(1)
-        else:
-            self.fusionCb.setCurrentIndex(0)
+        iou_map = {'ciou': 'CIoU', 'wiou': 'WIoU', 'focaleiou': 'Focal-EIoU'}
+        self.iouLossCb.setCurrentText(iou_map.get(t.get('iou_loss', 'ciou').lower(), 'CIoU'))
+        fusion_map = {'none': 'None', 'asff': 'ASFF', 'bifpn': 'BiFPN'}
+        self.fusionCb.setCurrentText(fusion_map.get(t.get('fusion', 'none').lower(), 'None'))
 
         # 注意力模块重置为 None
         self.attn_type.setCurrentIndex(0)
@@ -659,7 +652,7 @@ class TrainTab(QWidget):
         # 模型下拉框：已下载的 .pt + 可选下载列表 + .yaml 架构（从零训练）
         models_dir = Path(load_paths().get('models_dir', str(ROOT / 'models')))
         self.m.clear()
-        yaml_archs = ['yolov8n.yaml', 'yolo11n.yaml']
+        yaml_archs = ['yolo11n-p2.yaml', 'yolo11s-p2.yaml', 'yolov8n-p2.yaml', 'yolov8s-p2.yaml']
         for ya in yaml_archs:
             self.m.addItem(ya)
         # 合并已下载的 .pt 和 model_options，去重后显示

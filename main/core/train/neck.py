@@ -154,29 +154,68 @@ class WeightedFeatureFusion(nn.Module):
             outs.append(fused)
         return outs
 
-class FusedSequential(nn.Module):
-    """Wraps model.model (nn.Sequential) to add fusion after the neck.
+class FusedDetect(nn.Module):
+    """Wraps the Detect head to apply multi-scale fusion before detection.
 
-    Implements __getitem__/__len__/__iter__ so external code that indexes
-    into model.model (e.g. for layer access) still works.
+    Replaces the last layer of model.model (the Detect head) so the nn.Sequential
+    tree structure is preserved — no wrapping of the entire sequential.
     """
-    def __init__(self, original, fusion):
+    def __init__(self, detect, fusion):
         super().__init__()
-        self.original = original
+        self.detect = detect
         self.fusion = fusion
 
     def forward(self, x):
-        features = self.original(x)   # [P3, P4, P5] from backbone+neck
-        return self.fusion(features)  # [P3', P4', P5'] fused
+        # x: list of features [P3, P4, P5] from backbone+neck
+        fused = self.fusion(x)  # [P3', P4', P5'] fused
+        return self.detect(fused)
 
-    def __getitem__(self, idx):
-        return self.original[idx]
+    # ── Explicitly delegate attributes accessed by ultralytics trainer ──
+    @property
+    def stride(self):
+        return self.detect.stride
 
-    def __len__(self):
-        return len(self.original)
+    @property
+    def nc(self):
+        return self.detect.nc
 
-    def __iter__(self):
-        return iter(self.original)
+    @property
+    def ch(self):
+        return self.detect.ch
+
+    @property
+    def cv2(self):
+        return self.detect.cv2
+
+    @property
+    def cv3(self):
+        return self.detect.cv3
+
+    @property
+    def dfl(self):
+        return self.detect.dfl
+
+    @property
+    def reg_max(self):
+        return self.detect.reg_max
+
+    @property
+    def anchors(self):
+        return self.detect.anchors
+
+    @property
+    def f(self):
+        """From indices - which layers the detect head takes input from."""
+        return self.detect.f
+
+    @property
+    def i(self):
+        """Module index within the sequential."""
+        return self.detect.i
+
+    @property
+    def type(self):
+        return self.detect.type
 
 
 # ======================================================================
@@ -236,14 +275,16 @@ def inject_multiscale_fusion(model, fusion_type, channels=None):
         channels = _detect_channels(model)
 
     fusion_module = fusion_cls(channels)
-    original = model.model
-    model.model = FusedSequential(original, fusion_module)
+    # Replace only the Detect head (last layer of nn.Sequential) with FusedDetect
+    seq = model.model  # nn.Sequential inside DetectionModel
+    seq[-1] = FusedDetect(seq[-1], fusion_module)
     return f'{fusion_type.upper()}({channels[0]},{channels[1]},{channels[2]})'
 
 
 __all__ = [
     'ASFF', 'ASFFWrapper',
     'WeightedFeatureFusion',
+    'FusedDetect',
     'inject_multiscale_fusion',
     '_detect_channels',
 ]
