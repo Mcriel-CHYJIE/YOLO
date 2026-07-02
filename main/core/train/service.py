@@ -259,12 +259,20 @@ class Trainer(QObject):
                 if fusion_type and fusion_type != 'none':
                     try:
                         from main.core.train.neck import inject_multiscale_fusion
-                        # inject_multiscale_fusion takes the Trainer's model (DetectionModel)
                         result = inject_multiscale_fusion(model, fusion_type)
                         if result:
                             log_emit(f' [Neck] Multi-scale fusion: {result}')
                     except Exception as e:
                         log_emit(f' [WARN] Fusion injection failed: {e}')
+                # ── Rebuild EMA after any structural change ──
+                # Attention (AttentionWrapper replaces C3k2) and fusion
+                # (inserted into Sequential) both change state_dict keys.
+                # The EMA was created before these injections and its keys
+                # no longer match the model's state_dict.
+                if hasattr(trainer, 'ema'):
+                    from ultralytics.utils.torch_utils import ModelEMA
+                    trainer.ema = ModelEMA(trainer.model)
+                    log_emit(f' [EMA] Rebuilt after model structure change')
                 # ── Loss function patching ──
                 try:
                     from main.core.train.loss import patch_yolo_loss, restore_original_loss

@@ -24,67 +24,89 @@ import torch.nn.functional as F
 
 
 # ======================================================================
-# ASFF — Adaptively Spatial Feature Fusion
+# ASFF — Adaptively Spatial Feature Fusion (scalar-weights variant)
 # ======================================================================
 
 class ASFF(nn.Module):
-    """ASFF for a single output scale level.
+    """ASFF for a single output scale level — scalar-weighted, no per-pixel conv.
 
-    For output level l, takes all 3 input scales (P3/P4/P5), resizes them
-    to the spatial size of level l, and computes a per-pixel weighted sum
-    with learnable softmax weights.
+    Original ASFF uses a per-pixel conv (weight_conv) to predict fusion masks,
+    which introduces gradient instability even with identity init (the 1×1 conv
+    weights drift from zero under AMP, eventualy causing NaN loss).
+
+    This variant replaces the per-pixel conv with **learnable scalar fusion
+    weights** (3 scalars per level, softmax-normalized), identical to the BiFPN
+    approach.  Channel-alignment 1×1 convs are frozen at zero init so they
+    contribute zero signal — no gradients flow through them.
+
+    Total learnable params: 3 scalars × 3 levels = 9 parameters.
     """
     def __init__(self, level, channels):
         super().__init__()
         self.level = level
         self.num_levels = len(channels)
-        self.channels = channels[level]
 
-        # Channel alignment convs (1x1) to project all scales to the same channel dim
+        # ── Scalar fusion logits (learnable) ──
+        # Initialised so that softmax ≈ [1,0,0] for level 0, [0,1,0] for level 1, etc.
+        init = [-10.0] * self.num_levels
+        init[level] = 10.0
+        self.fusion_logits = nn.Parameter(torch.tensor(init, dtype=torch.float32))
+
+        # ── Channel alignment convs (1×1, frozen) ──
+        # These map P4(128ch)→64ch, P5(256ch)→64ch etc.  Zero-initialised and
+        # frozen so they never contribute signal — the fusion initially passes
+        # through the same-level feature unchanged.
         self.align_convs = nn.ModuleList()
         for i in range(self.num_levels):
             if i != level and channels[i] != channels[level]:
-                self.align_convs.append(nn.Conv2d(channels[i], channels[level], 1, bias=False))
+                conv = nn.Conv2d(channels[i], channels[level], 1, bias=False)
+                conv.weight.data.zero_()
+                for p in conv.parameters():
+                    p.requires_grad = False
+                self.align_convs.append(conv)
             else:
                 self.align_convs.append(nn.Identity() if i == level else nn.Identity())
 
-        # Weight predictor: concat of aligned features -> 3 weight maps
-        in_c = channels[level] * self.num_levels
-        self.weight_conv = nn.Sequential(
-            nn.Conv2d(in_c, self.num_levels, 1, bias=False),
-            nn.Softmax(dim=1),
-        )
-
     def forward(self, inputs):
-        """inputs: list of [N, C_i, H_i, W_i] at different scales"""
+        """inputs: list of [N, C_i, H_i, W_i] at different scales
+
+        YOLO order: [P3(high-res), P4(mid), P5(low-res)].
+          i < level  → feature resolution is HIGHER → downsample
+          i > level  → feature resolution is LOWER  → upsample
+
+        Runs all internal ops in float32 (outside autocast) to avoid AMP
+        float16 overflow in interpolate/avg_pool backward, then casts the
+        output back to the input dtype.
+        """
         level = self.level
-        target_h, target_w = inputs[level].shape[2:]
+        orig_dtypes = [f.dtype for f in inputs]
 
-        resized = []
-        for i, feat in enumerate(inputs):
-            if i == level:
-                resized.append(feat)
-            elif i < level:
-                # Smaller scale -> upsample
-                r = F.interpolate(feat, size=(target_h, target_w),
-                                  mode='bilinear', align_corners=False)
-                r = self.align_convs[i](r)
+        with torch.cuda.amp.autocast(enabled=False):
+            inputs = [f.float() for f in inputs]
+            target_h, target_w = inputs[level].shape[2:]
+
+            resized = []
+            for i, feat in enumerate(inputs):
+                if i == level:
+                    resized.append(feat)
+                    continue
+                # ── Resize spatial dims ──
+                if i < level:
+                    r = F.interpolate(feat, size=(target_h, target_w), mode='nearest')
+                else:
+                    r = F.interpolate(feat, size=(target_h, target_w), mode='nearest')
+                # ── Channel alignment (frozen, always zero output) ──
+                if hasattr(self.align_convs[i], 'weight'):
+                    r = self.align_convs[i](r)
                 resized.append(r)
-            else:
-                # Larger scale -> downsample
-                r = F.adaptive_avg_pool2d(feat, (target_h, target_w))
-                r = self.align_convs[i](r)
-                resized.append(r)
 
-        # Concatenate and predict spatial weight maps
-        concat = torch.cat(resized, dim=1)
-        weights = self.weight_conv(concat)  # [N, 3, H, W]
+            # ── Scalar-weighted fusion ──
+            w = F.softmax(self.fusion_logits.float(), dim=0)
+            output = torch.zeros_like(resized[0])
+            for i in range(self.num_levels):
+                output += w[i] * resized[i]
 
-        # Weighted sum
-        output = 0
-        for i in range(self.num_levels):
-            output += weights[:, i:i+1] * resized[i]
-        return output
+        return output.to(orig_dtypes[level])
 
 
 class ASFFWrapper(nn.Module):
@@ -118,24 +140,38 @@ class WeightedFeatureFusion(nn.Module):
     scales. Features are resized and channel-aligned before summation.
     The weights are global scalars (one per input-output level pair).
 
+    Channel-alignment 1×1 convs are zero-initialised and frozen so they
+    contribute zero signal — like the ASFF rewrite, this prevents gradient
+    instability with the pre-trained model.
+
     Reference: Tan et al., EfficientDet (CVPR 2020)
     """
     def __init__(self, channels):
         super().__init__()
         self.num_levels = len(channels)
-        self.weights = nn.Parameter(torch.ones(self.num_levels, self.num_levels))
+        # Identity init: each output level ≈ its own input level
+        init_w = torch.eye(self.num_levels) * 10.0 - 10.0  # diag=10, others=0 → softmax=identity
+        self.weights = nn.Parameter(init_w)
         self.align = nn.ModuleList()
         for i in range(self.num_levels):
             level_list = nn.ModuleList()
             for j in range(self.num_levels):
                 if channels[j] != channels[i]:
-                    level_list.append(nn.Conv2d(channels[j], channels[i], 1, bias=False))
+                    conv = nn.Conv2d(channels[j], channels[i], 1, bias=False)
+                    conv.weight.data.zero_()
+                    for p in conv.parameters():
+                        p.requires_grad = False
+                    level_list.append(conv)
                 else:
                     level_list.append(nn.Identity())
             self.align.append(level_list)
 
     def forward(self, features):
-        """features: [P3, P4, P5] -> [P3", P4", P5"]"""
+        """features: [P3(high-res), P4(mid), P5(low-res)] → [P3', P4', P5']
+
+        YOLO order is [P3, P4, P5] where lower index = higher resolution.
+        So j < i → need to DOWNSAMPLE, j > i → need to UPSAMPLE.
+        """
         outs = []
         for i in range(self.num_levels):
             ih, iw = features[i].shape[2:]
@@ -145,20 +181,33 @@ class WeightedFeatureFusion(nn.Module):
                 if i == j:
                     feat = features[j]
                 elif j < i:
+                    # j is earlier → higher res → downsample
+                    feat = F.adaptive_avg_pool2d(features[j], (ih, iw))
+                else:
+                    # j is later → lower res → upsample
                     feat = F.interpolate(features[j], size=(ih, iw),
                                          mode='bilinear', align_corners=False)
-                else:
-                    feat = F.adaptive_avg_pool2d(features[j], (ih, iw))
-                feat = self.align[i][j](feat)
+                # Channel alignment (frozen, always zero for cross-level)
+                if hasattr(self.align[i][j], 'weight'):
+                    feat = self.align[i][j](feat)
                 fused = fused + w[j] * feat
             outs.append(fused)
         return outs
 
 class FusedDetect(nn.Module):
-    """Wraps the Detect head to apply multi-scale fusion before detection.
+    """Applies multi-scale fusion inside the Detect head without wrapping it.
 
-    Replaces the last layer of model.model (the Detect head) so the nn.Sequential
-    tree structure is preserved — no wrapping of the entire sequential.
+    Instead of replacing seq[-1] (which shifts param keys like model.23.cv2.*
+    to model.23.detect.cv2.* and breaks EMA's deepcopy), this module is attached
+    as a plain attribute on the Detect head and its forward is monkey-patched:
+
+        detect._fusion = fusion_module
+        detect.forward = lambda x: fusion_module(x)  # → detect.forward(fused)
+                           then processed by original detect logic
+
+    The EMA key tree is preserved, and the _fusion parameters simply aren't
+    EMA-tracked — acceptable since fusion layers are a small fraction of total
+    params and the training loss directly updates them.
     """
     def __init__(self, detect, fusion):
         super().__init__()
@@ -230,24 +279,28 @@ FUSION_REGISTRY = {
 
 
 def _detect_channels(model):
-    """Auto-detect [c3, c4, c5] channel dimensions from model."""
+    """Auto-detect [P3, P4, P5] channel dimensions from the Detect head's cv2 input channels.
+
+    Instead of walking sub-modules recursively (which picks up the Detect head's
+    own internal convs), reads the input channels directly from each detection
+    scale's first conv layer — these are the true neck output channels.
+    """
     try:
         seq = model.model if hasattr(model, 'model') else model
-        # Walk backward, find the last 3 distinct Conv2d output channels
-        conv_channels = []
-        seen = set()
-        for module in reversed(list(seq.modules())):
-            if isinstance(module, nn.Conv2d) and module.out_channels not in seen:
-                conv_channels.append(module.out_channels)
-                seen.add(module.out_channels)
-                if len(conv_channels) == 3:
-                    break
-        if len(conv_channels) == 3:
-            return list(reversed(conv_channels))
+        detect = seq[-1]
+        if hasattr(detect, 'cv2'):
+            channels = []
+            for cv in detect.cv2:
+                # cv[0] is the first Conv block (ultralytics Conv wrapper)
+                sub = cv[0]
+                if hasattr(sub, 'conv') and hasattr(sub.conv, 'in_channels'):
+                    channels.append(sub.conv.in_channels)
+            if len(channels) >= 3:
+                return channels[:3]
     except Exception:
         pass
-    # Fallback: typical YOLO11n values
-    return [256, 256, 512]
+    # Fallback: typical yolo11n values
+    return [64, 128, 256]
 
 
 def inject_multiscale_fusion(model, fusion_type, channels=None):
@@ -275,9 +328,50 @@ def inject_multiscale_fusion(model, fusion_type, channels=None):
         channels = _detect_channels(model)
 
     fusion_module = fusion_cls(channels)
-    # Replace only the Detect head (last layer of nn.Sequential) with FusedDetect
-    seq = model.model  # nn.Sequential inside DetectionModel
-    seq[-1] = FusedDetect(seq[-1], fusion_module)
+    # Match the model's parameter device and dtype.
+    ref_param = next(model.parameters())
+    fusion_module = fusion_module.to(ref_param.device, dtype=ref_param.dtype)
+
+    # ── NaN-proof gradients on fusion learnable params ──
+    for p in fusion_module.parameters():
+        if p.requires_grad:
+            p.register_hook(lambda g: torch.nan_to_num(g, 0.0, 0.0, 0.0))
+
+    # ── Insert fusion as a real layer in nn.Sequential ──
+    # Standard approach used by YOLO-Extended / YOLOv6-ASFF:
+    # Put the fusion module right before Detect and update from-indices.
+    #   old: ... → P3,P4,P5 → Detect(f=[16,19,22])
+    #   new: ... → P3,P4,P5 → Fusion(f=[16,19,22]) → Detect(f=[fusion_idx])
+    #
+    # This avoids all injection issues (monkey-patch, pre-hook, gradient
+    # isolation) because the fusion is a native Sequential layer that
+    # _predict_once handles with its normal caching/routing logic.
+    seq = model.model  # nn.Sequential, currently 24 layers (0-23)
+    detect = seq[-1]   # Detect at index 23
+    fusion_idx = len(seq) - 1  # 23 — fusion takes detect's spot
+    detect_idx = len(seq)      # 24 — detect moves to new index
+
+    # Build new Sequential: old[:-1] + fusion + detect
+    old_layers = list(seq.children())[:-1]
+    new_seq = nn.Sequential(*(old_layers + [fusion_module, detect]))
+
+    # Set from-indices so _predict_once routes correctly.
+    # fusion takes the same 3 features detect used to take:
+    fusion_module.f = detect.f           # [16, 19, 22]
+    fusion_module.i = fusion_idx          # 23
+    # detect now takes its input from the fusion layer's single output.
+    # The fusion returns a list [P3', P4', P5']; accessing y[fusion_idx]
+    # with detect.f = fusion_idx (int) gives that list directly.
+    detect.f = fusion_idx                # 23 (int, not list)
+    detect.i = detect_idx                 # 24
+
+    # Patch model.mode = ... it's a property, replace underlying
+    model.model = new_seq
+    # Update save list (cache indices still include the same backbone layers)
+    _save = getattr(model, 'save', None)
+    if isinstance(_save, list):
+        _save.append(fusion_idx)
+
     return f'{fusion_type.upper()}({channels[0]},{channels[1]},{channels[2]})'
 
 

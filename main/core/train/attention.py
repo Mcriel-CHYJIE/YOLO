@@ -78,10 +78,14 @@ class CA(nn.Module):
     def __init__(self, channels, reduction=16):
         super().__init__()
         c = max(channels // reduction, 4)
-        self.conv1 = nn.Conv2d(channels, c, 1)
+        # bias=False: all convs are followed by BN or sigmoid, and under AMP
+        # autocast a float32 bias with float16 input/weight causes
+        # "Input type Half and bias type float should be the same".
+        # conv1 → BN handles centering (bias is redundant).
+        self.conv1 = nn.Conv2d(channels, c, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(c)
-        self.conv_h = nn.Conv2d(c, channels, 1)
-        self.conv_w = nn.Conv2d(c, channels, 1)
+        self.conv_h = nn.Conv2d(c, channels, 1, bias=False)
+        self.conv_w = nn.Conv2d(c, channels, 1, bias=False)
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -277,7 +281,14 @@ def inject_attention(model, attn_type):
                     c = module.cv1.conv.out_channels
 
                 if c and c > 0:
-                    seq[i] = AttentionWrapper(module, attn_type, c)
+                    wrapper = AttentionWrapper(module, attn_type, c)
+                    # Copy .i and .f from the original module — _predict_once
+                    # uses these to route intermediate outputs between layers:
+                    #   if m.f != -1: x = y[m.f] ...
+                    #   y.append(x if m.i in self.save else None)
+                    wrapper.i = getattr(module, 'i', i)
+                    wrapper.f = getattr(module, 'f', -1)
+                    seq[i] = wrapper
                     replaced += 1
                 break
 
