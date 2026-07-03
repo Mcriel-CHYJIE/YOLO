@@ -110,23 +110,21 @@ class ASFF(nn.Module):
 
 
 class ASFFWrapper(nn.Module):
-    """Full ASFF module producing 3 fused output scales.
+    """Full ASFF module producing N fused output scales.
 
-    Takes [P3, P4, P5] from the neck and returns [P3', P4', P5'].
-    Each output is a spatial-weighted combination of all 3 input scales.
+    Takes [P2, P3, P4, ...] from the neck and returns [P2', P3', P4', ...].
+    Each output is a spatial-weighted combination of all N input scales.
+    Automatically adapts to 3-level (P3-P5) or 4-level (P2-P5) models.
     """
     def __init__(self, channels):
         super().__init__()
-        self.asff_0 = ASFF(0, channels)  # P3 output (high-res)
-        self.asff_1 = ASFF(1, channels)  # P4 output (mid)
-        self.asff_2 = ASFF(2, channels)  # P5 output (low-res)
+        self.num_levels = len(channels)
+        for lvl in range(self.num_levels):
+            self.add_module(f'asff_{lvl}', ASFF(lvl, channels))
 
     def forward(self, features):
-        return [
-            self.asff_0(features),
-            self.asff_1(features),
-            self.asff_2(features),
-        ]
+        return [getattr(self, f'asff_{i}')(features)
+                for i in range(self.num_levels)]
 
 
 # ======================================================================
@@ -296,7 +294,7 @@ def _detect_channels(model):
                 if hasattr(sub, 'conv') and hasattr(sub.conv, 'in_channels'):
                     channels.append(sub.conv.in_channels)
             if len(channels) >= 3:
-                return channels[:3]
+                return channels
     except Exception:
         pass
     # Fallback: typical yolo11n values
@@ -372,7 +370,7 @@ def inject_multiscale_fusion(model, fusion_type, channels=None):
     if isinstance(_save, list):
         _save.append(fusion_idx)
 
-    return f'{fusion_type.upper()}({channels[0]},{channels[1]},{channels[2]})'
+    return f'{fusion_type.upper()}({",".join(str(c) for c in channels)})'
 
 
 __all__ = [

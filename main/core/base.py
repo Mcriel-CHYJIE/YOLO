@@ -108,7 +108,7 @@ QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal{{width:0;}}
 
 # ── 共享常量 ──
 VIDEO_EXTS = ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm')
-MODEL_FILTER = 'PyTorch (*.pt)'
+MODEL_FILTER = 'PyTorch (*.pt);;ONNX (*.onnx)'
 CLASS_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444',
                 '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
 

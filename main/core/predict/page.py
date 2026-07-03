@@ -13,6 +13,153 @@ from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QTextEdit
 from .service import Detector
 from .service import run_batch_inference
+from ultralytics import YOLO
+
+
+class HeatClassSelector(QGroupBox):
+    """类别选择器 — 载入模型时自动识别类别，按列排开带复选框"""
+    def __init__(self, save_callback=None):
+        super().__init__('Heat Classes')
+        self._save_callback = save_callback
+        self._checkboxes = {}  # class_id -> QCheckBox
+        lo = QVBoxLayout(self)
+        lo.setContentsMargins(6, 12, 6, 6)
+        lo.setSpacing(2)
+
+        # ── 顶行：提示 + 保存按钮 ──
+        top_row = QWidget()
+        tr_lo = QHBoxLayout(top_row)
+        tr_lo.setContentsMargins(0, 0, 0, 0); tr_lo.setSpacing(4)
+        self._hint = QLabel('Load model to show classes')
+        self._hint.setStyleSheet(
+            f'font-size:8px;color:{TEXT3};background:transparent;')
+        tr_lo.addWidget(self._hint, 1)
+        self._btn_save_heat = QPushButton('Save Heat')
+        self._btn_save_heat.setFixedHeight(22)
+        self._btn_save_heat.setStyleSheet(
+            'QPushButton{font-size:9px;padding:0 8px;}')
+        self._btn_save_heat.clicked.connect(self._on_save_heat)
+        tr_lo.addWidget(self._btn_save_heat)
+        lo.addWidget(top_row)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll.setStyleSheet('QScrollArea{border:none;background:transparent;}')
+        self._container = QWidget()
+        self._container.setStyleSheet('background:transparent;')
+        self._grid = QGridLayout(self._container)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(2)
+        self._scroll.setWidget(self._container)
+        self._scroll.setFixedHeight(70)
+        lo.addWidget(self._scroll)
+
+    def set_classes(self, names: dict):
+        """设置类别 dict {id: name}"""
+        self._checkboxes.clear()
+        while self._grid.count():
+            item = self._grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not names:
+            self._hint.setText('Load model to show classes')
+            return
+
+        self._hint.setText('Select classes for heatbar')
+
+        cols = 3
+        for i, cid in enumerate(sorted(names.keys())):
+            name = names[cid]
+            cell = QWidget()
+            cl = QHBoxLayout(cell)
+            cl.setContentsMargins(2, 0, 2, 0); cl.setSpacing(3)
+            lbl = QLabel(f'{cid}:{name}')
+            lbl.setStyleSheet(
+                f'font-size:9px;color:{TEXT};background:transparent;')
+            cl.addWidget(lbl, 1)
+            cb = QCheckBox()
+            cb.setChecked(False)
+            cb.setFixedWidth(16)
+            cl.addWidget(cb)
+            self._grid.addWidget(cell, i // cols, i % cols)
+            self._checkboxes[cid] = cb
+
+    def get_selected_ids(self) -> set:
+        """返回选中类别的 ID 集合"""
+        return {cid for cid, cb in self._checkboxes.items() if cb.isChecked()}
+
+    def _on_save_heat(self):
+        """保存热度条图片"""
+        if self._save_callback:
+            self._save_callback()
+
+
+class HeatBar(QWidget):
+    """检测热度条 — 用 numpy 按帧绘制绿/红像素列"""
+    def __init__(self):
+        super().__init__()
+        self.setFixedHeight(16)
+        self.setMinimumHeight(16)
+        self._data = []         # [(fraction, density), ...]
+        self._total_frames = 0
+        self._pixmap = None
+
+    def reset(self, total_frames=0):
+        self._data = []
+        self._total_frames = total_frames
+        self._pixmap = None
+        self.update()
+
+    def add_frame(self, idx, det_count, total):
+        if total == 0:
+            return
+        self._total_frames = total
+        density = min(det_count / max(total / max(len(self._data) + 1, 1), 1) * 5, 1.0)
+        self._data.append((idx / total, density))
+        self._rebuild_pixmap()
+
+    def _render_numpy(self, width, height):
+        import numpy as np
+        bar = np.full((height, width, 3), 42, dtype=np.uint8)
+        if not self._data:
+            return bar
+        n = len(self._data)
+        for i, (frac, density) in enumerate(self._data):
+            col = int(frac * width)
+            if i + 1 < n:
+                col_end = int(self._data[i + 1][0] * width)
+            else:
+                col_end = width
+            if col_end <= col:
+                col_end = col + 1
+            color = (0, 255, 0) if density == 0 else (0, 0, 255)
+            bar[:, col:col_end] = color
+        return bar
+
+    def _rebuild_pixmap(self):
+        w = max(self.width(), 1)
+        h = self.height()
+        np_img = self._render_numpy(w, h)
+        img = QImage(np_img.data, w, h, w * 3, QImage.Format_RGB888)
+        self._pixmap = QPixmap.fromImage(img)
+        self.update()
+
+    def paintEvent(self, event):
+        if self._pixmap is not None:
+            QPainter(self).drawPixmap(0, 0, self._pixmap)
+        else:
+            p = QPainter(self)
+            p.fillRect(0, 0, self.width(), self.height(), QColor(0x2a, 0x2a, 0x2a))
+            p.end()
+
+    def save_image(self, path, width=1920):
+        if not self._data:
+            return False
+        bar = self._render_numpy(width, 60)
+        import cv2
+        return cv2.imwrite(path, bar)
 
 
 class PredictTab(QWidget):
@@ -57,7 +204,7 @@ class PredictTab(QWidget):
             w.deleteLater()
 
         # ── 热力图开关（预先创建，供 Export 行和 Control 共用）──
-        self.btn_hm = ToggleSwitch(checked=True)
+        self.btn_hm = ToggleSwitch(checked=False)
         self.btn_hm.toggled.connect(self._toggle_hm)
 
         # ── 累计 + 当前帧分左右（样式一致）──
@@ -125,57 +272,75 @@ class PredictTab(QWidget):
         self._details_log.document().setMaximumBlockCount(0)
         stats_lo.addWidget(self._details_log, 1)
 
-        self.cb_export = ToggleSwitch(checked=True)
+        self.cb_loop = ToggleSwitch(checked=False)
         idx = self.exportRowLo.indexOf(self.exportToggleHolder)
         self.exportRowLo.removeWidget(self.exportToggleHolder)
         self.exportToggleHolder.deleteLater()
-        self.exportRowLo.insertWidget(idx, self.cb_export)
-        self.cb_export.toggled.connect(lambda on: self.exportPath.setText('') if not on else None)
+        loop_lbl = QLabel('Loop')
+        loop_lbl.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
+        self.exportRowLo.insertWidget(idx, loop_lbl)
+        self.exportRowLo.insertWidget(idx + 1, self.cb_loop)
+        self.cb_loop.toggled.connect(lambda on: None)
 
-        # 热力图开关放在 Export 右边
+        # ── 浏览按钮换图标 ──
+        for btn in [self.modelBrowseBtn, self.srcBrowseBtn]:
+            btn.setText('📁')
+            btn.setFixedSize(24, 22)
+            btn.setStyleSheet(
+                f'QPushButton{{background:{CARD};border:1px solid {BORDER};'
+                f'border-radius:3px;font-size:12px;padding:0;}}'
+                f'QPushButton:hover{{background:{BTN_HOVER};}}')
+
+        # 热力图开关放在右边
         hm_lbl = QLabel('Heatmap')
         hm_lbl.setStyleSheet(
             f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
         self.exportRowLo.addWidget(hm_lbl)
         self.exportRowLo.addWidget(self.btn_hm)
 
-        # 进度条高度修正在这里
-        self.progress_bar_p.setFixedHeight(6)
-        self.progress_bar_p.setStyleSheet(
-            'QProgressBar{border:none;border-radius:1px;background:%s;text-align:center;}'
-            'QProgressBar::chunk{background:%s;border-radius:1px;}' % (BORDER, PRI))
-
-        # ── Pause + Run Batch 放同一行 ──
+        # ── 所有按钮 + Export 放同一行 ──
         ctrl_lo = self.controlGroupP.layout()
-        # 找到 btn_pause 和 btn_run 的位置，移除后放入新行
-        pause_idx = -1; run_idx = -1
-        for i in range(ctrl_lo.count()):
-            w = ctrl_lo.itemAt(i).widget()
-            if w is self.btn_pause: pause_idx = i
-            if w is self.btn_run: run_idx = i
-        if pause_idx >= 0 and run_idx >= 0:
-            ctrl_lo.removeWidget(self.btn_pause)
-            ctrl_lo.removeWidget(self.btn_run)
-            row = QWidget()
-            rl = QHBoxLayout(row)
-            rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(4)
-            self.btn_pause.setStyleSheet('padding:4px 10px;font-size:10px;')
-            rl.addWidget(self.btn_pause)
-            self.btn_run.setStyleSheet('padding:4px 10px;font-size:10px;')
-            rl.addWidget(self.btn_run)
-            ctrl_lo.insertWidget(min(pause_idx, run_idx), row)
+        # 移除旧布局中所有子项
+        while ctrl_lo.count():
+            item = ctrl_lo.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        self.btn_run.setVisible(False)
 
-        # ── 循环播放开关 ──
-        loop_row = QWidget()
-        lr_lo = QHBoxLayout(loop_row)
-        lr_lo.setContentsMargins(0, 0, 0, 0); lr_lo.setSpacing(4)
-        loop_lbl = QLabel('Loop')
-        loop_lbl.setStyleSheet(f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
-        self.cb_loop = ToggleSwitch(checked=False)
-        lr_lo.addWidget(loop_lbl)
-        lr_lo.addStretch()
-        lr_lo.addWidget(self.cb_loop)
-        ctrl_lo.addWidget(loop_row)
+        btn_row = QWidget()
+        br_lo = QHBoxLayout(btn_row)
+        br_lo.setContentsMargins(0, 0, 0, 0); br_lo.setSpacing(4)
+        for b in [self.btn_start, self.btn_stop, self.btn_pause]:
+            b.setStyleSheet('padding:4px 10px;font-size:10px;')
+            br_lo.addWidget(b, 1)
+        br_lo.addStretch()
+        export_lbl = QLabel('Export')
+        export_lbl.setStyleSheet(
+            f'font-size:9px;color:{TEXT3};font-weight:500;background:transparent;')
+        br_lo.addWidget(export_lbl)
+        self.cb_export = ToggleSwitch(checked=True)
+        br_lo.addWidget(self.cb_export)
+        ctrl_lo.addWidget(btn_row)
+
+        # ── 删除残留的旧控件 ──
+        self.btn_run.deleteLater()
+        if hasattr(self, 'progress_bar_p'):
+            self.progress_bar_p.deleteLater()
+
+        # ── 类别选择器（插入 leftPanel，controlGroupP 与 statsGroupP 之间）──
+        self._heat_class_selector = HeatClassSelector(save_callback=self._save_heatbar)
+        left_lo = self.leftPanel.layout()
+        stats_idx = -1
+        for i in range(left_lo.count()):
+            w = left_lo.itemAt(i).widget()
+            if w is self.statsGroupP:
+                stats_idx = i
+                break
+        if stats_idx >= 0:
+            left_lo.insertWidget(stats_idx, self._heat_class_selector)
+
+        # StatsGroupP 中原本要移除的占位控件（保留原逻辑）
 
         # ── 右侧
         self._stack_layout_idx = None
@@ -249,6 +414,10 @@ class PredictTab(QWidget):
         self._progress_preview.sliderReleased.connect(self._on_seek_end)
         self._progress_preview.sliderMoved.connect(self._on_seek_moved)
         pc_lo.addWidget(self._progress_preview)
+
+        # ── 检测热度条（预览区下方常显）──
+        self._heatbar = HeatBar()
+        pc_lo.addWidget(self._heatbar)
 
         pc_lo.addWidget(self._status_bar)
 
@@ -371,12 +540,12 @@ class PredictTab(QWidget):
         self.btn_stop.clicked.connect(self._stop_run)
         self.btn_pause.setEnabled(False)
         self.btn_pause.clicked.connect(self._toggle_pause)
-        self.btn_run.setObjectName('pri')
-        self.btn_run.clicked.connect(self._run_batch)
 
     def _load_latest(self):
         w = find_latest_best()
-        if w: self.lbl_model.setText(f'[{Path(w).name}]'); self._model_path = Path(w)
+        if w:
+            self.lbl_model.setText(f'[{Path(w).name}]'); self._model_path = Path(w)
+            self._load_model_classes(self._model_path)
 
     def _browse_model(self):
         opts = QFileDialog.Options()
@@ -386,6 +555,22 @@ class PredictTab(QWidget):
             self._model_path = Path(p)
             self.lbl_model.setText(f'[{self._model_path.name}]')
             self.studio.log_operation('Predict', f'选择模型 · {self._model_path.name}')
+            self._load_model_classes(self._model_path)
+
+    def _load_model_classes(self, path):
+        """从模型读取类别名并填充类别选择器"""
+        if not path or not path.exists():
+            return
+        try:
+            model = YOLO(str(path))
+            names = getattr(model, 'names', None) or {}
+            if not names:
+                # ONNX 等无类别元数据的模型，默认单类
+                names = {0: 'object'}
+            self._heat_class_selector.set_classes(names)
+            self.studio.log_operation('Predict', f'模型类别: {len(names)} 类')
+        except Exception as e:
+            self.studio.log_operation('Predict', f'读取模型类别失败: {e}')
 
     def _browse_src(self):
         menu = QMenu(self)
@@ -414,20 +599,21 @@ class PredictTab(QWidget):
     def _show_video_controls(self):
         self.stack.setCurrentIndex(0)
         for w in [self.btn_start, self.btn_stop, self.btn_pause]: w.setVisible(True)
-        self.btn_run.setVisible(False)
-        self.progress_bar_p.setValue(0); self.progress_bar_p.setVisible(True)
 
     def _show_batch_controls(self):
         self.stack.setCurrentIndex(1)
         for w in [self.btn_start, self.btn_stop, self.btn_pause]: w.setVisible(False)
-        self.btn_run.setVisible(True)
-        self.progress_bar_p.setVisible(False)
 
     def _toggle_start(self):
         if not self._model_path or not self._model_path.exists():
             QMessageBox.warning(self, 'Warning', 'Please select a model first'); return
         if not self._source_path or not self._source_path.exists():
-            QMessageBox.warning(self, 'Warning', 'Please select a video first'); return
+            QMessageBox.warning(self, 'Warning', 'Please select images/video first'); return
+        # 图片/文件夹模式 → 批量推理
+        if self._mode in ('image', 'folder'):
+            self._run_batch_inline()
+            return
+        # 视频模式切换暂停
         if self._worker and self._worker.isRunning():
             self._worker.toggle_pause(); self.btn_pause.setText('Resume' if self._worker._pause_event.is_set() else 'Pause'); return
         export_path = None
@@ -436,21 +622,22 @@ class PredictTab(QWidget):
             fn = str(d / f"detected_{self._source_path.stem}_{datetime.now().strftime('%m%d_%H%M%S')}.mp4")
             export_path, _ = QFileDialog.getSaveFileName(self, 'Save Detected Video', fn, 'Video Files (*.mp4 *.avi)')
             if not export_path: return
-            self.exportPath.setText(export_path)
         else:
-            self.exportPath.clear()
+            pass
 
         self._worker = Detector(
             self._model_path, self._source_path,
             self.sp_conf.value(), self.sp_iou.value(),
             show_heatmap=self.btn_hm.isChecked(),
-            loop=self.cb_loop.isChecked())
+            loop=self.cb_loop.isChecked(),
+            heat_target_ids=self._heat_class_selector.get_selected_ids())
         self._worker_run_id += 1
         _rid = self._worker_run_id
         self._worker.frame_ready.connect(self._on_frame)
         self._worker.fps_updated.connect(lambda v: self._sb_fps.setText(f'FPS: {v:.0f}'))
         self._worker.stats_updated.connect(self._on_stats)
         self._worker.details_ready.connect(self._on_details)
+        self._worker.heat_signal.connect(self._heatbar.add_frame)
         self._worker.finished.connect(lambda rid=_rid: self._on_finish(rid))
         self._worker.log_signal.connect(lambda m: self.log.setText(m))
         self.btn_start.setEnabled(False); self.btn_stop.setEnabled(True); self.btn_pause.setEnabled(True)
@@ -459,9 +646,54 @@ class PredictTab(QWidget):
         self.lbl_cls.setText('Detecting...'); self._details_log.clear()
         self._sb_fps.setText('FPS: 0'); self._sb_dets.setText('Detections: 0'); self._sb_curr.setText('Current: 0')
         self._spin_frame.setValue(0)
+        self._heatbar.reset()
         self._worker.export_path = export_path
         self._worker.start()
         self.studio.log_operation('Predict', f'视频检测开始 · {self._source_path.name}')
+
+    def _run_batch_inline(self):
+        """图片/文件夹批量推理（原 _run_batch 逻辑）"""
+        w = self._model_path; src = self._source_path
+        self.log_view.clear()
+        self.log_view.append('Running batch inference...'); QApplication.processEvents()
+        self.btn_start.setEnabled(False)
+        self.studio.log_operation('Predict', f'批量检测开始 · {src.name if src.is_file() else src.stem}')
+
+        try:
+            result = run_batch_inference(
+                w, src, self.sp_conf.value(), self.sp_iou.value(),
+                self.studio.gpu_ok, self.cb_export.isChecked())
+            self._image_results = result['results']
+            self._heatmaps = result.get('heatmaps', [])
+            self._featuremaps = result.get('featuremaps', [])
+            self._fm_layers_all = result.get('fm_layers_all', [])
+            self._current_image_idx = 0
+
+            if result['cls_counts']:
+                t = sum(result['cls_counts'].values())
+                rows = []
+                for name, count in sorted(result['cls_counts'].items(), key=lambda x: -x[1]):
+                    pct = count / t * 100
+                    bar = max(1, int(pct * 0.5))
+                    rows.append(f'<tr><td style="padding:1px 4px;white-space:nowrap;">● {name}</td><td align="right" style="padding:1px 4px;font-weight:600;">{count}</td><td align="right" style="padding:1px 4px;color:#78716c;">{pct:.0f}%</td></tr>')
+                self.lbl_cls.setText('<table style="width:100%;font-size:9px;color:#1c1917;border-collapse:collapse;">' + ''.join(rows) + '</table>')
+            else:
+                self.lbl_cls.setText('No detections')
+            self.log_view.append(f'Done! {result["total_imgs"]} sources, {result["total_dets"]} detections')
+            if result['save_dir']:
+                self.log_view.append(f'   Saved: {result["save_dir"]}')
+            else:
+                pass
+            sv = result.get('saved_views_dir', '')
+            if sv:
+                self.log_view.append(f'   4-views: {sv}')
+            if result['total_imgs'] > 0: self._show_image_preview(0)
+            self.studio.log_operation('Predict', f'批量检测完成 · {result["total_imgs"]} 源, {result["total_dets"]} 检测')
+        except Exception as e:
+            import traceback; traceback.print_exc(); self.log_view.append(f'Error: {e}')
+            self.studio.log_operation('Predict', f'批量检测失败 · {e}')
+        finally:
+            self.btn_start.setEnabled(True)
 
     def _toggle_pause(self):
         if self._worker and self._worker.isRunning():
@@ -479,7 +711,7 @@ class PredictTab(QWidget):
     def _stop_run(self):
         if self._worker and self._worker.isRunning():
             self._worker.stop(); self.log.setText('Stopped')
-            self.progress_bar_p.setValue(0)
+            self._heatbar.reset()
             self.studio.log_operation('Predict', '视频检测已停止')
 
     def _on_seek_start(self):
@@ -516,11 +748,9 @@ class PredictTab(QWidget):
                     frame.strides[0], QImage.Format_RGB888)
         self.video_view.setPixmap(QPixmap.fromImage(qi))
         self.video_view.setStyleSheet('')
-        if total > 0:
+        if total > 0 and not self._seeking:
             pct = int(idx / total * 100)
-            self.progress_bar_p.setValue(pct)
-            if not self._seeking:
-                self._progress_preview.setValue(pct)
+            self._progress_preview.setValue(pct)
 
     def _on_stats(self, stats):
         for k, v in stats.items():
@@ -573,49 +803,20 @@ class PredictTab(QWidget):
         self.btn_start.setText('Restart'); self._worker = None
         self.studio.log_operation('Predict', '视频检测完成 ✓')
 
-    def _run_batch(self):
-        w = self._model_path; src = self._source_path
-        if not w or not w.exists(): QMessageBox.warning(self, 'Warning', 'Please select a model first'); return
-        if not src or not src.exists(): QMessageBox.warning(self, 'Warning', 'Please select images/folder first'); return
-        self.log_view.clear(); self.btn_run.setEnabled(False)
-        self.log_view.append('Running batch inference...'); QApplication.processEvents()
-        self.studio.log_operation('Predict', f'批量检测开始 · {src.name if src.is_file() else src.stem}')
-
-        try:
-            result = run_batch_inference(
-                w, src, self.sp_conf.value(), self.sp_iou.value(),
-                self.studio.gpu_ok, self.cb_export.isChecked())
-            self._image_results = result['results']
-            self._heatmaps = result.get('heatmaps', [])
-            self._featuremaps = result.get('featuremaps', [])
-            self._fm_layers_all = result.get('fm_layers_all', [])
-            self._current_image_idx = 0
-            
-            if result['cls_counts']:
-                t = sum(result['cls_counts'].values())
-                rows = []
-                for name, count in sorted(result['cls_counts'].items(), key=lambda x: -x[1]):
-                    pct = count / t * 100
-                    bar = max(1, int(pct * 0.5))
-                    rows.append(f'<tr><td style="padding:1px 4px;white-space:nowrap;">● {name}</td><td align="right" style="padding:1px 4px;font-weight:600;">{count}</td><td align="right" style="padding:1px 4px;color:#78716c;">{pct:.0f}%</td></tr>')
-                self.lbl_cls.setText('<table style="width:100%;font-size:9px;color:#1c1917;border-collapse:collapse;">' + ''.join(rows) + '</table>')
-            else:
-                self.lbl_cls.setText('No detections')
-            self.log_view.append(f'Done! {result["total_imgs"]} sources, {result["total_dets"]} detections')
-            if result['save_dir']:
-                self.log_view.append(f'   Saved: {result["save_dir"]}')
-                self.exportPath.setText(result['save_dir'])
-            else:
-                self.exportPath.clear()
-            sv = result.get('saved_views_dir', '')
-            if sv:
-                self.log_view.append(f'   4-views: {sv}')
-            if result['total_imgs'] > 0: self._show_image_preview(0)
-            self.studio.log_operation('Predict', f'批量检测完成 · {result["total_imgs"]} 源, {result["total_dets"]} 检测')
-        except Exception as e:
-            import traceback; traceback.print_exc(); self.log_view.append(f'Error: {e}')
-            self.studio.log_operation('Predict', f'批量检测失败 · {e}')
-        finally: self.btn_run.setEnabled(True)
+    def _save_heatbar(self):
+        """保存热度条到 predict_output 目录"""
+        from main.config import load_paths
+        out_dir = Path(load_paths().get('predict_output', ''))
+        if not out_dir.exists():
+            out_dir = Path.cwd()
+        model_name = self._model_path.stem if self._model_path else 'unknown'
+        ts = datetime.now().strftime('%m%d_%H%M')
+        filename = f'{model_name}_{ts}.png'
+        path = str(out_dir / filename)
+        if self._heatbar.save_image(path):
+            self.studio.log_operation('Predict', f'热度条已保存: {filename}')
+        else:
+            self.studio.log_operation('Predict', '热度条保存失败（无数据）')
 
     def _show_image_preview(self, idx):
         self._current_image_idx = idx

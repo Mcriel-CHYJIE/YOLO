@@ -136,10 +136,11 @@ class Detector(QObject):
     frame_ready = pyqtSignal(np.ndarray, int, int)
     fps_updated = pyqtSignal(float); stats_updated = pyqtSignal(dict)
     details_ready = pyqtSignal(list)
+    heat_signal = pyqtSignal(int, int, int)  # idx, det_count, total
     log_signal = pyqtSignal(str); finished = pyqtSignal()
 
     def __init__(self, model_path, video_path, conf=0.25, iou=0.45, target_fps=None,
-                 show_heatmap=False, loop=False):
+                 show_heatmap=False, loop=False, heat_target_ids=None):
         super().__init__()
         self.model_path = Path(model_path); self.video_path = Path(video_path)
         self.conf = conf; self.iou = iou
@@ -148,6 +149,7 @@ class Detector(QObject):
         self.export_path = None; self.target_fps = target_fps
         self._show_heatmap = show_heatmap
         self._loop = loop
+        self._heat_target_ids = heat_target_ids or set()
         self._seek_target = -1
         self._thread = None
 
@@ -230,11 +232,15 @@ class Detector(QObject):
                 now = datetime.now(); fps_val = 1.0 / max((now - t_prev).total_seconds(), 0.001); t_prev = now
                 stats = {}
                 dets = []
+                heat_det_count = 0
                 if results.boxes is not None:
                     for cls_id, conf in zip(results.boxes.cls, results.boxes.conf):
-                        name = model.names.get(int(cls_id), f'cls_{int(cls_id)}')
+                        cid = int(cls_id)
+                        name = model.names.get(cid, f'cls_{cid}')
                         stats[name] = stats.get(name, 0) + 1
                         dets.append(f'{name} {conf:.2f}')
+                        if not self._heat_target_ids or cid in self._heat_target_ids:
+                            heat_det_count += 1
                 line = f'[{idx}/{total}]'
                 if dets:
                     line += '  ' + ' | '.join(dets)
@@ -243,6 +249,7 @@ class Detector(QObject):
                 self.frame_ready.emit(display_frame, idx, total)
                 self.fps_updated.emit(fps_val); self.stats_updated.emit(stats)
                 self.details_ready.emit([line])
+                self.heat_signal.emit(idx, heat_det_count, total)
             if writer is not None: writer.release(); self.log_signal.emit(f' Video saved: {Path(self.export_path).name}')
             cap.release()
         except Exception as e:

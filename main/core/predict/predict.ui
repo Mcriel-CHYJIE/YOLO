@@ -33,8 +33,8 @@
 
     <item>
      <widget class="QWidget" name="leftPanel" native="true">
-     <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
-     <property name="maximumSize"><size><width>280</width><height>16777215</height></size></property>
+     <property name="minimumSize"><size><width>320</width><height>0</height></size></property>
+     <property name="maximumSize"><size><width>320</width><height>16777215</height></size></property>
      <layout class="QVBoxLayout" name="leftLo">
       <property name="leftMargin">
        <number>0</number>
@@ -52,71 +52,65 @@
 
       <item><widget class="QGroupBox" name="inputGroup">
        <property name="title"><string>Input</string></property>
-       <layout class="QVBoxLayout" name="inputLo">
+       <layout class="QHBoxLayout" name="inputLo">
         <property name="leftMargin">
-       <number>8</number>
+       <number>6</number>
       </property><property name="topMargin">
-       <number>12</number>
+       <number>8</number>
       </property>
         <property name="rightMargin">
-       <number>8</number>
+       <number>6</number>
       </property><property name="bottomMargin">
-       <number>8</number>
+       <number>6</number>
       </property>
         <property name="spacing">
-       <number>4</number>
+       <number>3</number>
       </property>
         <item><widget class="QLabel" name="modelLabelP">
-         <property name="text"><string>Model Weights</string></property>
+         <property name="text"><string>Model</string></property>
          <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
         </widget></item>
-        <item><layout class="QHBoxLayout" name="modelRowP">
-         <item><widget class="QLabel" name="lbl_model">
-          <property name="text"><string>Not selected</string></property>
-          <property name="styleSheet"><string>font-size:10px;color:#a8a29e;</string></property>
-         </widget></item>
-         <item><widget class="QPushButton" name="modelBrowseBtn">
-          <property name="text"><string>Browse</string></property>
-         </widget></item>
-        </layout></item>
+        <item><widget class="QLabel" name="lbl_model">
+         <property name="text"><string>Not selected</string></property>
+         <property name="styleSheet"><string>font-size:9px;color:#a8a29e;</string></property>
+        </widget></item>
+        <item><widget class="QPushButton" name="modelBrowseBtn">
+         <property name="text"><string></string></property>
+        </widget></item>
         <item><widget class="QLabel" name="srcLabelP">
-         <property name="text"><string>Source</string></property>
+         <property name="text"><string>Src</string></property>
          <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
         </widget></item>
-        <item><layout class="QHBoxLayout" name="srcRowP">
-         <item><widget class="QLineEdit" name="lbl_src">
-          <property name="placeholderText"><string>Image / Video / Folder</string></property>
-         </widget></item>
-         <item><widget class="QPushButton" name="srcBrowseBtn">
-          <property name="text"><string>Browse</string></property>
-         </widget></item>
-        </layout></item>
+        <item><widget class="QLineEdit" name="lbl_src">
+         <property name="placeholderText"><string>Image/Video/Folder</string></property>
+        </widget></item>
+        <item><widget class="QPushButton" name="srcBrowseBtn">
+         <property name="text"><string></string></property>
+        </widget></item>
        </layout>
       </widget></item>
 
       <item><widget class="QGroupBox" name="paramsGroupP">
        <property name="title"><string>Parameters</string></property>
-       <layout class="QGridLayout" name="paramsGridP">
+       <layout class="QHBoxLayout" name="paramsGridP">
         <property name="leftMargin">
        <number>6</number>
       </property><property name="topMargin">
-       <number>12</number>
+       <number>8</number>
       </property>
         <property name="rightMargin">
        <number>6</number>
       </property><property name="bottomMargin">
        <number>6</number>
       </property>
-        <property name="horizontalSpacing">
-       <number>3</number>
-      </property><property name="verticalSpacing">
+        <property name="spacing">
        <number>3</number>
       </property>
-        <item row="0" column="0"><widget class="QLabel" name="confLabel">
+        <item><widget class="QLabel" name="confLabel">
          <property name="text"><string>Conf</string></property>
          <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
         </widget></item>
-        <item row="0" column="1"><widget class="QDoubleSpinBox" name="sp_conf">
+        <item><widget class="QDoubleSpinBox" name="sp_conf">
          <property name="decimals">
        <number>2</number>
       </property>
@@ -132,11 +126,11 @@
        <double>0.25</double>
       </property>
         </widget></item>
-        <item row="0" column="2"><widget class="QLabel" name="iouLabelP">
+        <item><widget class="QLabel" name="iouLabelP">
          <property name="text"><string>IoU</string></property>
          <property name="styleSheet"><string>font-size:9px;color:#78716c;font-weight:500;</string></property>
         </widget></item>
-        <item row="0" column="3"><widget class="QDoubleSpinBox" name="sp_iou">
+        <item><widget class="QDoubleSpinBox" name="sp_iou">
          <property name="decimals">
        <number>2</number>
       </property>
@@ -152,32 +146,23 @@
        <double>0.45</double>
       </property>
         </widget></item>
-        <item row="1" column="0" colspan="4">
+        <item>
          <widget class="QWidget" name="exportRow" native="true">
           <layout class="QHBoxLayout" name="exportRowLo">
            <property name="leftMargin">
-       <number>6</number>
+       <number>0</number>
       </property><property name="topMargin">
-       <number>1</number>
+       <number>0</number>
       </property>
            <property name="rightMargin">
-       <number>6</number>
+       <number>0</number>
       </property><property name="bottomMargin">
-       <number>1</number>
+       <number>0</number>
       </property>
            <property name="spacing">
-       <number>4</number>
-      </property>
-           <item><widget class="QLabel" name="exportLabel">
-            <property name="text"><string>Export</string></property>
-            <property name="styleSheet"><string>font-size:9px;color:#1c1917;font-weight:500;</string></property>
-           </widget></item>
+        <number>4</number>
+       </property>
            <item><widget class="QWidget" name="exportToggleHolder" native="true"/></item>
-           <item><widget class="QLineEdit" name="exportPath">
-            <property name="readOnly"><bool>true</bool></property>
-            <property name="placeholderText"><string>Save path</string></property>
-            <property name="styleSheet"><string>font-size:8px;color:#a8a29e;border:none;background:transparent;padding:0 2px;</string></property>
-           </widget></item>
           </layout>
          </widget>
         </item>
